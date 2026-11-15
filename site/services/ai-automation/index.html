@@ -18,7 +18,7 @@
   .crumb a { color: var(--ink-3); } .crumb a:hover { color: var(--clay); }
   .hero.svc h1 { font-size: clamp(46px, 5.6vw, 84px); }
   .hero.svc .statue { object-position: center bottom; }
-  .gear-glow { position: absolute; left: 52%; top: 36%; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(255,150,80,.55), rgba(255,150,80,0) 70%); filter: blur(8px); animation: breathe2 3s ease-in-out infinite; pointer-events: none; mix-blend-mode: multiply; }
+  .gear-glow { position: absolute; left: 60%; top: 50%; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(255,150,80,.55), rgba(255,150,80,0) 70%); filter: blur(8px); animation: breathe2 3s ease-in-out infinite; pointer-events: none; mix-blend-mode: multiply; }
   @keyframes breathe2 { 50% { transform: scale(1.35); opacity: .6; } }
   /* viz: response time */
   .viz-resp .row { display: grid; grid-template-columns: 92px 1fr 64px; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-3); margin: 6px 0; }
@@ -112,7 +112,7 @@
       <div class="stage" id="stage">
         <div class="sun"></div>
         <div class="sun-rays"></div>
-        <img class="statue" src="/img/talos.webp" alt="Marble statue of Talos, the self-moving machine of Greek myth, with brass gears in his chest" width="900" height="1125">
+        <img class="statue" src="/img/talos.webp" alt="Marble statue of Talos holding a glowing brass clockwork of gears" width="900" height="1125">
         <div class="gear-glow" aria-hidden="true"></div>
         <div class="chip f1" style="--fd:0s"><span class="ck"><svg viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></svg></span><span><b>Lead answered</b><small>2:00 AM · 44 sec</small></span></div>
         <div class="chip f2" style="--fd:1.2s"><span class="ck"><svg viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></svg></span><span><b>CRM updated</b><small>no copy-paste</small></span></div>
