@@ -92,6 +92,18 @@
   });
   $$('.mnav a').forEach(a => a.addEventListener('click', () => nav && nav.classList.remove('menu-open')));
 
+
+  /* before/after toggle */
+  $$('.ba').forEach(box => {
+    const btns = $$('.ba-tog button', box); let touched = false;
+    const set = v => { box.dataset.s = v; btns.forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v)); };
+    btns.forEach(b => b.addEventListener('click', () => { touched = true; set(b.dataset.v); }));
+    new IntersectionObserver((es, o) => es.forEach(e => {
+      if (!e.isIntersecting) return; o.disconnect();
+      setTimeout(() => { if (!touched) set('after'); }, reduce ? 0 : 1600);
+    }), { threshold: .55 }).observe(box);
+  });
+
   /* pointer effects */
   if (!reduce && matchMedia('(hover: hover)').matches) {
     $$('.tilt').forEach(c => {

@@ -65,12 +65,23 @@ def faq_block(title, faqs):
 '''
 
 
+INDUSTRIES = [("clinics", "Clinics", "Dental & medical"), ("home-services", "Home services", "HVAC, plumbing, roofing"),
+              ("real-estate", "Real estate", "Agents & brokerages"), ("law-firms", "Law firms", "Intake to case updates"),
+              ("ecommerce", "E-commerce", "Shopify & DTC brands"), ("accounting", "Accounting", "CPA & bookkeeping firms")]
+INDUSTRY_STRIP = ('  <section class="istrip wrap">\n    <h2 class="big rv">Built for <span class="clay">your industry.</span></h2>\n    <div class="igrid">'
+                  + "".join(f'<a class="icard rv" style="--d:{k*0.06:.2f}s" href="/solutions/{s}/"><b>{n}</b><small>{d}</small><span>→</span></a>' for k, (s, n, d) in enumerate(INDUSTRIES))
+                  + '</div>\n  </section>\n\n')
+
+
 def build(p):
     head = re.sub(r"<title>.*?</title>", f"<title>{p['title']}</title>", HEAD)
     head = re.sub(r'<meta name="description" content="[^"]*">', f'<meta name="description" content="{p["desc"]}">', head)
-    url = f"https://morningtelos.com/services/{p['slug']}/"
+    section = p.get("section", "services")
+    url = f"https://morningtelos.com/{section}/{p['slug']}/"
     schema = {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": a, "acceptedAnswer": {"@type": "Answer", "text": b}} for a, b in p["faqs"]]}
     svc = {"@context": "https://schema.org", "@type": "Service", "name": p["name"], "serviceType": p["service_type"], "provider": {"@type": "Organization", "name": "Morning Telos", "url": "https://morningtelos.com/"}, "url": url}
+    if p.get("audience"):
+        svc["audience"] = {"@type": "BusinessAudience", "audienceType": p["audience"]}
     extra = f'<link rel="canonical" href="{url}">\n<script type="application/ld+json">{json.dumps(schema)}</script>\n<script type="application/ld+json">{json.dumps(svc)}</script>\n<style>{p.get("css", "")}</style>\n'
     head = head.replace('<link rel="stylesheet" href="/assets/site.css">', '<link rel="stylesheet" href="/assets/site.css">\n' + extra)
 
@@ -90,7 +101,7 @@ def build(p):
   <section class="hero svc" id="hero">
     <div class="wrap">
       <div>
-        <div class="crumb rv"><a href="/">Home</a> / <a href="/#services">Services</a> / {p["name"]}</div>
+        <div class="crumb rv"><a href="/">Home</a> / {p.get("crumb", '<a href="/#services">Services</a>')} / {p["name"]}</div>
         <h1 aria-label="{p["h1_label"]}">
           {h1.strip()}
         </h1>
@@ -170,8 +181,8 @@ def build(p):
         for old, new in zip(["<h3>Telos Session</h3>", "<h3>Telos Audit</h3>", "<h3>Build</h3>", "<h3>Compound</h3>"], p["step_names"]):
             how = how.replace(old, new)
     final = FINAL.replace("<p>Tell us where your business is headed and where it is stuck. We'll map your highest-leverage first move.</p>", f"<p>{p['final_line']}</p>")
-    page = head + hero + LOGOS + stall + auto + p["signature"] + outc + how + RIBBONS + faq_block(p["faq_title"], p["faqs"]) + final + FOOTER
-    out = ROOT / "services" / p["slug"] / "index.html"
+    page = head + hero + LOGOS + stall + p.get("after_stall", "") + auto + p["signature"] + outc + how + p.get("before_faq", INDUSTRY_STRIP if section == "services" else "") + RIBBONS + faq_block(p["faq_title"], p["faqs"]) + final + FOOTER
+    out = ROOT / section / p["slug"] / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page)
     print("wrote", out.relative_to(ROOT.parent), len(page))

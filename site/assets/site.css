@@ -598,3 +598,18 @@
   .mnav-in .btn { margin-top: 18px; justify-content: center; }
 }
 @media (max-width: 640px) { .nav-cta .btn-dark { display: none; } }
+
+/* ---- industry / related-service strip ---- */
+.istrip { padding: 40px 0 110px; }
+.istrip h2 { margin-bottom: 36px; }
+.igrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.icard { position: relative; display: block; padding: 22px 54px 22px 22px; border-radius: 16px; border: 1px solid var(--line); background: var(--white); transition: border-color .3s, transform .4s var(--ease), box-shadow .4s; }
+.icard b { display: block; font-family: var(--serif); font-weight: 400; font-size: 24px; }
+.icard small { display: block; margin-top: 4px; font-size: 14px; color: var(--ink-3); }
+.icard span { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line-2); display: grid; place-items: center; transition: background .3s, color .3s, border-color .3s, transform .4s var(--ease); }
+.icard:hover { border-color: var(--clay-soft); transform: translateY(-3px); box-shadow: 0 24px 40px -30px rgba(20,20,19,.45); }
+.icard:hover span { background: var(--clay); border-color: var(--clay); color: #fff; transform: translateY(-50%) rotate(-45deg); }
+.foot-top { grid-template-columns: 1.3fr repeat(5, 1fr); }
+@media (max-width: 1080px) { .foot-top { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1000px) { .igrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .igrid { grid-template-columns: 1fr; } .foot-top { grid-template-columns: 1fr 1fr; } }
