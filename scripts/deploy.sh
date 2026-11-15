@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deploys the site to the Hostinger VPS as the "morningtelos" Docker project.
-# The VPS builds the image straight from the main branch on GitHub
-# (Dockerfile copies site/ into nginx), so push your changes first.
+# The container downloads site/ from the main branch on GitHub each time it
+# starts, so push your changes first.
 # Traefik (already on the VPS) routes morningtelos.com and handles SSL.
 # Usage: HOSTINGER_API_TOKEN=... scripts/deploy.sh
 set -euo pipefail
@@ -23,7 +23,7 @@ wait_for() {
 body=$(python3 -c 'import json; print(json.dumps({"project_name":"morningtelos","content":open("docker-compose.yml").read()}))')
 
 # Take down the old project if it exists, then create it fresh.
-# (Recreating rebuilds from GitHub and makes Traefik retry the SSL certificate.)
+# (Recreating pulls the latest site from GitHub and makes Traefik retry the SSL certificate.)
 if curl -sS "$API/docker/morningtelos" "${auth[@]}" | grep -q '"content":"services'; then
   id=$(curl -sS -X DELETE "$API/docker/morningtelos/down" "${auth[@]}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
   wait_for "$id"

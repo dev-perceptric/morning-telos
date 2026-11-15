@@ -1,10 +1,16 @@
 services:
   web:
-    build:
-      context: https://github.com/dev-perceptric/morning-telos.git#main
-    pull_policy: build
-    image: morningtelos-web
+    image: nginx:1.27-alpine
     restart: unless-stopped
+    # On every start, download the latest site/ folder from GitHub (main branch).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        set -e;
+        wget -qO /tmp/site.tgz https://codeload.github.com/dev-perceptric/morning-telos/tar.gz/refs/heads/main;
+        mkdir -p /tmp/src && tar -xzf /tmp/site.tgz -C /tmp/src;
+        rm -rf /usr/share/nginx/html/* && cp -r /tmp/src/*/site/. /usr/share/nginx/html/;
+        exec /docker-entrypoint.sh nginx -g 'daemon off;'
     labels:
       - traefik.enable=true
       - traefik.http.routers.morningtelos.rule=Host(`morningtelos.com`) || Host(`www.morningtelos.com`)
