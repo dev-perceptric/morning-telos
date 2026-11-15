@@ -34,11 +34,17 @@ PY
 )
 printf '%s\n' "$compose" > docker-compose.yml
 
+# Take down the old project if it exists, then create it fresh.
+# (Recreating also makes Traefik retry the SSL certificate.)
 if curl -sS "$API/morningtelos" -H "Authorization: Bearer $TOKEN" | grep -q '"content":"services'; then
-  method=PUT; url="$API/morningtelos/update"
-else
-  method=POST; url="$API"
+  id=$(curl -sS -X DELETE "$API/morningtelos/down" -H "Authorization: Bearer $TOKEN" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+  for _ in $(seq 1 30); do
+    state=$(curl -sS "${API%/docker}/actions/$id" -H "Authorization: Bearer $TOKEN" | python3 -c 'import sys,json;print(json.load(sys.stdin)["state"])')
+    [ "$state" = success ] && break
+    [ "$state" = error ] && { echo "down failed"; exit 1; }
+    sleep 3
+  done
 fi
 python3 -c 'import json,sys; print(json.dumps({"project_name":"morningtelos","content":open("docker-compose.yml").read()}))' \
-  | curl -sS -X "$method" "$url" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d @-
+  | curl -sS -X POST "$API" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d @-
 echo
