@@ -196,8 +196,17 @@
   .scard .more span { transition: transform .25s var(--ease); }
   .scard:hover .more span { transform: translateX(5px); }
 
+  /* breathing space after telos */
+  .breath { height: 55vh; background: linear-gradient(#f9eae0, var(--ivory) 85%); display: grid; place-items: center; align-content: center; gap: 14px; }
+  .breath-line { width: 1px; height: 120px; background: linear-gradient(var(--clay), rgba(217,119,87,0)); transform-origin: top; animation: breathe-line 2.4s var(--ease) infinite; }
+  .breath-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--clay); opacity: .6; animation: breathe-dot 2.4s var(--ease) infinite; }
+  @keyframes breathe-line { 0% { transform: scaleY(0); opacity: 1; } 60% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+  @keyframes breathe-dot { 0%, 40% { transform: translateY(-20px); opacity: 0; } 70% { transform: none; opacity: .7; } 100% { opacity: 0; } }
+  @media (max-width: 640px) { .breath { height: 38vh; } .breath-line { height: 80px; } }
+  @media (prefers-reduced-motion: reduce) { .breath { height: 25vh; } }
+
   /* where growth stalls: scroll timeline */
-  .stall { padding: 140px 0 120px; }
+  .stall { padding: 60px 0 120px; }
   .stall-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 72px; align-items: start; }
   .stall-side { position: sticky; top: 140px; }
   .stall-side .lead { margin-top: 22px; }
@@ -555,6 +564,8 @@
       <div class="telos-prog" aria-hidden="true"><div class="lbl"><span class="l1">Clearing the busywork</span><span class="l2">Telos set free ✓</span></div><div class="trk"><i></i></div></div>
     </div>
   </section>
+
+  <div class="breath" aria-hidden="true"><span class="breath-line"></span><span class="breath-dot"></span></div>
 
   <!-- 3. WHERE GROWTH STALLS -->
   <section class="stall" id="busy">
