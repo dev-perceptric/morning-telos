@@ -104,7 +104,7 @@ def build(p):
       <div class="stage" id="stage">
         <div class="sun"></div>
         <div class="sun-rays"></div>
-        <img class="statue" src="/img/{p["img"]}" alt="{p["img_alt"]}" width="900" height="1125">
+        <img class="statue" src="/img/{p["img"]}" alt="{p["img_alt"]}" width="900" height="{p.get("img_h", 1125)}">
         {glow}
         {chips}
       </div>
@@ -291,7 +291,7 @@ PAGES = [
         h1=("Software built around", "how you run."), h1_label="Custom business software built around how your business runs",
         lead="A custom software development agency for founders and operators. We build CRMs, internal tools, client portals and dashboards that fit your workflows, so your team stops working around the tools.",
         second_cta=("See an example", "demo"), proof="Free 30-minute call. We map what to build first.",
-        img="software.webp", img_alt="Marble statue of a young Greek man holding a glowing laptop", glow=("22%", "44%"),
+        img="software.webp", img_h=787, img_alt="Marble statue of a young Greek man holding a glowing laptop", glow=("70%", "62%"),
         chips=[("Orders dashboard", "one source of truth"), ("Client portal", "launched"), ("Spreadsheets", "retired"), ("Team access", "set by role")],
         stall_head='When the tools <span class="clay">stop fitting.</span>',
         stall_lead="Off-the-shelf apps get you started. As you grow, your team spends more time bending the tools than doing the work.",
