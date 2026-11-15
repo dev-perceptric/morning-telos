@@ -339,7 +339,7 @@ PAGES = [
         h1=("Systems that keep", "getting better."), h1_label="Managed AI automation and ongoing support on a monthly plan",
         lead="Managed AI automation services for founders and operators. On one monthly plan we monitor everything we build, fix issues fast, and ship new automations every month, so your systems compound instead of decay.",
         second_cta=("See a monthly report", "demo"), proof="Free 30-minute call. We review what you run today.",
-        img="atlas.webp", img_alt="Marble statue of a young Greek man carrying a globe of the Earth on his shoulder",
+        img="atlas.webp", img_h=692, img_alt="Marble statue of a young Greek man carrying a globe of the Earth on his shoulder",
         chips=[("Monitoring", "24/7"), ("Fix shipped", "same day"), ("New automation", "added this month"), ("Monthly report", "sent")],
         stall_head='Systems decay <span class="clay">without an owner.</span>',
         stall_lead="Tools change, APIs update and the business moves on. Without someone watching, good systems slowly stop working.",
