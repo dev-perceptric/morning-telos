@@ -472,6 +472,9 @@ page(
 )
 
 
+import solutions_more  # noqa: E402
+solutions_more.add(globals())
+
 if __name__ == "__main__":
     for p in PAGES:
         B.build(p)

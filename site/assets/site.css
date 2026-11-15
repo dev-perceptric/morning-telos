@@ -613,3 +613,6 @@
 @media (max-width: 1080px) { .foot-top { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 1000px) { .igrid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .igrid { grid-template-columns: 1fr; } .foot-top { grid-template-columns: 1fr 1fr; } }
+
+.dd-panel.wide { width: 780px; }
+.dd-grid.three { grid-template-columns: repeat(3, 1fr); }

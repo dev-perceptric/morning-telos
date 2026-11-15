@@ -65,9 +65,7 @@ def faq_block(title, faqs):
 '''
 
 
-INDUSTRIES = [("clinics", "Clinics", "Dental & medical"), ("home-services", "Home services", "HVAC, plumbing, roofing"),
-              ("real-estate", "Real estate", "Agents & brokerages"), ("law-firms", "Law firms", "Intake to case updates"),
-              ("ecommerce", "E-commerce", "Shopify & DTC brands"), ("accounting", "Accounting", "CPA & bookkeeping firms")]
+INDUSTRIES = [("clinics", "Clinics", "Dental &amp; medical"), ("home-services", "Home services", "HVAC, plumbing, roofing"), ("real-estate", "Real estate", "Agents &amp; brokerages"), ("law-firms", "Law firms", "Intake to case updates"), ("ecommerce", "E-commerce", "Shopify &amp; DTC brands"), ("accounting", "Accounting", "CPA &amp; bookkeeping firms"), ("fitness", "Fitness", "Gyms &amp; studios"), ("logistics", "Logistics", "Freight &amp; distribution"), ("agencies", "Agencies", "Marketing &amp; creative"), ("saas", "SaaS", "Startups &amp; software"), ("insurance", "Insurance", "Agencies &amp; brokers"), ("recruiting", "Recruiting", "Staffing &amp; search")]
 INDUSTRY_STRIP = ('  <section class="istrip wrap">\n    <h2 class="big rv">Built for <span class="clay">your industry.</span></h2>\n    <div class="igrid">'
                   + "".join(f'<a class="icard rv" style="--d:{k*0.06:.2f}s" href="/solutions/{s}/"><b>{n}</b><small>{d}</small><span>→</span></a>' for k, (s, n, d) in enumerate(INDUSTRIES))
                   + '</div>\n  </section>\n\n')
