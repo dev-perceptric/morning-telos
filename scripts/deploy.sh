@@ -1,50 +1,33 @@
 #!/usr/bin/env bash
-# Deploys site/ to the Hostinger VPS as the "morningtelos" Docker project.
+# Deploys the site to the Hostinger VPS as the "morningtelos" Docker project.
+# The VPS builds the image straight from the main branch on GitHub
+# (Dockerfile copies site/ into nginx), so push your changes first.
 # Traefik (already on the VPS) routes morningtelos.com and handles SSL.
 # Usage: HOSTINGER_API_TOKEN=... scripts/deploy.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VM_ID="${VM_ID:-2139771}"
 TOKEN="${HOSTINGER_API_TOKEN:-dummy}"
-API="https://developers.hostinger.com/api/vps/v1/virtual-machines/$VM_ID/docker"
+API="https://developers.hostinger.com/api/vps/v1/virtual-machines/$VM_ID"
+auth=(-H "Authorization: Bearer $TOKEN")
 
-compose=$(python3 - <<'PY'
-import pathlib, textwrap
-html = pathlib.Path("site/index.html").read_text().replace("$", "$$")
-body = textwrap.indent(html, " " * 6)
-print(f"""services:
-  web:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    configs:
-      - source: index
-        target: /usr/share/nginx/html/index.html
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.morningtelos.rule=Host(`morningtelos.com`) || Host(`www.morningtelos.com`)
-      - traefik.http.routers.morningtelos.entrypoints=websecure
-      - traefik.http.routers.morningtelos.tls.certresolver=letsencrypt
-      - traefik.http.services.morningtelos.loadbalancer.server.port=80
-
-configs:
-  index:
-    content: |
-{body}""")
-PY
-)
-printf '%s\n' "$compose" > docker-compose.yml
-
-# Take down the old project if it exists, then create it fresh.
-# (Recreating also makes Traefik retry the SSL certificate.)
-if curl -sS "$API/morningtelos" -H "Authorization: Bearer $TOKEN" | grep -q '"content":"services'; then
-  id=$(curl -sS -X DELETE "$API/morningtelos/down" -H "Authorization: Bearer $TOKEN" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
-  for _ in $(seq 1 30); do
-    state=$(curl -sS "${API%/docker}/actions/$id" -H "Authorization: Bearer $TOKEN" | python3 -c 'import sys,json;print(json.load(sys.stdin)["state"])')
-    [ "$state" = success ] && break
-    [ "$state" = error ] && { echo "down failed"; exit 1; }
+wait_for() {
+  for _ in $(seq 1 100); do
+    state=$(curl -sS "$API/actions/$1" "${auth[@]}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["state"])')
+    case "$state" in success) return 0;; error) echo "action $1 failed"; return 1;; esac
     sleep 3
   done
+  echo "action $1 timed out"; return 1
+}
+
+body=$(python3 -c 'import json; print(json.dumps({"project_name":"morningtelos","content":open("docker-compose.yml").read()}))')
+
+# Take down the old project if it exists, then create it fresh.
+# (Recreating rebuilds from GitHub and makes Traefik retry the SSL certificate.)
+if curl -sS "$API/docker/morningtelos" "${auth[@]}" | grep -q '"content":"services'; then
+  id=$(curl -sS -X DELETE "$API/docker/morningtelos/down" "${auth[@]}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+  wait_for "$id"
 fi
-python3 -c 'import json,sys; print(json.dumps({"project_name":"morningtelos","content":open("docker-compose.yml").read()}))' \
-  | curl -sS -X POST "$API" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d @-
-echo
+r=$(curl -sS -X POST "$API/docker" "${auth[@]}" -H "Content-Type: application/json" -d "$body")
+id=$(echo "$r" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])') || { echo "$r"; exit 1; }
+wait_for "$id" && echo "deployed"

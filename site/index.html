@@ -3,32 +3,274 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Morning Telos</title>
-<meta name="description" content="Morning Telos builds AI automation for businesses.">
+<title>Morning Telos | AI Automation Partner</title>
+<meta name="description" content="Morning Telos builds AI automations that handle the busywork, so your team can focus on the work that matters.">
+<meta property="og:title" content="Morning Telos | AI Automation Partner">
+<meta property="og:description" content="Wake up to work already done.">
+<meta property="og:image" content="https://morningtelos.com/img/hero.webp">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 20'%3E%3Crect width='28' height='20' fill='%23000'/%3E%3Cg fill='%23FF7A2F'%3E%3Crect x='8' y='0' width='12' height='4'/%3E%3Crect x='4' y='4' width='20' height='4'/%3E%3Crect x='0' y='8' width='28' height='4'/%3E%3Crect x='0' y='16' width='28' height='4'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0b0b0d; --fg:#f4f1ea; --muted:#9a968d; --accent:#e8b65a; }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  html,body { height:100%; }
-  body { background:var(--bg); color:var(--fg); font-family:Georgia,"Times New Roman",serif;
-         display:flex; align-items:center; justify-content:center; padding:24px; }
-  main { max-width:640px; text-align:center; }
-  .mark { width:56px; height:56px; margin:0 auto 32px; border-radius:50%;
-          background:radial-gradient(circle at 50% 60%, var(--accent) 0 38%, transparent 39%);
-          box-shadow:0 0 60px rgba(232,182,90,.35); }
-  h1 { font-size:clamp(40px,8vw,72px); font-weight:400; letter-spacing:.02em; }
-  .greek { color:var(--muted); font-style:italic; margin-top:8px; font-size:15px; letter-spacing:.08em; }
-  p.lead { margin-top:32px; font-size:clamp(18px,3vw,22px); line-height:1.5; }
-  .soon { margin-top:40px; font-family:ui-monospace,Menlo,monospace; font-size:12px;
-          letter-spacing:.3em; text-transform:uppercase; color:var(--accent); }
+  :root {
+    --bg: #000000;
+    --fg: #ffffff;
+    --ink: #0e0e0c;
+    --sun: #ff7a2f;
+    --sun-hover: #ff9152;
+    --sun-soft: rgba(255, 122, 47, .14);
+    --grey-400: #9a9a9a;
+    --grey-600: #6d6d6d;
+    --line: #2a2a2a;
+    --max: 1400px;
+    --serif: "Instrument Serif", "Times New Roman", serif;
+    --sans: "Inter Tight", "Avenir Next", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); color: var(--fg); font-family: var(--sans);
+         -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; overflow-x: clip; scroll-behavior: smooth; }
+  body { background: var(--bg); font-size: 18px; line-height: 1.55; }
+  a { color: inherit; text-decoration: none; }
+  img { display: block; max-width: 100%; }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 40px; }
+  .label { font-family: var(--mono); font-size: 13px; font-weight: 500; letter-spacing: .18em; text-transform: uppercase; color: var(--fg); }
+  .hl { color: var(--sun); }
+
+  /* logo mark: pixel sun over the horizon */
+  .mark { display: inline-grid; grid-template-columns: repeat(7, 4px); grid-auto-rows: 4px; }
+  .mark i { background: var(--sun); }
+  .mark .o { background: transparent; }
+  .mark.lg { grid-template-columns: repeat(7, 8px); grid-auto-rows: 8px; }
+
+  /* nav */
+  .nav { position: absolute; inset: 0 0 auto 0; z-index: 10; }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 76px; max-width: none; padding: 0 32px; }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 22px; letter-spacing: -.01em; }
+  .nav-link { font-size: 15px; font-weight: 500; border-bottom: 1px solid transparent; transition: border-color .2s; }
+  .nav-link:hover { border-color: var(--sun); }
+
+  /* buttons */
+  .btn { display: inline-flex; align-items: center; gap: 18px; background: var(--fg); color: #000; border: 1px solid #000;
+         padding: 8px 8px 8px 24px; font: 500 19px/1.4 var(--sans); transition: background .2s; white-space: nowrap; }
+  .btn .arr { width: 26px; height: 26px; background: #000; color: var(--fg); display: grid; place-items: center; font-size: 14px; }
+  .btn:hover { background: var(--sun); }
+  .btn:focus-visible, .card:focus-visible, .nav-link:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
+
+  /* hero */
+  .hero { position: relative; min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+  .hero-img { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); height: min(78svh, 760px); width: auto; max-width: none; pointer-events: none;
+              -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent 100%); mask-image: radial-gradient(closest-side, #000 62%, transparent 100%); }
+  .hero h1 { position: absolute; left: 0; right: 0; top: 46%; transform: translateY(-50%); text-align: center; z-index: 2;
+             font-family: var(--serif); font-weight: 400; font-size: clamp(58px, 9.4vw, 140px); line-height: .98; letter-spacing: -.02em; padding: 0 24px; }
+  .hero h1 em { color: var(--sun); }
+  .hero-foot { position: relative; z-index: 2; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 40px; padding-bottom: 56px; }
+  .hero-foot h2 { font-size: 34px; font-weight: 600; line-height: 1.1; letter-spacing: -.01em; }
+  .hero-foot p { margin-top: 8px; color: #e6e6e6; font-size: 19px; }
+  .rule { height: 1px; background: var(--fg); position: relative; min-width: 80px; }
+  .rule::after { content: ""; position: absolute; right: 0; top: -3px; border: 3.5px solid transparent; border-left: 6px solid var(--fg); }
+
+  /* approach */
+  .approach { padding-top: 160px; padding-bottom: 120px; }
+  .approach-head { display: flex; align-items: end; justify-content: space-between; gap: 40px; margin-bottom: 48px; }
+  .approach-head h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(44px, 5.6vw, 80px); line-height: 1; letter-spacing: -.02em; max-width: 13ch; margin-top: 20px; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .card { border: 1px solid #d9d9d9; padding: 36px 32px 40px 40px; display: flex; flex-direction: column; min-height: 460px; transition: border-color .2s, background .2s; }
+  .card:hover { border-color: var(--sun); background: var(--sun-soft); }
+  .card svg { width: 108px; height: 108px; stroke: var(--fg); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; margin-bottom: auto; }
+  .card .num { font-family: var(--mono); font-size: 13px; color: var(--grey-400); letter-spacing: .14em; margin-top: 48px; }
+  .card h3 { font-size: 52px; font-weight: 700; line-height: 1.05; letter-spacing: -.02em; margin: 8px 0 16px; }
+  .card p { font-size: 16px; line-height: 1.45; color: #e2e2e2; max-width: 34ch; }
+
+  /* telos */
+  .telos { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-items: center; min-height: 640px; }
+  .telos-img { width: 100%; height: 100%; object-fit: cover; object-position: 20% 50%; }
+  .telos-copy { position: relative; padding: 80px 64px; height: 100%; display: flex; flex-direction: column; justify-content: center;
+                background-image: linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px);
+                background-size: 64px 64px; }
+  .telos-copy .greek { font-family: var(--serif); font-style: italic; font-size: 32px; color: var(--sun); }
+  .telos-copy h2 { font-size: clamp(40px, 4.4vw, 64px); font-weight: 600; line-height: 1.06; letter-spacing: -.02em; margin: 20px 0 24px; max-width: 14ch; }
+  .telos-copy p { max-width: 46ch; color: #e2e2e2; }
+
+  /* ribbon */
+  .ribbon-clip { overflow: hidden; padding: 40px 0; }
+  .ribbon { background: var(--sun); color: #000; transform: rotate(-2.6deg); margin: 100px -4vw 80px; overflow: hidden; white-space: nowrap; padding: 14px 0; }
+  .ribbon .track { display: inline-flex; animation: slide 40s linear infinite; }
+  .ribbon span { font-family: var(--serif); font-size: 30px; padding: 0 22px; }
+  .ribbon span.dot { padding: 0; }
+  @keyframes slide { to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) { .ribbon .track { animation: none; } html { scroll-behavior: auto; } }
+
+  /* close */
+  .close { text-align: center; padding-bottom: 80px; }
+  .close .mark { margin-bottom: 40px; }
+  .close h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(52px, 7vw, 104px); line-height: 1; letter-spacing: -.02em; margin-bottom: 40px; }
+  .team { margin-top: 100px; width: 100%; height: auto; }
+
+  footer { padding: 72px 0 48px; }
+  footer .wrap { display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
+  footer small { display: block; margin-top: 10px; color: var(--grey-400); font-size: 13px; }
+  footer a.mail { font-weight: 600; font-size: 15px; }
+  footer a.mail:hover { color: var(--sun); }
+
+  @media (max-width: 1000px) {
+    .cards { grid-template-columns: 1fr; }
+    .card { min-height: 0; }
+    .card svg { width: 84px; height: 84px; }
+    .card .num { margin-top: 32px; }
+    .telos { grid-template-columns: 1fr; }
+    .telos-img { height: 420px; }
+    .approach-head { flex-direction: column; align-items: start; }
+  }
+  @media (max-width: 760px) {
+    .wrap { padding: 0 16px; }
+    .nav .wrap { padding: 0 16px; height: 64px; }
+    .brand { font-size: 19px; }
+    .hero-img { top: 64px; height: 62svh; }
+    .hero h1 { top: 44%; }
+    .hero-foot { grid-template-columns: 1fr; gap: 20px; padding-bottom: 36px; }
+    .hero-foot h2 { font-size: 27px; }
+    .hero-foot p { font-size: 17px; }
+    .rule { display: none; }
+    .btn { font-size: 17px; white-space: normal; }
+    .approach { padding-top: 100px; padding-bottom: 80px; }
+    .card { padding: 28px 24px 32px; }
+    .card h3 { font-size: 42px; }
+    .telos-copy { padding: 56px 16px; }
+    .ribbon { margin: 56px -6vw 48px; }
+    .btn { justify-content: space-between; }
+    .ribbon span { font-size: 24px; }
+    .team { margin-top: 64px; }
+  }
 </style>
 </head>
 <body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Morning Telos home">
+      <span class="mark" aria-hidden="true">
+        <i class="o"></i><i class="o"></i><i></i><i></i><i></i><i class="o"></i><i class="o"></i>
+        <i class="o"></i><i></i><i></i><i></i><i></i><i></i><i class="o"></i>
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        <i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i>
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </span>
+      Morning Telos
+    </a>
+    <a class="nav-link" href="mailto:hello@morningtelos.com">Book a call</a>
+  </div>
+</header>
+
 <main>
-  <div class="mark" aria-hidden="true"></div>
-  <h1>Morning Telos</h1>
-  <div class="greek">τέλος · purpose, the end it all works toward</div>
-  <p class="lead">AI automation for businesses that want their time back.</p>
-  <div class="soon">Launching soon</div>
+  <section class="hero">
+    <img class="hero-img" src="/img/hero.webp" alt="Marble bust of a Greek philosopher holding a cup of coffee" width="1000" height="1000">
+    <h1>Wake up to work<br><em>already done.</em></h1>
+    <div class="wrap hero-foot">
+      <div>
+        <h2>Your <span class="hl">AI automation partner.</span></h2>
+        <p>We build AI systems that handle the busywork, so your team can focus on the work that matters.</p>
+      </div>
+      <div class="rule" aria-hidden="true"></div>
+      <a class="btn" href="mailto:hello@morningtelos.com">Book a free audit <span class="arr" aria-hidden="true">↗</span></a>
+    </div>
+  </section>
+
+  <section class="approach wrap" id="approach">
+    <div class="approach-head">
+      <div>
+        <div class="label">Our approach</div>
+        <h2>From busywork to <span class="hl">done by sunrise.</span></h2>
+      </div>
+    </div>
+    <div class="cards">
+      <a class="card" href="mailto:hello@morningtelos.com?subject=Audit">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="50" cy="50" r="30"/><path d="M72 72l30 30"/><path d="M98 98l8 8"/>
+          <path d="M36 62V52M46 62V40M56 62V46M66 62V36"/>
+        </svg>
+        <div class="num">01</div>
+        <h3>Audit</h3>
+        <p>We map how your team spends its week and find the tasks AI can take over first. You get a short, clear plan in days.</p>
+      </a>
+      <a class="card" href="mailto:hello@morningtelos.com?subject=Build">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <path d="M20 22h80M24 30h72"/><circle cx="20" cy="26" r="5"/><circle cx="100" cy="26" r="5"/>
+          <path d="M34 34v58M46 34v58M60 34v58M74 34v58M86 34v58"/>
+          <path d="M28 92h64v8H28zM20 100h80v8H20z"/>
+        </svg>
+        <div class="num">02</div>
+        <h3>Build</h3>
+        <p>We build automations and AI agents that plug into the tools you already use. Your team keeps working the way it does today.</p>
+      </a>
+      <a class="card" href="mailto:hello@morningtelos.com?subject=Run">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <path d="M8 78h104"/><path d="M32 78a28 28 0 0 1 56 0"/>
+          <path d="M60 36V22M30 48l-10-10M90 48l10-10M18 66H6M102 66h12"/>
+          <path d="M26 92h68M42 104h36"/>
+        </svg>
+        <div class="num">03</div>
+        <h3>Run</h3>
+        <p>We watch, fix and improve every system after launch on a simple monthly plan. Your automations keep running every morning.</p>
+      </a>
+    </div>
+  </section>
+
+  <section class="telos">
+    <img class="telos-img" src="/img/think.webp" alt="Marble statue of a young man thinking, with a laptop on his knee" width="1300" height="726" loading="lazy">
+    <div class="telos-copy">
+      <div class="greek">τέλος · telos</div>
+      <h2>Every system starts with <span class="hl">the end goal.</span></h2>
+      <p>Telos is the Greek word for purpose. Before we build anything, we agree on the result you want, like hours saved each week or every lead answered in minutes. Then we build toward it and show you the numbers.</p>
+    </div>
+  </section>
+
+  <div class="ribbon-clip"><div class="ribbon" aria-hidden="true">
+    <div class="track">
+      <span>Less busywork, more craft</span><span class="dot">•</span><span>Built for the morning shift</span><span class="dot">•</span>
+      <span>Less busywork, more craft</span><span class="dot">•</span><span>Built for the morning shift</span><span class="dot">•</span>
+      <span>Less busywork, more craft</span><span class="dot">•</span><span>Built for the morning shift</span><span class="dot">•</span>
+      <span>Less busywork, more craft</span><span class="dot">•</span><span>Built for the morning shift</span><span class="dot">•</span>
+      <span>Less busywork, more craft</span><span class="dot">•</span><span>Built for the morning shift</span><span class="dot">•</span>
+      <span>Less busywork, more craft</span><span class="dot">•</span><span>Built for the morning shift</span><span class="dot">•</span>
+      <span>Less busywork, more craft</span><span class="dot">•</span><span>Built for the morning shift</span><span class="dot">•</span>
+      <span>Less busywork, more craft</span><span class="dot">•</span><span>Built for the morning shift</span><span class="dot">•</span>
+    </div>
+  </div></div>
+
+  <section class="close wrap">
+    <span class="mark lg" aria-hidden="true">
+      <i class="o"></i><i class="o"></i><i></i><i></i><i></i><i class="o"></i><i class="o"></i>
+      <i class="o"></i><i></i><i></i><i></i><i></i><i></i><i class="o"></i>
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      <i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i>
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </span>
+    <h2>Start your mornings <em class="hl">ahead.</em></h2>
+    <a class="btn" href="mailto:hello@morningtelos.com">Get started <span class="arr" aria-hidden="true">↗</span></a>
+    <img class="team" src="/img/team.webp" alt="Three marble statues gathered around a tablet" width="1300" height="726" loading="lazy">
+  </section>
 </main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="brand" href="/">
+        <span class="mark" aria-hidden="true">
+          <i class="o"></i><i class="o"></i><i></i><i></i><i></i><i class="o"></i><i class="o"></i>
+          <i class="o"></i><i></i><i></i><i></i><i></i><i></i><i class="o"></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i><i class="o"></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </span>
+        Morning Telos
+      </a>
+      <small>© 2026 Morning Telos. All rights reserved.</small>
+    </div>
+    <a class="mail" href="mailto:hello@morningtelos.com">hello@morningtelos.com</a>
+  </div>
+</footer>
+
 </body>
 </html>
