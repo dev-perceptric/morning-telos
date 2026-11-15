@@ -381,6 +381,11 @@ PAGES = [
     ),
 ]
 
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import pages_more  # noqa: E402
+PAGES += pages_more.make(globals())
+
 if __name__ == "__main__":
     for p in PAGES:
         build(p)

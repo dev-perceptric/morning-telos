@@ -79,6 +79,19 @@
   addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
   addEventListener('resize', onScroll); onScroll();
 
+
+  /* nav dropdown + mobile menu */
+  $$('.dd').forEach(dd => {
+    const b = $('.dd-btn', dd);
+    b.addEventListener('click', e => { e.stopPropagation(); const o = dd.classList.toggle('open'); b.setAttribute('aria-expanded', o); });
+  });
+  document.addEventListener('click', e => { $$('.dd.open').forEach(dd => { if (!dd.contains(e.target)) { dd.classList.remove('open'); $('.dd-btn', dd).setAttribute('aria-expanded', 'false'); } }); });
+  const mb = $('.menu-btn');
+  if (mb && nav) mb.addEventListener('click', () => {
+    const o = nav.classList.toggle('menu-open'); mb.setAttribute('aria-expanded', o); $('.mnav', nav).setAttribute('aria-hidden', !o);
+  });
+  $$('.mnav a').forEach(a => a.addEventListener('click', () => nav && nav.classList.remove('menu-open')));
+
   /* pointer effects */
   if (!reduce && matchMedia('(hover: hover)').matches) {
     $$('.tilt').forEach(c => {
