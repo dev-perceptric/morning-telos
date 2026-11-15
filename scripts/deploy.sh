@@ -21,7 +21,7 @@ wait_for() {
 }
 
 sha=$(git rev-parse HEAD)
-git fetch -q origin main && [ "$(git rev-parse origin/main)" = "$sha" ] || { echo "Push your commits to main first"; exit 1; }
+[ "$(git ls-remote origin refs/heads/main | cut -f1)" = "$sha" ] || { echo "Push your commits to main first"; exit 1; }
 # Pin the download to this exact commit so GitHub's cache can't serve an older copy.
 body=$(SHA="$sha" python3 -c 'import json,os; c=open("docker-compose.yml").read().replace("refs/heads/main", os.environ["SHA"]); print(json.dumps({"project_name":"morningtelos","content":c}))')
 
