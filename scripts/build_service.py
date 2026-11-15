@@ -56,7 +56,7 @@ def faq_block(title, faqs):
     q = ''.join(f'      <div class="qa rv"><button aria-expanded="false">{a}<span class="pm"></span></button><div class="ans"><div><p>{b}</p></div></div></div>\n' for a, b in faqs)
     return f'''  <section class="faq" id="faq">
     <div class="wrap">
-      <div class="faq-side rv"><h2 class="big">{title}</h2><a href="mailto:hello@morningtelos.com">Ask us directly <span>→</span></a></div>
+      <div class="faq-side rv"><h2 class="big">{title}</h2><a href="mailto:meet@morningtelos.com">Ask us directly <span>→</span></a></div>
       <div class="faq-list">
 {q}      </div>
     </div>
