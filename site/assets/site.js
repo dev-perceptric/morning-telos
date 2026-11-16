@@ -126,6 +126,14 @@
     addEventListener('scroll', () => requestAnimationFrame(spy), { passive: true }); spy();
   }
 
+
+  /* blog: copy template buttons */
+  $$('.tpl-copy').forEach(b => b.addEventListener('click', () => {
+    const txt = b.closest('.tpl').querySelector('.tpl-t').innerText;
+    const done = () => { b.classList.add('done'); b.textContent = 'Copied'; setTimeout(() => { b.classList.remove('done'); b.textContent = 'Copy'; }, 1600); };
+    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done, done); else done();
+  }));
+
   /* pointer effects */
   if (!reduce && matchMedia('(hover: hover)').matches) {
     $$('.tilt').forEach(c => {

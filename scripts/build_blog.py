@@ -10,6 +10,7 @@ Body shortcodes:
   [[TABLE]]    at-a-glance comparison table (listicles, from `entries`)
   [[ENTRIES]]  the numbered entries (listicles, from `entries`)
   [[STATS]]    sourced stat cards (from `stats`: n, text, source, url)
+  [[TPL key]]  copy-ready template cards (from `templates.key`: list of {title, text})
 """
 import datetime as dt
 import html
@@ -34,6 +35,8 @@ CATEGORIES = {
     "build-vs-buy": ("Build vs buy", "When off-the-shelf software is enough, and when custom wins."),
     "industries": ("Industries", "Automation playbooks for specific industries."),
     "statistics": ("Statistics", "Sourced numbers on AI, automation and customer service."),
+    "templates": ("Templates", "Copy-ready texts, emails and scripts for local businesses."),
+    "local-business": ("Local business growth", "Practical playbooks for clinics, home services and other local businesses."),
 }
 SERVICES = {
     "ai-automation": ("AI &amp; automation", "Workflows that run on their own"),
@@ -86,6 +89,7 @@ def load_posts():
         words = len(re.sub(r"[#>*_`\[\]()|-]", " ", body).split())
         words += sum(len(" ".join(str(v) for v in e.values()).split()) for e in meta.get("entries", []))
         words += sum(len((q["q"] + " " + q["a"]).split()) for q in meta.get("faqs", []))
+        words += sum(len(t["text"].split()) for g in (meta.get("templates") or {}).values() for t in g)
         meta["read"] = max(3, round(words / 230))
         posts.append(meta)
     posts.sort(key=lambda p: str(p["updated"]), reverse=True)
@@ -132,6 +136,13 @@ def entries_html(p):
     return out
 
 
+def tpl_html(p, key):
+    items = (p.get("templates") or {}).get(key, [])
+    return '<div class="tpls">' + "".join(
+        f'<div class="tpl"><div class="tpl-h"><b>{esc(t["title"])}</b><button type="button" class="tpl-copy">Copy</button></div><p class="tpl-t">{esc(t["text"].strip())}</p></div>'
+        for t in items) + "</div>"
+
+
 def stats_html(p):
     cards = "".join(f'<div class="stat"><b>{esc(x["n"])}</b><p>{esc(x["text"])}</p><a href="{esc(x["url"])}" rel="nofollow noopener" target="_blank">{esc(x["source"])}</a></div>' for x in p.get("stats", []))
     return f'<div class="stats">{cards}</div>' if cards else ""
@@ -157,6 +168,7 @@ def build_post(p, posts):
     has_list = "[[ENTRIES]]" in body
     # convert body with placeholders protected
     body = body.replace("[[TABLE]]", "\n\nTABLEPLACEHOLDER\n\n").replace("[[ENTRIES]]", "\n\nENTRIESPLACEHOLDER\n\n").replace("[[STATS]]", "\n\nSTATSPLACEHOLDER\n\n")
+    body = re.sub(r"\[\[TPL ([\w-]+)\]\]", lambda m: f"\n\nTPLPLACEHOLDER:{m.group(1)}\n\n", body)
     content = md(body)
     # heading ids + toc
     toc = []
@@ -170,6 +182,7 @@ def build_post(p, posts):
     if has_list:
         content = content.replace("<p>TABLEPLACEHOLDER</p>", table_html(p)).replace("<p>ENTRIESPLACEHOLDER</p>", entries_html(p))
     content = content.replace("<p>STATSPLACEHOLDER</p>", stats_html(p))
+    content = re.sub(r"<p>TPLPLACEHOLDER:([\w-]+)</p>", lambda m: tpl_html(p, m.group(1)), content)
     # first blockquote = short answer box
     content = content.replace("<blockquote>", '<blockquote class="answer">', 1)
     faqs = p.get("faqs", [])
