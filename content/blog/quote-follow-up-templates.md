@@ -262,7 +262,7 @@ faqs:
 
 This guide is for contractors, home service pros, insurance agents and anyone else who sends quotes for a living.
 
-Most quotes don't get a "no." They get silence. The customer got busy, forgot, or is waiting for a nudge. A polite follow-up at the right time is often all it takes to win the job.
+Plenty of quotes end in silence. The customer got busy, forgot, or is waiting for a nudge. A polite follow-up at the right time is often all it takes to win the job.
 
 Below you'll find 33 quote follow-up templates, grouped by when to send them. Copy them, swap in your details, and send.
 
