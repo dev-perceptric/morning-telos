@@ -117,4 +117,4 @@ Off-the-shelf tools are a great place to start. Bring in help when:
 - You bought a tool but never finished setting it up.
 - Volume is high enough that per-resolution fees add up to more than a custom build.
 
-That's the work we do at Morning Telos. If an off-the-shelf tool fits, we set it up and connect it for you. If it doesn't, we build a custom support agent around your tools and rules. See our [AI agents service](/services/ai-agents/) or book a free [Telos Session](/#book).
+That's the work we do at Morning Telos. If an off-the-shelf tool fits, we set it up and connect it for you. If it doesn't, we build a custom support agent around your tools and rules. See our [AI agents service](/services/ai-agents/) or book a free [Telos Session](/book/).

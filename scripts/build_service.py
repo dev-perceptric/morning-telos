@@ -105,7 +105,7 @@ def build(p):
         </h1>
         <p class="lead rv" style="--d:.55s">{p["lead"]}</p>
         <div class="hero-ctas rv" style="--d:.7s">
-          <a class="btn btn-dark btn-lg mag" href="#book">Book a Telos Session <span class="arr">→</span></a>
+          <a class="btn btn-dark btn-lg mag" href="/book/">Book a Telos Session <span class="arr">→</span></a>
           <a class="btn btn-ghost btn-lg" href="#{p["second_cta"][1]}">{p["second_cta"][0]}</a>
         </div>
         <div class="hero-proof rv" style="--d:.85s">{AVS}<p><b>For founders, operators and decision makers.</b><br>{p["proof"]}</p></div>
