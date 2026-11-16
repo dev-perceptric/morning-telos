@@ -1,5 +1,5 @@
 ---
-title: "20+ After-Hours Voicemail Greeting & Text Scripts"
+title: "30+ After-Hours Voicemail Greeting & Text Scripts"
 description: "Copy-and-paste after-hours voicemail greetings for evenings, weekends, holidays, lunch breaks and emergency lines, plus matching texts to send callers."
 category: templates
 date: 2026-11-16

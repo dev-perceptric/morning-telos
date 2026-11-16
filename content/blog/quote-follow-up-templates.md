@@ -1,5 +1,5 @@
 ---
-title: "25+ Quote Follow-Up Text & Email Templates to Win More Jobs"
+title: "30+ Quote Follow-Up Text & Email Templates to Win More Jobs"
 description: "Copy-and-paste quote follow-up texts and emails for every stage, from the day you send the quote to the final check-in, plus what to send after you win or lose."
 category: templates
 date: 2026-11-16
