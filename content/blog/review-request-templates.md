@@ -4,7 +4,7 @@ description: "Copy-and-paste review request texts, emails and in-person scripts,
 category: templates
 date: 2026-11-16
 image: /img/blog/review-request-templates.webp
-image_alt: "Marble statue for a guide to review request templates"
+image_alt: "Marble statue of a young Greek man holding up five golden stars"
 services: [ai-agents, ai-automation]
 manual:
   title: "Sending these by hand?"
