@@ -600,7 +600,7 @@
 @media (max-width: 640px) { .nav-cta .btn-dark { display: none; } }
 
 /* ---- industry / related-service strip ---- */
-.istrip { padding: 40px 0 110px; }
+.istrip { padding-top: 40px; padding-bottom: 110px; }
 .istrip h2 { margin-bottom: 36px; }
 .igrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .icard { position: relative; display: block; padding: 22px 54px 22px 22px; border-radius: 16px; border: 1px solid var(--line); background: var(--white); transition: border-color .3s, transform .4s var(--ease), box-shadow .4s; }

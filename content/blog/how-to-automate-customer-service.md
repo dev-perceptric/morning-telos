@@ -12,17 +12,46 @@ faqs:
   - q: "What is the first thing to automate in customer service?"
     a: "Start with your five most common questions. Pull a month of tickets or emails, group them by topic, and automate the top group first. That usually covers a large share of volume with very little risk."
   - q: "How much does customer service automation cost?"
-    a: "Off-the-shelf AI support tools start around $50 to $300 a month for a small team. A custom AI support agent that connects to your order system, CRM and help desk usually costs $5,000 to $25,000 to build, plus a monthly fee to run and improve it."
+    a: "Off-the-shelf AI tools for small teams usually cost tens to a few hundred dollars a month. AI phone receptionists run about $25 to $500 a month. A custom AI support agent that connects to your order system, CRM and help desk usually costs $5,000 to $25,000 to build, plus a monthly fee to run and improve it."
   - q: "Will customers be upset if they talk to AI?"
     a: "Customers mostly care about getting a fast, correct answer. Be clear that they are talking to an assistant, make it easy to reach a person, and only let the AI answer questions it can answer well."
   - q: "Do I need a help desk before I automate?"
     a: "It helps. A help desk like Zendesk, Gorgias, Intercom or Help Scout gives you one place for every conversation, which makes it much easier to plug in AI and measure results."
-sources: []
+stats:
+  - n: "30% → 50%"
+    text: "Service teams estimate AI handles 30% of cases today and expect it to reach 50% by 2027."
+    source: "Salesforce, State of Service, 2025"
+    url: "https://www.salesforce.com/news/stories/state-of-service-report-announcement-2025/ai-expected-to-resolve-half-of-service-cases-by-2027-data-shows/"
+  - n: "4 hrs"
+    text: "Reps using AI spend 20% less time on routine cases, about four hours a week."
+    source: "Salesforce, State of Service, 2025"
+    url: "https://www.salesforce.com/news/stories/state-of-service-report-announcement-2025/ai-expected-to-resolve-half-of-service-cases-by-2027-data-shows/"
+  - n: "74%"
+    text: "of consumers now expect 24/7 customer service because of AI."
+    source: "Zendesk, CX Trends 2026"
+    url: "https://www.zendesk.com/newsroom/press-releases/contextual-intelligence-becomes-the-new-standard-for-exceptional-customer-experience-in-2026/"
+  - n: "76%"
+    text: "of support teams invested in AI for customer service in 2024, up from the 54% who had planned to."
+    source: "Intercom, Customer Service Transformation Report 2025"
+    url: "https://www.intercom.com/blog/customer-service-transformation-report-2025/"
+sources:
+  - title: "Salesforce, State of Service report (2025)"
+    url: "https://www.salesforce.com/news/stories/state-of-service-report-announcement-2025/ai-expected-to-resolve-half-of-service-cases-by-2027-data-shows/"
+  - title: "Zendesk, CX Trends 2026 press release"
+    url: "https://www.zendesk.com/newsroom/press-releases/contextual-intelligence-becomes-the-new-standard-for-exceptional-customer-experience-in-2026/"
+  - title: "Intercom, Customer Service Transformation Report 2025"
+    url: "https://www.intercom.com/blog/customer-service-transformation-report-2025/"
+  - title: "Upfirst pricing"
+    url: "https://upfirst.ai/pricing"
+  - title: "Smith.ai AI Receptionist pricing"
+    url: "https://smith.ai/pricing/ai-receptionist"
 ---
 
 > **Short answer:** To automate customer service, find your most common questions, write clear answers for them, then connect an AI assistant to your help desk and order data so it can answer and take simple actions. Keep a fast path to a person for anything sensitive, and review what the AI gets wrong every week.
 
 At Morning Telos we build AI support agents and automations for founders and operators, so we see the same pattern in almost every business: a handful of questions make up most of the inbox, and answering them by hand eats hours every day. This guide walks through how to automate them step by step.
+
+Customers expect fast answers at any hour, and support teams are moving quickly to meet that:
 
 [[STATS]]
 
@@ -71,10 +100,10 @@ Read a sample of AI conversations every week. Fix wrong answers in your source o
 
 | Tool type | Examples | Best for | Typical cost |
 |---|---|---|---|
-| Help desk with built-in AI | Zendesk AI, Intercom Fin, Gorgias AI, Help Scout AI | Teams that already use that help desk | Per resolution or per seat, often $0.99 to $1.50 per AI resolution or $50+ per seat a month |
-| AI chat for websites | Tidio, Chatbase, Crisp | Small sites that need an AI chat widget fast | $30 to $300 a month |
-| AI receptionist (phone) | Smith.ai, Goodcall, Rosie, Upfirst | Businesses that get a lot of calls | $50 to $400+ a month |
-| Automation platforms | Zapier, Make, n8n | Connecting tools and moving data between them | $20 to $100+ a month |
+| Help desk with built-in AI | Zendesk AI, Intercom Fin, Gorgias AI, Help Scout AI | Teams that already use that help desk | Usually priced per AI resolution or per seat |
+| AI chat for websites | Tidio, Chatbase, Crisp | Small sites that need an AI chat widget fast | Monthly plans, often with a free tier |
+| AI receptionist (phone) | Smith.ai, Goodcall, Rosie, Upfirst | Businesses that get a lot of calls | About $25 to $500 a month ([full price breakdown](/blog/ai-receptionist-cost/)) |
+| Automation platforms | Zapier, Make, n8n | Connecting tools and moving data between them | Free tiers, then monthly plans by usage |
 | Custom AI support agent | Built by a developer or agency | Unique rules, many systems, high volume | $5,000 to $25,000 to build, plus a monthly fee |
 
 Prices change often, so check each vendor's pricing page before you buy.

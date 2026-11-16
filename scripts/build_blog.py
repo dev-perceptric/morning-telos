@@ -260,7 +260,7 @@ def build_index(posts, cat=None):
         title, h1, url, blurb = "The Morning Telos Blog | AI Automation Guides, Costs & Agency Picks", "The Morning Telos Blog", f"{BASE}/blog/", "Plain-English guides to AI automation: what to automate, what it costs, and who to hire."
         listed = posts
     used = [c for c in CATEGORIES if any(p["category"] == c for p in posts)]
-    chips = f'<a class="chip{"" if cat else " on"}" href="/blog/">All</a>' + "".join(f'<a class="chip{" on" if c == cat else ""}" href="/blog/category/{c}/">{esc(CATEGORIES[c][0])}</a>' for c in used)
+    chips = f'<a class="bchip{"" if cat else " on"}" href="/blog/">All</a>' + "".join(f'<a class="bchip{" on" if c == cat else ""}" href="/blog/category/{c}/">{esc(CATEGORIES[c][0])}</a>' for c in used)
     featured = card(listed[0], big=True) if listed and not cat else ""
     grid = "".join(card(p) for p in (listed[1:] if featured else listed))
     schema = f'<script type="application/ld+json">{json.dumps({"@context": "https://schema.org", "@type": "Blog" if not cat else "CollectionPage", "name": h1, "url": url, "publisher": {"@type": "Organization", "name": "Morning Telos", "url": BASE + "/"}})}</script>\n'
