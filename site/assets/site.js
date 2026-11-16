@@ -104,6 +104,28 @@
     }), { threshold: .55 }).observe(box);
   });
 
+
+  /* blog: AI summary menu, copy link, table of contents */
+  $$('.act.ai').forEach(w => {
+    const b = $('button', w);
+    b.addEventListener('click', e => { e.stopPropagation(); const o = w.classList.toggle('open'); b.setAttribute('aria-expanded', o); });
+  });
+  document.addEventListener('click', () => $$('.act.ai.open').forEach(w => w.classList.remove('open')));
+  $$('.act.copy').forEach(b => b.addEventListener('click', () => {
+    const done = () => { b.classList.add('done'); $('span', b).textContent = 'Copied'; setTimeout(() => { b.classList.remove('done'); $('span', b).textContent = 'Copy link'; }, 1800); };
+    if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.url).then(done, done); else done();
+  }));
+  const tocLinks = $$('.toc a');
+  if (tocLinks.length) {
+    const targets = tocLinks.map(a => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
+    const spy = () => {
+      let cur = null;
+      targets.forEach(t => { if (t.getBoundingClientRect().top < 140) cur = t.id; });
+      tocLinks.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + cur));
+    };
+    addEventListener('scroll', () => requestAnimationFrame(spy), { passive: true }); spy();
+  }
+
   /* pointer effects */
   if (!reduce && matchMedia('(hover: hover)').matches) {
     $$('.tilt').forEach(c => {
