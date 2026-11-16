@@ -11,6 +11,10 @@ Body shortcodes:
   [[ENTRIES]]  the numbered entries (listicles, from `entries`)
   [[STATS]]    sourced stat cards (from `stats`: n, text, source, url)
   [[TPL key]]  copy-ready template cards (from `templates.key`: list of {title, text})
+  [[MANUAL]]   "Sending these by hand?" box (from `manual`: {title, text, link_text, link})
+  [[OFFER]]    Morning Telos offer card (from `offer`: {kicker, title, text, points[], cta})
+  [[PROMO]]    short inline Morning Telos mention (from `promo`: text, Markdown allowed)
+Front matter `offer` also replaces the default sidebar card.
 """
 import datetime as dt
 import html
@@ -80,6 +84,8 @@ def head(title, desc, canonical, extra=""):
 def load_posts():
     posts = []
     for f in sorted(CONTENT.glob("*.md")):
+        if f.name.startswith("_"):
+            continue
         raw = f.read_text()
         m = re.match(r"^---\n(.*?)\n---\n(.*)$", raw, re.S)
         meta, body = yaml.safe_load(m.group(1)), m.group(2)
@@ -143,6 +149,30 @@ def tpl_html(p, key):
         for t in items) + "</div>"
 
 
+def manual_html(p):
+    m = p.get("manual")
+    if not m:
+        return ""
+    link = f'<a href="{esc(m.get("link", "/book/"))}">{esc(m.get("link_text", "See how it works"))} →</a>'
+    return (f'<aside class="manual"><span class="mi" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>'
+            f'<div><b>{esc(m.get("title", "Sending these by hand?"))}</b><p>{esc(m["text"])}</p>{link}</div></aside>')
+
+
+def offer_html(p):
+    o = p.get("offer")
+    if not o:
+        return ""
+    pts = "".join(f"<li>{esc(x)}</li>" for x in o.get("points", []))
+    return (f'<aside class="offer"><span class="ok">{esc(o.get("kicker", "Done for you by Morning Telos"))}</span><h3>{esc(o["title"])}</h3>'
+            f'<p>{esc(o["text"])}</p>{"<ul>" + pts + "</ul>" if pts else ""}'
+            f'<a class="btn btn-dark" href="/book/">{esc(o.get("cta", "Book a free Telos Session"))} <span class="arr">→</span></a></aside>')
+
+
+def promo_html(p):
+    t = p.get("promo")
+    return f'<aside class="promo"><span class="pm-mark" aria-hidden="true">{MARK}</span><div>{md(t)}</div></aside>' if t else ""
+
+
 def stats_html(p):
     cards = "".join(f'<div class="stat"><b>{esc(x["n"])}</b><p>{esc(x["text"])}</p><a href="{esc(x["url"])}" rel="nofollow noopener" target="_blank">{esc(x["source"])}</a></div>' for x in p.get("stats", []))
     return f'<div class="stats">{cards}</div>' if cards else ""
@@ -161,13 +191,20 @@ def share_bar(url, title):
     </div>'''
 
 
+def side_cta(p):
+    o = p.get("offer")
+    if o:
+        return f'<div class="side-cta"><b>{esc(o.get("side_title", o["title"]))}</b><p>{esc(o.get("side_text", "We set it up for you, usually in about a week. Start with a free 30-minute Telos Session."))}</p><a class="btn" href="/book/">Book a Telos Session →</a></div>'
+    return '<div class="side-cta"><b>Want systems that run while you sleep?</b><p>Book a free 30-minute Telos Session. We\'ll find your highest-leverage first move.</p><a class="btn" href="/book/">Book a Telos Session →</a></div>'
+
+
 def build_post(p, posts):
     url = f"{BASE}/blog/{p['slug']}/"
     cat_name = CATEGORIES[p["category"]][0]
     body = p["body"]
     has_list = "[[ENTRIES]]" in body
     # convert body with placeholders protected
-    body = body.replace("[[TABLE]]", "\n\nTABLEPLACEHOLDER\n\n").replace("[[ENTRIES]]", "\n\nENTRIESPLACEHOLDER\n\n").replace("[[STATS]]", "\n\nSTATSPLACEHOLDER\n\n")
+    body = body.replace("[[TABLE]]", "\n\nTABLEPLACEHOLDER\n\n").replace("[[ENTRIES]]", "\n\nENTRIESPLACEHOLDER\n\n").replace("[[STATS]]", "\n\nSTATSPLACEHOLDER\n\n").replace("[[MANUAL]]", "\n\nMANUALPLACEHOLDER\n\n").replace("[[OFFER]]", "\n\nOFFERPLACEHOLDER\n\n").replace("[[PROMO]]", "\n\nPROMOPLACEHOLDER\n\n")
     body = re.sub(r"\[\[TPL ([\w-]+)\]\]", lambda m: f"\n\nTPLPLACEHOLDER:{m.group(1)}\n\n", body)
     content = md(body)
     # heading ids + toc
@@ -182,6 +219,7 @@ def build_post(p, posts):
     if has_list:
         content = content.replace("<p>TABLEPLACEHOLDER</p>", table_html(p)).replace("<p>ENTRIESPLACEHOLDER</p>", entries_html(p))
     content = content.replace("<p>STATSPLACEHOLDER</p>", stats_html(p))
+    content = content.replace("<p>MANUALPLACEHOLDER</p>", manual_html(p)).replace("<p>OFFERPLACEHOLDER</p>", offer_html(p)).replace("<p>PROMOPLACEHOLDER</p>", promo_html(p))
     content = re.sub(r"<p>TPLPLACEHOLDER:([\w-]+)</p>", lambda m: tpl_html(p, m.group(1)), content)
     # first blockquote = short answer box
     content = content.replace("<blockquote>", '<blockquote class="answer">', 1)
@@ -244,7 +282,7 @@ def build_post(p, posts):
     </article>
     <aside class="post-side">
       <div class="toc"><div class="toc-h"><b>On this page</b><small>{p["read"]} min read</small></div><ol>{toc_items}</ol></div>
-      <div class="side-cta"><b>Want systems that run while you sleep?</b><p>Book a free 30-minute Telos Session. We'll find your highest-leverage first move.</p><a class="btn" href="/book/">Book a Telos Session →</a></div>
+      {side_cta(p)}
     </aside>
   </div>
   <section class="post-cta wrap"><div><h2>Want systems that run <span class="clay">while you sleep?</span></h2><p>Morning Telos builds software and AI automation for founders, operators and decision makers.</p></div><a class="btn btn-dark btn-lg" href="/book/">Book a Telos Session <span class="arr">→</span></a></section>
