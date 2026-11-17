@@ -3,11 +3,14 @@
 // so tests never reach the real products.
 //
 // Every call answers with a typed result instead of throwing. `retryable` is true for a hiccup worth trying again
-// later: a timeout, a network error, 429 or a 5xx. 401, 403, 404, 409 and 422 won't fix themselves.
+// later: a timeout, a network error, 429, a 5xx, or Capybaroar's 409 "conflict" (the same brand is being made right
+// now). 401, 403, 404, 422 and every other 409 (domain_taken, plan_limit, limit_reached) won't fix themselves.
 
 export type Product = "arrowsterr" | "capybaroar";
 export const PRODUCTS: readonly Product[] = ["arrowsterr", "capybaroar"];
 export const PRODUCT_NAME: Record<Product, string> = { arrowsterr: "Arrowsterr", capybaroar: "Capybaroar" };
+/** Arrowsterr refuses a brand without a website domain (422). Capybaroar takes one with none. */
+export const NEEDS_DOMAIN: Record<Product, boolean> = { arrowsterr: true, capybaroar: false };
 
 export type Brand = { id: string; name: string; domain: string | null; external_id: string };
 export type BrandKey = { key: string; prefix: string };
@@ -77,12 +80,13 @@ export function partnerClient(o: { product: Product; url: string; key: string; f
       return { ok: false, status: res.status, code: "bad_response", message: "The answer was not JSON.", retryable: true };
     }
     const err = (json as { error?: { code?: unknown; message?: unknown } } | null)?.error;
+    const code = typeof err?.code === "string" ? err.code : `http_${res.status}`;
     return {
       ok: false,
       status: res.status,
-      code: typeof err?.code === "string" ? err.code : `http_${res.status}`,
+      code,
       message: typeof err?.message === "string" ? err.message.slice(0, 300) : res.statusText || `HTTP ${res.status}`,
-      retryable: isRetryable(res.status),
+      retryable: isRetryable(res.status, code),
     };
   }
 
@@ -110,5 +114,9 @@ export function partnerClient(o: { product: Product; url: string; key: string; f
   };
 }
 
-/** A timeout, network error, 429 or 5xx: worth trying again later. */
-export const isRetryable = (status: number) => status === 0 || status === 408 || status === 429 || status >= 500;
+/** 409 codes that mean "try again in a moment". Any other 409 is a conflict a person has to sort out. */
+const RETRYABLE_CONFLICTS: ReadonlySet<string> = new Set(["conflict"]);
+
+/** A timeout, network error, 429, 5xx or a 409 "conflict": worth trying again later. */
+export const isRetryable = (status: number, code = "") =>
+  status === 0 || status === 408 || status === 429 || status >= 500 || (status === 409 && RETRYABLE_CONFLICTS.has(code));

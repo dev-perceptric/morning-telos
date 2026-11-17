@@ -192,7 +192,7 @@ function Home({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {
   );
 }
 
-/** A small card while the workspace's brands in Arrowsterr and Capybaroar are being set up. Nothing once both are ready. */
+/** A small card while the workspace's brands in Arrowsterr and Capybaroar are being set up or wait for the website. Nothing once both are ready. */
 function SetupStatus({ sb, workspaceId }: { sb: SupabaseClient; workspaceId: string }) {
   const [card, setCard] = useState<SetupCard | null>(null);
   useEffect(() => {
@@ -222,6 +222,11 @@ function SetupStatus({ sb, workspaceId }: { sb: SupabaseClient; workspaceId: str
       <div className="min-w-0">
         <p className="text-[15px] font-semibold text-ink">{card.title}</p>
         <p className="text-[14px] text-ink-3">{card.text}</p>
+        {card.action ? (
+          <button type="button" className="mt-2 text-[14px] font-medium text-clay-2 underline-offset-2 hover:underline" onClick={() => navigate(card.action!.path)}>
+            {card.action.label}
+          </button>
+        ) : null}
       </div>
     </div>
   );

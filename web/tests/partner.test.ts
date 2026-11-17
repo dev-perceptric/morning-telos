@@ -110,7 +110,16 @@ test("a success without the fields we need is a retryable bad answer", async () 
 });
 
 test("isRetryable", () => {
-  assert.deepEqual([0, 408, 429, 500, 503, 400, 401, 403, 404, 409, 422].map(isRetryable), [true, true, true, true, true, false, false, false, false, false, false]);
+  assert.deepEqual([0, 408, 429, 500, 503, 400, 401, 403, 404, 409, 422].map((s) => isRetryable(s)), [true, true, true, true, true, false, false, false, false, false, false]);
+});
+
+test("409s: Capybaroar's conflict is retryable; domain_taken, plan_limit and limit_reached are not", async () => {
+  for (const [code, retryable] of [["conflict", true], ["domain_taken", false], ["plan_limit", false], ["limit_reached", false], ["too_many_keys", false]] as const) {
+    const { f } = fakeFetch(() => json(409, { error: { code, message: "m" } }));
+    const r = await partnerClient({ product: "capybaroar", url: "https://cb.test", key: "k", fetch: f }).createBrand({ name: "A", domain: null, external_id: "ws1" });
+    assert.ok(!r.ok);
+    assert.deepEqual([r.code, r.retryable], [code, retryable]);
+  }
 });
 
 test("connectLink posts to the brand's connect-link and needs a web address back", async () => {

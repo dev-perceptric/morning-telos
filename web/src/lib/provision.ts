@@ -6,13 +6,17 @@
 // brand on a retry), make a brand key, seal it, save it ready. If the brand already existed, a retry after a crash
 // may have left an unsaved key there, so its keys are revoked before a new one is made. A product that fails is saved
 // failed with one short line, and doesn't stop the other. Hiccups (timeouts, 429, 5xx) make the job try again later.
+// Arrowsterr needs the workspace's website (NEEDS_DOMAIN). With none, its service waits ("waiting") without a call,
+// and 009_website_gate.sql queues provision again when the website is added.
 
-import { PRODUCT_NAME, PRODUCTS, type Partner, type PartnerFailure, type Product } from "./partner.ts";
+import { NEEDS_DOMAIN, PRODUCT_NAME, PRODUCTS, type Partner, type PartnerFailure, type Product } from "./partner.ts";
 import type { JobResult } from "./jobs.ts";
 
-export type ServiceStatus = "pending" | "ready" | "failed" | "removing" | "removed";
+/** waiting: needs something from the customer first (Arrowsterr: the website). */
+export type ServiceStatus = "pending" | "waiting" | "ready" | "failed" | "removing" | "removed";
 export type ServicePatch =
   | { status: "ready"; brand_id: string; sealed_key: string; key_prefix: string; last_error: null }
+  | { status: "waiting"; last_error: null }
   | { status: "failed"; last_error: string; brand_id?: string };
 
 export type ProvisionDeps = {
@@ -25,7 +29,7 @@ export type ProvisionDeps = {
   save: (product: Product, patch: ServicePatch) => Promise<void>;
 };
 
-export type ProductResult = { product: Product; status: "ready" | "skipped" | "failed"; error?: string; retryable?: boolean };
+export type ProductResult = { product: Product; status: "ready" | "waiting" | "skipped" | "failed"; error?: string; retryable?: boolean };
 
 /** The additional data a brand key is sealed with: it only opens for this workspace and product. */
 export const keyAad = (workspaceId: string, product: Product) => `${workspaceId}:${product}`;
@@ -42,6 +46,8 @@ export function errorLine(product: Product, f: PartnerFailure): string {
   if (f.code === "timeout") return `${name} did not answer in time.`;
   if (f.status === 0) return `Could not reach ${name}.`;
   if (f.code === "bad_response") return `${name} sent an answer we could not read.`;
+  if (f.code === "domain_taken") return "Another customer already tracks this website in SEO. We'll sort it out.";
+  if (f.code === "plan_limit" || f.code === "limit_reached") return `Our ${name} partner plan is full. Raise its limit, then run provision again.`;
   if (f.status === 429) return `${name} asked us to slow down.`;
   if (f.status >= 500) return `${name} had a server problem (${f.status}).`;
   if (f.status === 401) return `${name} did not accept our partner key.`;
@@ -57,11 +63,16 @@ async function one(product: Product, ws: { id: string; name: string; website: st
     await d.save(product, { status: "failed", last_error: error, ...(brand_id ? { brand_id } : {}) });
     return { product, status: "failed", error, retryable };
   };
+  const domain = domainOf(ws.website);
+  if (NEEDS_DOMAIN[product] && !domain) {
+    await d.save(product, { status: "waiting", last_error: null });
+    return { product, status: "waiting" };
+  }
   const p = d.partner(product);
   if (!p.ok) return fail(p.error, false);
   const api = p.partner;
 
-  const brand = await api.createBrand({ name: ws.name, domain: domainOf(ws.website), external_id: ws.id });
+  const brand = await api.createBrand({ name: ws.name, domain, external_id: ws.id });
   if (!brand.ok) return fail(errorLine(product, brand), brand.retryable);
   const brandId = brand.data.id;
   if (brand.status !== 201) {
