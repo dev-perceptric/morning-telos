@@ -3,16 +3,17 @@
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (t) => String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const isMobile = () => matchMedia("(max-width:900px)").matches;
-const S = { me: null, agents: [], apps: [], threads: [], pending: [], business: "Morning Telos", tz: "America/Chicago", model: "auto" };
+const S = { me: null, ws: null, agents: [], services: {}, threads: [], pending: [], blocked: null, model: "auto" };
 const AG = {};
 const IMG = (k) => `/img/agents/${k}-f.webp`, FULL = (k) => `/img/agents/${k}.webp`;
-const APPC = { arrowsterr: ["A", "#d9a441"], capybaroar: ["C", "#c084a7"], claritia: ["C", "#d97757"], omniscient: ["O", "#5b8def"], magpiereply: ["M", "#3f8f5e"], anthropic: ["✳", "#141413"] };
+const APPC = { arrowsterr: ["A", "#d9a441"], capybaroar: ["C", "#c084a7"], claritia: ["C", "#d97757"], anthropic: ["✳", "#141413"], stripe: ["S", "#635bff"] };
+const SVC_ICON = { arrowsterr: ["SEO", "#d9a441"], capybaroar: ["Soc", "#c084a7"] };
 
 // ---------- basics ----------
 function toast(t) { const el = $("#toast"); el.innerHTML = `<span>${esc(t)}</span>`; el.classList.add("on"); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("on"), 3800); }
 async function api(path, { method = "GET", body } = {}) {
   const r = await fetch(path, { method, headers: { "Content-Type": "application/json", "x-mt": "1" }, body: body ? JSON.stringify(body) : undefined });
-  if (r.status === 401 && !path.startsWith("/api/login") && !path.startsWith("/api/setup")) { showAuth(false); throw new Error("Log in first."); }
+  if (r.status === 401 && !path.startsWith("/api/login") && !path.startsWith("/api/signup")) { showAuth("login"); throw new Error("Log in first."); }
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
   return data;
@@ -46,21 +47,26 @@ document.addEventListener("click", (e) => { const t = e.target.closest("[data-to
 
 // ---------- auth ----------
 let authMode = "login";
-function showAuth(setup, needsCode = true) {
-  authMode = setup ? "setup" : "login";
+function showAuth(mode) {
+  authMode = mode === "signup" ? "signup" : "login";
+  const su = authMode === "signup";
   $("#boot").hidden = true; $("#shell").hidden = true; $("#tabbar").hidden = true; $("#auth").hidden = false;
-  $("#authT").textContent = setup ? "Set up your workspace" : "Log in";
-  $("#authS").textContent = setup ? "Create the owner account for your AI team." : "Welcome back to your AI team.";
-  $("#fCode").hidden = !(setup && needsCode); $("#fName").hidden = !setup; $("#pwHint").hidden = !setup;
-  $("#authBtn").textContent = setup ? "Create account" : "Log in";
-  $('#authForm [name="password"]').autocomplete = setup ? "new-password" : "current-password";
-  setTimeout(() => $(setup && needsCode ? '#authForm [name="code"]' : '#authForm [name="email"]').focus(), 50);
+  $("#authT").textContent = su ? "Start your free trial" : "Log in";
+  $("#authS").textContent = su ? "Your AI team, ready in a minute. 14 days free, no card needed." : "Welcome back to your AI team.";
+  $$("[data-su]").forEach((e) => (e.hidden = !su));
+  $("#authBtn").textContent = su ? "Create my workspace" : "Log in";
+  $('#authForm [name="password"]').autocomplete = su ? "new-password" : "current-password";
+  $("#authSwitch").innerHTML = su ? 'Already have an account? <a class="link" href="#login" data-auth="login">Log in</a>' : 'New here? <a class="link" href="#signup" data-auth="signup">Start a free trial</a>';
+  $("#authErr").textContent = "";
+  setTimeout(() => $(su ? '#authForm [name="name"]' : '#authForm [name="email"]').focus(), 50);
 }
+document.addEventListener("click", (e) => { const a = e.target.closest("[data-auth]"); if (a) { e.preventDefault(); history.replaceState(null, "", "#" + a.dataset.auth); showAuth(a.dataset.auth); } });
 $("#authForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const f = new FormData(e.target), body = Object.fromEntries(f.entries());
+  const body = Object.fromEntries(new FormData(e.target).entries());
+  if (authMode === "signup") body.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   $("#authErr").textContent = ""; $("#authBtn").disabled = true;
-  try { await api(authMode === "setup" ? "/api/setup" : "/api/login", { method: "POST", body }); location.hash = "home"; await boot(); }
+  try { await api(authMode === "signup" ? "/api/signup" : "/api/login", { method: "POST", body }); location.hash = "home"; await boot(); }
   catch (err) { $("#authErr").textContent = err.message; }
   finally { $("#authBtn").disabled = false; }
 });
@@ -70,14 +76,13 @@ document.addEventListener("click", async (e) => { if (!e.target.closest("[data-l
 async function init() {
   try {
     const st = await (await fetch("/api/state")).json();
-    if (st.needsSetup) return showAuth(true, st.setupNeedsCode);
-    if (!st.me) return showAuth(false);
+    if (!st.me) return showAuth(location.hash === "#signup" ? "signup" : "login");
     await boot();
   } catch { $("#boot").textContent = "Can't reach the server. Refresh to try again."; }
 }
 async function refresh() {
   const b = await api("/api/bootstrap");
-  S.me = b.me; S.agents = b.agents; S.apps = b.apps; S.threads = b.threads; S.business = b.business; S.tz = b.timezone;
+  Object.assign(S, { me: b.me, ws: b.ws, agents: b.agents, services: b.services, threads: b.threads, blocked: b.blocked });
   S.agents.forEach((a) => (AG[a.key] = a));
   S.pending = await api("/api/approvals?status=pending");
   paintChrome();
@@ -85,10 +90,12 @@ async function refresh() {
 async function boot() {
   await refresh();
   $("#boot").hidden = true; $("#auth").hidden = true; $("#shell").hidden = false; $("#tabbar").hidden = false;
+  if (["#login", "#signup", ""].includes(location.hash)) history.replaceState(null, "", "#home");
   show();
 }
 function paintChrome() {
-  $$("[data-biz]").forEach((e) => (e.textContent = S.business));
+  $$("[data-biz]").forEach((e) => (e.textContent = S.ws?.name || "Morning Telos"));
+  $$("[data-admin]").forEach((e) => (e.hidden = !S.me?.is_admin));
   const nm = S.me?.name || S.me?.email || "";
   $$("[data-initial]").forEach((e) => (e.textContent = (nm[0] || "·").toUpperCase()));
   $$("[data-myname]").forEach((e) => (e.textContent = nm));
@@ -308,28 +315,31 @@ document.addEventListener("click", async (e) => {
 
 // ---------- home ----------
 async function renderHome() {
+  await refresh();
   const h = new Date().getHours(), nm = (S.me?.name || "").split(" ")[0];
   $("#greet").textContent = (h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening") + (nm ? ", " + nm : "");
-  const app = (k) => S.apps.find((a) => a.key === k);
-  const ok = (k) => app(k)?.status === "ok";
+  const ok = (k) => S.services[k]?.ready;
   const sugg = [];
   if (ok("arrowsterr")) sugg.push("@Artemis how is our AI visibility this week?", "@Artemis what should we write next?");
   if (ok("capybaroar")) sugg.push("@Aphrodite plan next week's posts");
-  if (ok("claritia")) sugg.push("@Hora list our forms and booking links", "@Iris draft this month's newsletter");
-  if (!sugg.length) sugg.push("What can my team do once I connect my apps?", "Help me write my brand voice for Knowledge");
+  if (!sugg.length) sugg.push("Help me write a short brand voice guide", "@Hephaestus outline a homepage for my business", "What can my AI team do for me?");
   const IC = '<svg class="ico sm" viewBox="0 0 24 24"><path d="M12 3v3M18.4 5.6l-2.1 2.1M21 12h-3M5.6 5.6l2.1 2.1M3 12h3"/><path d="M9 18h6M10 21h4M12 9a4 4 0 0 0-2 7.5V18h4v-1.5A4 4 0 0 0 12 9Z"/></svg>', GO = '<svg class="ico sm go-ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   $("#sugg").innerHTML = sugg.slice(0, 3).map((c) => `<button class="sg-i" data-chip="${esc(c)}">${IC}<span>${hl(c)}</span>${GO}</button>`).join("");
+  // trial / plan banner
+  const w = S.ws, tb = $("#trialBar");
+  if (S.blocked) { tb.hidden = false; tb.className = "trialbar warn"; tb.innerHTML = `${esc(S.blocked)} <b>Open Billing →</b>`; }
+  else if (w.plan === "trial") { const d = Math.max(0, Math.ceil((new Date(w.trial_ends_at) - Date.now()) / 864e5)); tb.hidden = false; tb.className = "trialbar"; tb.innerHTML = `Free trial: <b>${d} day${d === 1 ? "" : "s"} left</b> · Choose a plan →`; }
+  else tb.hidden = true;
   const [home, know] = await Promise.all([api("/api/home"), api("/api/knowledge")]);
+  const filled = know.some((d) => !/What we sell:\s*\nWho our customers are:/.test(d.body));
   const steps = [
-    ["anthropic", "Add your Claude API key", "This is your team's brain", "#apps"],
-    ["arrowsterr", "Connect Arrowsterr", "For Artemis: SEO and AI visibility", "#apps"],
-    ["capybaroar", "Connect Capybaroar", "For Aphrodite: social posts", "#apps"],
-    ["claritia", "Connect Claritia", "For Iris and Hora: email, forms, bookings", "#apps"],
-  ].map(([k, t, s, href]) => ({ done: ok(k), t, s, href }));
-  steps.push({ done: know.length > 0, t: "Tell your team about your business", s: "Services, prices, voice and rules", href: "#knowledge" });
+    { done: filled, t: "Tell your team about your business", s: "Fill in what you sell, who you serve and how you sound", href: "#knowledge" },
+    { done: S.services.arrowsterr?.setup, t: "SEO and AI visibility", s: "Morning Telos is setting this up for you. Usually within 1 business day.", href: "#team", wait: true },
+    { done: S.services.capybaroar?.setup, t: "Connect your social accounts", s: "Book a quick call and we'll connect Facebook, Instagram and more", href: "https://morningtelos.com/book/", ext: true },
+  ];
   const left = steps.filter((x) => !x.done);
   $("#setupSec").hidden = !left.length; $("#setupN").textContent = left.length;
-  $("#setupList").innerHTML = left.map((x) => `<a class="row" href="${x.href}"><span class="main"><b>${x.t}</b><small>${x.s}</small></span><span class="btn sm">Set up</span></a>`).join("");
+  $("#setupList").innerHTML = left.map((x) => `<a class="row" href="${x.href}"${x.ext ? ' target="_blank" rel="noopener"' : ""}><span class="main"><b>${x.t}</b><small>${x.s}</small></span><span class="${x.wait ? "meta" : "btn sm"}">${x.wait ? "In progress" : x.ext ? "Book a call" : "Start"}</span></a>`).join("");
   $("#homeNeeds").innerHTML = S.pending.length ? S.pending.slice(0, 3).map((p) => apRow(p)).join("") : emptyHTML("All caught up", "Your team will ask you here before changing anything.");
   $("#homeKpis").innerHTML = [["Replies", home.replies], ["Changes done", home.changesDone], ["Waiting on you", S.pending.length], ["AI cost", "$" + home.spend.toFixed(2)]].map(([k, v]) => `<div class="kpi"><small>${k}</small><b>${v}</b><em class="flat">Last 7 days</em></div>`).join("");
   $("#feed").innerHTML = home.activity.length ? home.activity.map((a) => `<${a.thread_id ? `a href="#chat/${a.thread_id}"` : "div"} class="row"><img class="av sm" src="${IMG(a.agent || "chief")}" alt=""><p><b>${AG[a.agent]?.god || "Team"}</b> ${esc(a.text)}</p><span class="meta">${ago(a.created_at)}</span></${a.thread_id ? "a" : "div"}>`).join("") : emptyHTML("Quiet so far", "Ask your team something to get started.");
@@ -338,9 +348,9 @@ async function renderHome() {
 // ---------- team + agent ----------
 function renderTeam() {
   const CATS = [["Marketing", ["social", "seo", "email", "web"]], ["Sales and scheduling", ["sales", "forms"]], ["Customer service", ["support"]], ["Operations", ["chief"]]];
-  const ics = (apps) => `<span class="ics">${apps.filter((x) => APPC[x]).map((x) => `<span class="ic" title="${x}" style="background:${APPC[x][1]}">${APPC[x][0]}</span>`).join("")}</span>`;
-  const st = (a) => !a.enabled ? ["idle", "Paused"] : a.ready ? ["", "Ready"] : ["wait", "Needs " + a.missing.join(", ")];
-  const card = (a) => `<article class="card uc"><div class="top"><img src="${IMG(a.key)}" alt="${a.god}">${ics(a.apps)}</div><div class="r1"><span class="eyebrow">${a.god}</span><span class="status ${st(a)[0]}">${esc(st(a)[1])}</span></div><h3>${a.name}</h3><p>${esc(a.job)}</p><ul>${a.out.map((o) => `<li>${esc(o)}</li>`).join("")}</ul><div class="ft"><a href="#agent/${a.key}">See how it works →</a>${a.ready ? `<button class="btn primary sm try" data-try="${a.key}">Try in chat</button>` : `<a class="btn sm" href="#apps">Connect</a>`}</div></article>`;
+  const ics = (svcs) => `<span class="ics">${svcs.filter((x) => SVC_ICON[x]).map((x) => `<span class="ic" title="${esc(S.services[x]?.label || x)}" style="background:${SVC_ICON[x][1]};width:auto;padding:0 6px;font-size:10px">${SVC_ICON[x][0]}</span>`).join("")}</span>`;
+  const st = (a) => a.soon ? ["idle", "Coming soon"] : !a.enabled ? ["idle", "Paused"] : a.ready ? ["", "Ready"] : ["wait", "Setting up"];
+  const card = (a) => `<article class="card uc"><div class="top"><img src="${IMG(a.key)}" alt="${a.god}">${ics(a.services)}</div><div class="r1"><span class="eyebrow">${a.god}</span><span class="status ${st(a)[0]}">${esc(st(a)[1])}</span></div><h3>${a.name}</h3><p>${esc(a.job)}</p><ul>${a.out.map((o) => `<li>${esc(o)}</li>`).join("")}</ul><div class="ft"><a href="#agent/${a.key}">See how it works →</a>${a.soon ? "" : `<button class="btn primary sm try" data-try="${a.key}">Try in chat</button>`}</div></article>`;
   $("#ucWrap").innerHTML = CATS.map(([c, ks]) => `<section class="uc-sec"><h2>${c}</h2><div class="uc-grid">${ks.map((k) => card(AG[k])).join("")}</div></section>`).join("");
 }
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-try]"); if (!b) return; const k = b.dataset.try; location.hash = "home"; setTimeout(() => { const ta = $("#homeInput"); ta.value = "@" + AG[k].god + " "; ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; }, 80); });
@@ -351,13 +361,13 @@ async function openAgent(k) {
   const a = AG[k]; window._agent = k;
   $("#agImg").src = FULL(k); $("#agImg").alt = "Marble statue of " + a.god;
   $("#agGod").textContent = a.god; $("#agName").textContent = a.name; $("#agJob").textContent = a.job;
-  $("#agTools").innerHTML = (a.apps[0] === "all" ? ["All connected apps"] : a.apps.map((x) => S.apps.find((y) => y.key === x)?.name || x)).map((t) => `<span class="toolc"><i style="background:${APPC[a.apps.find((x) => (S.apps.find((y) => y.key === x)?.name) === t)]?.[1] || "#999"}"></i>${esc(t)}</span>`).join("");
+  $("#agTools").innerHTML = a.soon ? `<span class="toolc">Coming soon</span>` : a.services.map((x) => `<span class="toolc"><i style="background:${S.services[x]?.ready ? "var(--green)" : "var(--ink-4)"}"></i>${esc(S.services[x]?.label || x)}${S.services[x]?.ready ? "" : " · setting up"}</span>`).join("") || `<span class="toolc">Knowledge and chat</span>`;
   $("#agTog").setAttribute("aria-checked", a.enabled); $("#agOnLbl").textContent = a.enabled ? "Working" : "Paused";
   $("#trust").innerHTML = TRUST.map(([v, t, s]) => `<button class="radio" role="radio" aria-checked="${a.trust === v}" data-trust="${v}"><span class="rd"></span><span><b>${t}</b><small>${s}</small></span></button>`).join("");
-  if (!agThreads[k]) $("#agChat").innerHTML = `<div class="msg"><img class="av" src="${IMG(k)}" alt=""><div class="body"><div class="who">${a.god} <span>· ${a.name}</span></div>${md(a.ready ? `Hi, I'm ${a.god}. ${a.job} What do you need?` : `Hi, I'm ${a.god}. Connect ${a.missing.join(" and ")} in Apps so I can do real work.`)}</div></div>`;
+  if (!agThreads[k]) $("#agChat").innerHTML = `<div class="msg"><img class="av" src="${IMG(k)}" alt=""><div class="body"><div class="who">${a.god} <span>· ${a.name}</span></div>${md(a.soon ? `Hi, I'm ${a.god}. I'm coming soon.` : a.ready ? `Hi, I'm ${a.god}. ${a.job} What do you need?` : `Hi, I'm ${a.god}. Morning Telos is still setting up ${a.missing.join(" and ").toLowerCase()} for you, so I'll work from your Knowledge for now.`)}</div></div>`;
   setTab("ov");
   const [st, know] = await Promise.all([api(`/api/agents/${k}/stats`), api("/api/knowledge")]);
-  $("#agKpis").innerHTML = [["Replies", st.replies], ["Changes done", st.done], ["Waiting on you", st.pending], ["Status", !a.enabled ? "Paused" : a.ready ? "Ready" : "Setup"]].map(([x, v]) => `<div class="kpi"><small>${x}</small><b>${v}</b><em class="flat">${x === "Status" ? (a.ready ? "All apps connected" : "Needs " + esc(a.missing.join(", "))) : "Last 7 days"}</em></div>`).join("");
+  $("#agKpis").innerHTML = [["Replies", st.replies], ["Changes done", st.done], ["Waiting on you", st.pending], ["Status", a.soon ? "Soon" : !a.enabled ? "Paused" : a.ready ? "Ready" : "Setup"]].map(([x, v]) => `<div class="kpi"><small>${x}</small><b>${v}</b><em class="flat">${x === "Status" ? (a.soon ? "Coming soon" : a.ready ? "All services ready" : "Setting up " + esc(a.missing.join(", ").toLowerCase())) : "Last 7 days"}</em></div>`).join("");
   const mine = S.pending.filter((p) => p.agent === k);
   $("#agNeeds").innerHTML = mine.length ? mine.map((p) => apRow(p)).join("") : emptyHTML("Nothing waiting", "All caught up.");
   $("#agRecent").innerHTML = st.recent.length ? st.recent.map((r) => `<div class="row"><p>${esc(r.text)}</p><span class="meta">${ago(r.created_at)}</span></div>`).join("") : emptyHTML("No work yet", "Send a message to get started.");
@@ -375,8 +385,8 @@ async function renderRoutines() {
   $("#rtList").innerHTML = list.length ? list.map((r) => `<div class="row"><img class="av" src="${IMG(r.agent)}" alt=""><span class="main"><b>${esc(r.title)}</b><small>${AG[r.agent]?.god} · ${dayTxt(r.days)} at ${r.at_time}${r.last_run_at ? " · last ran " + ago(r.last_run_at) : ""}</small></span><button class="btn sm ghost" data-rtrun="${r.id}">Run now</button><button class="switch" role="switch" aria-checked="${r.enabled}" data-rt="${r.id}" aria-label="${esc(r.title)}"></button><button class="icon-btn" data-rtdel="${r.id}" aria-label="Delete routine"><svg class="ico sm" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg></button></div>`).join("") : emptyHTML("No routines yet", "Example: every Monday at 8am, Aphrodite plans the week's posts.");
 }
 $("#rtNew").addEventListener("click", () => {
-  const opts = S.agents.map((a) => `<option value="${a.key}">${a.god} · ${a.name}</option>`).join("");
-  openDrawer("New routine", `<form id="rtForm"><label class="fld"><span>Teammate</span><select class="sel" name="agent">${opts}</select></label><label class="fld"><span>Name</span><input class="inp" name="title" placeholder="Plan next week's posts"></label><label class="fld"><span>What to do</span><textarea class="ta" name="instruction" placeholder="Look at last week's results and draft 5 posts for next week."></textarea></label><div class="fld"><span>Days</span><div class="daypick">${DAYS.map((d, i) => `<label><input type="checkbox" name="days" value="${i}" ${i >= 1 && i <= 5 ? "checked" : ""}>${d}</label>`).join("")}</div></div><label class="fld"><span>Time (${esc(S.tz)})</span><input class="inp" type="time" name="at_time" value="08:00"></label><div class="err" id="rtErr"></div><button class="btn primary">Save routine</button></form>`);
+  const opts = S.agents.filter((a) => !a.soon).map((a) => `<option value="${a.key}">${a.god} · ${a.name}</option>`).join("");
+  openDrawer("New routine", `<form id="rtForm"><label class="fld"><span>Teammate</span><select class="sel" name="agent">${opts}</select></label><label class="fld"><span>Name</span><input class="inp" name="title" placeholder="Plan next week's posts"></label><label class="fld"><span>What to do</span><textarea class="ta" name="instruction" placeholder="Look at last week's results and draft 5 posts for next week."></textarea></label><div class="fld"><span>Days</span><div class="daypick">${DAYS.map((d, i) => `<label><input type="checkbox" name="days" value="${i}" ${i >= 1 && i <= 5 ? "checked" : ""}>${d}</label>`).join("")}</div></div><label class="fld"><span>Time (${esc(S.ws.timezone)})</span><input class="inp" type="time" name="at_time" value="08:00"></label><div class="err" id="rtErr"></div><button class="btn primary">Save routine</button></form>`);
   $("#rtForm").addEventListener("submit", async (e) => { e.preventDefault(); const f = new FormData(e.target); try { await api("/api/routines", { method: "POST", body: { agent: f.get("agent"), title: f.get("title"), instruction: f.get("instruction"), days: f.getAll("days").map(Number), at_time: f.get("at_time") } }); closeDrawer(); toast("Routine saved"); renderRoutines(); } catch (x) { $("#rtErr").textContent = x.message; } });
 });
 $("#rtList").addEventListener("click", async (e) => {
@@ -408,34 +418,79 @@ document.addEventListener("submit", async (e) => {
 });
 document.addEventListener("click", async (e) => { const b = e.target.closest("[data-kdel]"); if (!b || !confirm("Delete this doc?")) return; await api("/api/knowledge/" + b.dataset.kdel, { method: "DELETE" }); kSel = null; if ($("#dw").classList.contains("on")) closeDrawer(); renderKnowledge(); });
 
-// ---------- apps ----------
-async function renderApps() {
-  S.apps = await api("/api/apps");
+// ---------- billing ----------
+const SECRET_ATTRS = 'type="text" class="inp secret" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other"';
+async function renderBilling() {
+  const b = await api("/api/billing"), w = b.ws, owner = S.me?.role === "owner";
+  if (new URLSearchParams(location.hash.split("?")[1] || "").get("paid")) toast("Thanks! Your plan is active.");
+  const pct = b.budget ? Math.min(100, Math.round((b.used / b.budget) * 100)) : 0;
+  const trialDays = Math.max(0, Math.ceil((new Date(w.trial_ends_at) - Date.now()) / 864e5));
+  const planName = w.plan === "trial" ? "Free trial" : w.plan === "internal" ? "Morning Telos team" : (b.plans.find((p) => p.key === w.plan)?.name || w.plan);
+  $("#planNow").innerHTML = `<div class="sh" style="margin-bottom:4px"><h2>${esc(planName)}</h2><span class="status ${w.status === "active" || w.status === "trialing" ? "" : "wait"}">${esc(w.plan === "trial" ? `${trialDays} day${trialDays === 1 ? "" : "s"} left` : w.status)}</span></div>
+    ${w.plan === "internal" ? `<p style="color:var(--ink-3);font-size:13.5px">No limits for the Morning Telos team.</p>` : `<div class="meter"><i style="width:${pct}%"></i></div><p style="color:var(--ink-3);font-size:13px">${pct}% of this period's AI allowance used.</p>`}`;
+  $("#portalBtn").hidden = !(b.hasBilling && owner);
+  $("#planGrid").innerHTML = b.plans.length ? b.plans.map((p) => `<div class="card plan ${p.key === w.plan ? "cur" : ""}"><h3>${esc(p.name)}</h3><span class="price">${esc(p.price_label || "")}</span><p>Your full AI team with ${p.key === "pro" ? "a bigger" : "a monthly"} AI allowance.</p>
+    ${p.key === w.plan ? `<span class="btn sm" style="pointer-events:none">Current plan</span>` : p.buyable && b.stripe && owner ? `<button class="btn primary sm" data-buy="${p.key}">Choose ${esc(p.name)}</button>` : `<a class="btn sm" href="https://morningtelos.com/book/" target="_blank" rel="noopener">Talk to us</a>`}</div>`).join("") : emptyHTML("Plans coming soon", "Talk to us to keep your team after the trial.");
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-buy]"); if (!b) return;
+  b.disabled = true;
+  try { const r = await api("/api/billing/checkout", { method: "POST", body: { plan: b.dataset.buy } }); location.href = r.url; } catch (x) { toast(x.message); b.disabled = false; }
+});
+$("#portalBtn").addEventListener("click", async () => { try { const r = await api("/api/billing/portal", { method: "POST" }); location.href = r.url; } catch (x) { toast(x.message); } });
+
+// ---------- admin ----------
+async function renderAdmin() {
+  if (!S.me?.is_admin) { location.hash = "home"; return; }
+  const d = await api("/api/admin/overview");
   const st = (a) => a.status === "ok" ? `<span class="pillst ok">Connected${a.toolCount ? ` · ${a.toolCount} tools` : ""}</span>` : a.status === "error" ? `<span class="pillst error">Not working</span>` : `<span class="pillst off">Not connected</span>`;
-  $("#appsGrid").innerHTML = S.apps.map((a) => `<div class="card appx"><div class="hd"><span class="lg" style="background:${APPC[a.key]?.[1] || "#999"}">${APPC[a.key]?.[0] || "?"}</span><span class="tx"><b>${esc(a.name)}</b><small>${esc(a.help)}</small></span>${st(a)}</div>
-    <form data-app="${a.key}">${a.kind === "mcp" ? `<input class="inp" name="url" placeholder="https://…/mcp" value="${esc(a.url)}" aria-label="${esc(a.name)} MCP address">` : ""}
-    <input class="inp" name="key" type="password" autocomplete="off" placeholder="${a.hasKey ? "Key saved. Paste a new one to replace it" : "Paste API key"}" aria-label="${esc(a.name)} API key">
+  $("#admApps").innerHTML = d.apps.map((a) => `<div class="card appx"><div class="hd"><span class="lg" style="background:${APPC[a.key]?.[1] || "#999"}">${APPC[a.key]?.[0] || "?"}</span><span class="tx"><b>${esc(a.name)}</b><small>${esc(a.help)}</small></span>${st(a)}</div>
+    <form data-app="${a.key}" autocomplete="off">${a.kind === "mcp" ? `<input class="inp" name="mcp_address" autocomplete="off" data-1p-ignore data-lpignore="true" placeholder="https://…/mcp" value="${esc(a.url)}" aria-label="${esc(a.name)} MCP address">` : ""}
+    <input ${SECRET_ATTRS} name="k_secret" placeholder="${a.hasKey ? "Saved. Paste a new key to replace it" : "Paste key"}" aria-label="${esc(a.name)} key">
+    ${a.kind === "stripe" ? `<input ${SECRET_ATTRS} name="k_whsec" placeholder="Webhook signing secret (whsec_…)" aria-label="Stripe webhook secret">` : ""}
     ${a.error ? `<div class="err">${esc(a.error)}</div>` : ""}
     <div class="row2"><button class="btn primary sm">${a.status === "ok" ? "Update" : "Save and test"}</button>${a.hasKey ? `<button type="button" class="btn ghost sm" data-appdel="${a.key}">Disconnect</button>` : ""}</div></form></div>`).join("");
-  const s = await api("/api/settings"); $("#hookUrl").textContent = s.hook_url;
+  $("#admHook").textContent = "Stripe webhook: " + d.hookUrl;
+  $("#admPlans").innerHTML = `<div class="plan-edit h"><span>Plan</span><span>Name</span><span>Price label</span><span>Stripe price id</span><span>AI $ / period</span></div>` +
+    d.plans.map((p) => `<div class="plan-edit" data-plan="${p.key}"><b style="font-size:13px">${p.key}</b><input class="inp" name="name" value="${esc(p.name)}"><input class="inp" name="price_label" value="${esc(p.price_label)}" placeholder="$99/month"><input class="inp" name="stripe_price_id" value="${esc(p.stripe_price_id || "")}" placeholder="price_…" ${p.key === "trial" ? "disabled" : ""}><input class="inp" name="ai_budget_usd" type="number" min="0" step="1" value="${Number(p.ai_budget_usd)}"></div>`).join("") +
+    `<button class="btn primary sm" style="margin-top:6px">Save plans</button>`;
+  $("#admWs").innerHTML = d.workspaces.map((w) => `<form class="adm-row" data-ws="${w.id}" autocomplete="off"><span><b>${esc(w.name)}</b><small>${esc(w.owner_email || "")} · ${esc(w.website || "no site")} · ${w.users} ${w.users === 1 ? "person" : "people"} · $${w.spend30.toFixed(2)} AI / 30d</small></span>
+    <input class="inp" name="arrowsterr_brand" placeholder="Arrowsterr brand" value="${esc(w.arrowsterr_brand || "")}" autocomplete="off" data-1p-ignore>
+    <input class="inp" name="capybaroar_brand_id" placeholder="Capybaroar brand id" value="${esc(w.capybaroar_brand_id || "")}" autocomplete="off" data-1p-ignore>
+    <span style="display:flex;gap:6px"><select class="sel" name="plan">${["trial", "starter", "pro", "internal"].map((p) => `<option ${p === w.plan ? "selected" : ""}>${p}</option>`).join("")}</select><select class="sel" name="status">${["trialing", "active", "past_due", "canceled"].map((p) => `<option ${p === w.status ? "selected" : ""}>${p}</option>`).join("")}</select></span>
+    <span style="display:flex;gap:6px"><button class="btn sm">Save</button><button type="button" class="btn ghost sm" data-extend="${w.id}" title="Add 7 trial days">+7d</button></span></form>`).join("") || emptyHTML("No workspaces", "");
 }
 document.addEventListener("submit", async (e) => {
-  const f = e.target.closest("[data-app]"); if (!f) return;
-  e.preventDefault(); const b = f.querySelector("button"); b.disabled = true; b.textContent = "Testing…";
-  const d = Object.fromEntries(new FormData(f).entries());
-  try { const r = await api("/api/apps/" + f.dataset.app, { method: "POST", body: d }); toast(r.status === "ok" ? "Connected" : "Saved, but the test failed: " + r.error); }
-  catch (x) { toast(x.message); }
-  await refresh(); renderApps();
+  const f = e.target.closest("[data-app]");
+  if (f) {
+    e.preventDefault(); const b = f.querySelector("button"); b.disabled = true; b.textContent = "Testing…";
+    const d = Object.fromEntries(new FormData(f).entries());
+    try { const r = await api("/api/admin/apps/" + f.dataset.app, { method: "POST", body: { url: d.mcp_address, key: d.k_secret, webhook_secret: d.k_whsec } }); toast(r.status === "ok" ? "Connected" : "Saved, but the test failed: " + r.error); }
+    catch (x) { toast(x.message); }
+    await refresh(); return renderAdmin();
+  }
+  const w = e.target.closest("[data-ws]");
+  if (w) { e.preventDefault(); try { await api("/api/admin/workspaces/" + w.dataset.ws, { method: "POST", body: Object.fromEntries(new FormData(w).entries()) }); toast("Workspace saved"); } catch (x) { toast(x.message); } return renderAdmin(); }
+  if (e.target.id === "admPlans") {
+    e.preventDefault();
+    const plans = $$("[data-plan]", e.target).map((r) => ({ key: r.dataset.plan, ...Object.fromEntries($$("input", r).map((i) => [i.name, i.value])) }));
+    try { await api("/api/admin/plans", { method: "POST", body: { plans } }); toast("Plans saved"); } catch (x) { toast(x.message); }
+  }
 });
-document.addEventListener("click", async (e) => { const b = e.target.closest("[data-appdel]"); if (!b || !confirm("Disconnect this app? Its key will be deleted.")) return; await api("/api/apps/" + b.dataset.appdel, { method: "DELETE" }); await refresh(); renderApps(); });
+document.addEventListener("click", async (e) => {
+  const x = e.target.closest("[data-extend]");
+  if (x) { await api("/api/admin/workspaces/" + x.dataset.extend, { method: "POST", body: { extend_trial_days: 7 } }); toast("Trial extended 7 days"); return renderAdmin(); }
+  const b = e.target.closest("[data-appdel]");
+  if (b && confirm("Disconnect this platform app? Every workspace loses it.")) { await api("/api/admin/apps/" + b.dataset.appdel, { method: "DELETE" }); renderAdmin(); }
+});
 
 // ---------- settings ----------
 const TZS = ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu", "Europe/London", "Europe/Berlin", "Asia/Ho_Chi_Minh", "Asia/Singapore", "Australia/Sydney", "UTC"];
 async function renderSettings() {
-  const s = await api("/api/settings");
-  $('#bizForm [name="business_name"]').value = s.business_name;
-  $("#tzSel").innerHTML = [...new Set([s.timezone, ...TZS])].map((z) => `<option ${z === s.timezone ? "selected" : ""}>${z}</option>`).join("");
-  const owner = S.me?.role === "owner";
+  const s = await api("/api/settings"), owner = S.me?.role === "owner";
+  $('#bizForm [name="name"]').value = s.ws.name; $('#bizForm [name="website"]').value = s.ws.website || "";
+  $("#tzSel").innerHTML = [...new Set([s.ws.timezone, ...TZS])].map((z) => `<option ${z === s.ws.timezone ? "selected" : ""}>${z}</option>`).join("");
+  $$("#bizForm input, #bizForm select, #bizForm button").forEach((x) => (x.disabled = !owner));
   $("#userList").innerHTML = s.users.map((u) => `<div class="row"><span class="avatar-me" style="width:32px;height:32px">${esc((u.name || u.email)[0].toUpperCase())}</span><span class="main"><b>${esc(u.name || u.email)}</b><small>${esc(u.email)} · ${u.role === "owner" ? "Owner" : "Teammate"}</small></span>${owner && u.role !== "owner" ? `<button class="btn ghost sm" data-udel="${u.id}">Remove</button>` : ""}</div>`).join("");
   $("#userForm").hidden = !owner;
 }
@@ -445,13 +500,13 @@ $("#userForm").addEventListener("submit", async (e) => { e.preventDefault(); $("
 document.addEventListener("click", async (e) => { const b = e.target.closest("[data-udel]"); if (!b || !confirm("Remove this person?")) return; await api("/api/users/" + b.dataset.udel, { method: "DELETE" }); renderSettings(); });
 
 // ---------- command palette ----------
-const PAGES = [["home", "Home"], ["approvals", "Approvals"], ["team", "Team"], ["routines", "Routines"], ["knowledge", "Knowledge"], ["apps", "Apps"], ["settings", "Settings"]];
+const PAGES = [["home", "Home"], ["approvals", "Approvals"], ["team", "Team"], ["routines", "Routines"], ["knowledge", "Knowledge"], ["billing", "Billing"], ["settings", "Settings"]];
 let palSel = 0, palItems = [];
 function renderPal() {
   const q = $("#palIn").value.toLowerCase().trim();
   const items = [
     { l: "New request", k: "Actions", go: () => { location.hash = "home"; setTimeout(() => $("#homeInput").focus(), 80); }, i: '<span class="pi">+</span>' },
-    ...PAGES.map((p) => ({ l: p[1], k: "Pages", go: () => (location.hash = p[0]), i: '<span class="pi">›</span>' })),
+    ...[...PAGES, ...(S.me?.is_admin ? [["admin", "Admin"]] : [])].map((p) => ({ l: p[1], k: "Pages", go: () => (location.hash = p[0]), i: '<span class="pi">›</span>' })),
     ...S.agents.map((a) => ({ l: `${a.god} · ${a.name}`, k: "Teammates", go: () => (location.hash = "agent/" + a.key), i: `<img src="${IMG(a.key)}" alt="">` })),
     ...S.threads.map((t) => ({ l: t.title, k: "Chats", go: () => (location.hash = "chat/" + t.id), i: '<span class="pi">#</span>' })),
   ].filter((x) => !q || x.l.toLowerCase().includes(q));
@@ -467,19 +522,19 @@ document.addEventListener("click", (e) => { if (e.target.closest("[data-pal]")) 
 document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k" && !$("#shell").hidden) { e.preventDefault(); $("#pal").classList.contains("on") ? closePal() : openPal(); } });
 $("#palIn").addEventListener("input", () => { palSel = 0; renderPal(); });
 $("#palIn").addEventListener("keydown", (e) => { if (e.key === "ArrowDown") { e.preventDefault(); palSel = (palSel + 1) % palItems.length; renderPal(); } else if (e.key === "ArrowUp") { e.preventDefault(); palSel = (palSel - 1 + palItems.length) % palItems.length; renderPal(); } else if (e.key === "Enter") { e.preventDefault(); runPal(palSel); } });
-document.addEventListener("click", (e) => { if (!e.target.closest("[data-more]")) return; openDrawer("More", `<div class="card list">${[["routines", "Routines"], ["apps", "Apps"], ["settings", "Settings"]].map((p) => `<a class="row" href="#${p[0]}" data-close><span class="main"><b>${p[1]}</b></span><svg class="ico sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></a>`).join("")}<button class="row" data-logout><span class="main"><b>Log out</b></span></button></div>`); });
+document.addEventListener("click", (e) => { if (!e.target.closest("[data-more]")) return; openDrawer("More", `<div class="card list">${[["routines", "Routines"], ["billing", "Billing"], ["settings", "Settings"], ...(S.me?.is_admin ? [["admin", "Admin"]] : [])].map((p) => `<a class="row" href="#${p[0]}" data-close><span class="main"><b>${p[1]}</b></span><svg class="ico sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></a>`).join("")}<button class="row" data-logout><span class="main"><b>Log out</b></span></button></div>`); });
 
 // ---------- router ----------
 function show(keepScroll) {
   if ($("#shell").hidden) return;
-  let [v, arg] = (location.hash.slice(1) || "home").split("/");
+  let [v, arg] = (location.hash.slice(1).split("?")[0] || "home").split("/");
   if (!document.getElementById("v-" + v)) v = "home";
   if (v === "agent" && !AG[arg]) v = "team";
   $$(".view").forEach((x) => x.classList.toggle("on", x.id === "v-" + v));
   const navV = v === "agent" ? "team" : v === "chat" ? "home" : v;
-  $$("[data-v]").forEach((a) => { const on = a.dataset.v === navV || (a.dataset.v === "more" && ["routines", "apps", "settings"].includes(navV)); a.classList.toggle("on", on); if (a.tagName === "A") a.toggleAttribute("aria-current", on); });
+  $$("[data-v]").forEach((a) => { const on = a.dataset.v === navV || (a.dataset.v === "more" && ["routines", "billing", "settings", "admin"].includes(navV)); a.classList.toggle("on", on); if (a.tagName === "A") a.toggleAttribute("aria-current", on); });
   if (v !== "agent") window._agent = null;
-  const run = { home: renderHome, approvals: renderApprovals, team: renderTeam, routines: renderRoutines, knowledge: renderKnowledge, apps: renderApps, settings: renderSettings }[v];
+  const run = { home: renderHome, approvals: renderApprovals, team: renderTeam, routines: renderRoutines, knowledge: renderKnowledge, billing: renderBilling, admin: renderAdmin, settings: renderSettings }[v];
   if (run) Promise.resolve(run()).catch((e) => toast(e.message));
   if (v === "agent") openAgent(arg).catch((e) => toast(e.message));
   if (v === "chat" && arg && +arg !== curThread) openThread(+arg);

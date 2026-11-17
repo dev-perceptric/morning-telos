@@ -21,12 +21,14 @@
     <span class="logo"><svg viewBox="0 0 28 20" aria-hidden="true"><g fill="#D97757"><rect x="8" y="0" width="12" height="4"/><rect x="4" y="4" width="20" height="4"/><rect x="0" y="8" width="28" height="4"/><rect x="0" y="16" width="28" height="4"/></g></svg></span>
     <h1 id="authT">Log in</h1>
     <p class="sub" id="authS">Welcome back to your AI team.</p>
-    <label class="fld" id="fCode" hidden><span>Setup code</span><input class="inp" name="code" autocomplete="off"><small>The one-time code Morning Telos gave you.</small></label>
-    <label class="fld" id="fName" hidden><span>Your name</span><input class="inp" name="name" autocomplete="name"></label>
+    <label class="fld" data-su hidden><span>Your name</span><input class="inp" name="name" autocomplete="name"></label>
+    <label class="fld" data-su hidden><span>Business name</span><input class="inp" name="business" autocomplete="organization"></label>
+    <label class="fld" data-su hidden><span>Website <em style="font-style:normal;color:var(--ink-4);font-weight:400">(optional)</em></span><input class="inp" name="website" autocomplete="url" placeholder="yourbusiness.com"></label>
     <label class="fld"><span>Email</span><input class="inp" name="email" type="email" autocomplete="email" required></label>
-    <label class="fld"><span>Password</span><input class="inp" name="password" type="password" autocomplete="current-password" required><small id="pwHint" hidden>At least 10 characters.</small></label>
+    <label class="fld"><span>Password</span><input class="inp" name="password" type="password" autocomplete="current-password" required><small data-su hidden>At least 10 characters.</small></label>
     <div class="err" id="authErr" role="alert"></div>
     <button class="btn primary full" id="authBtn">Log in</button>
+    <p class="sub" style="margin:14px 0 0;text-align:center;font-size:13.5px" id="authSwitch"></p>
   </form>
 </div>
 
@@ -47,7 +49,8 @@
       <a class="nl" href="#routines" data-v="routines"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Routines</a>
       <div class="grp"><h6>Setup</h6>
         <a class="nl" href="#knowledge" data-v="knowledge"><svg class="ico" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19V5M8 7h6"/></svg>Knowledge</a>
-        <a class="nl" href="#apps" data-v="apps"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Apps</a>
+        <a class="nl" href="#billing" data-v="billing"><svg class="ico" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>Billing</a>
+        <a class="nl" href="#admin" data-v="admin" data-admin hidden><svg class="ico" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6Z"/></svg>Admin</a>
         <a class="nl" href="#settings" data-v="settings"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</a>
       </div>
     </nav>
@@ -68,6 +71,7 @@
     <main id="main">
       <!-- HOME -->
       <section class="view narrow" id="v-home">
+        <a class="trialbar" id="trialBar" href="#billing" hidden></a>
         <div class="hero"><p id="greet">Hello</p><h1>What should your team do today?</h1></div>
         <form class="composer down" id="homeForm">
           <label class="sr" for="homeInput">Ask your team</label>
@@ -113,7 +117,7 @@
 
       <!-- TEAM -->
       <section class="view" id="v-team">
-        <div class="ph"><div><h1>Team</h1><p>AI employees that work inside your apps. Tag any of them with @.</p></div></div>
+        <div class="ph"><div><h1>Team</h1><p>Your AI employees, each named after a Greek god. Tag any of them with @.</p></div></div>
         <div id="ucWrap"></div>
       </section>
 
@@ -166,11 +170,20 @@
         <div class="split"><div class="card list" id="kList"></div><div class="card pad pane" id="kPane"></div></div>
       </section>
 
-      <!-- APPS -->
-      <section class="view" id="v-apps">
-        <div class="ph"><div><h1>Apps</h1><p>Your team's hands. Keys are encrypted and never shown again after you save them.</p></div></div>
-        <div class="apps2" id="appsGrid"></div>
-        <div class="sec"><div class="sh"><h2>Form submissions</h2></div><div class="note-box">To send Claritia form submissions here, add this webhook address in Claritia: <br><code id="hookUrl"></code></div></div>
+      <!-- BILLING -->
+      <section class="view" id="v-billing">
+        <div class="ph"><div><h1>Billing</h1><p>Your plan and how much of this period's AI allowance your team has used.</p></div><button class="btn" id="portalBtn" hidden>Manage billing</button></div>
+        <div class="card pad" id="planNow"></div>
+        <div class="sec"><div class="sh"><h2>Plans</h2></div><div class="plans" id="planGrid"></div></div>
+      </section>
+
+      <!-- ADMIN -->
+      <section class="view" id="v-admin">
+        <div class="ph"><div><h1>Admin</h1><p>Morning Telos only. Platform keys, plans and every customer workspace.</p></div></div>
+        <div class="sh"><h2>Platform apps</h2><span class="meta" style="font-size:12px;color:var(--ink-4)">Morning Telos's own accounts. Customers never see these.</span></div>
+        <div class="apps2" id="admApps"></div>
+        <div class="sec"><div class="sh"><h2>Plans</h2><span class="meta" style="font-size:12px;color:var(--ink-4)" id="admHook"></span></div><form class="card pad" id="admPlans"></form></div>
+        <div class="sec"><div class="sh"><h2>Workspaces</h2></div><div class="card list" id="admWs"></div></div>
       </section>
 
       <!-- SETTINGS -->
@@ -178,7 +191,8 @@
         <div class="ph"><div><h1>Settings</h1><p>Your business, your people and your account.</p></div><button class="btn" data-logout>Log out</button></div>
         <div class="two">
           <form class="card pad" id="bizForm"><div class="sh"><h2>Business</h2></div>
-            <label class="fld"><span>Business name</span><input class="inp" name="business_name"></label>
+            <label class="fld"><span>Business name</span><input class="inp" name="name"></label>
+            <label class="fld"><span>Website</span><input class="inp" name="website" placeholder="yourbusiness.com"></label>
             <label class="fld"><span>Time zone</span><select class="sel" name="timezone" id="tzSel"></select><small>Routines run on this time zone.</small></label>
             <button class="btn primary">Save</button> <span class="ok-t" id="bizOk"></span></form>
           <form class="card pad" id="pwForm"><div class="sh"><h2>Change password</h2></div>

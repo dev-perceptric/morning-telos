@@ -568,3 +568,28 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
 .note-box code{font:12px var(--mono);word-break:break-all;color:var(--ink-2)}
 .need{font-size:12px;color:var(--amber);font-weight:600}
 @media (max-width:900px){.apps2,.form-grid{grid-template-columns:1fr}.step,.ap-inline{padding-left:0;margin-left:0}}
+
+/* ---------- product additions ---------- */
+.secret{-webkit-text-security:disc;text-security:disc}
+.trialbar{display:flex;justify-content:center;gap:8px;align-items:center;margin:8px auto 0;max-width:max-content;font-size:13px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:6px 14px;box-shadow:var(--sh)}
+.trialbar b{color:var(--clay-2)}
+.trialbar.warn{border-color:var(--clay);background:var(--clay-bg)}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.plan{padding:18px 20px;display:flex;flex-direction:column;gap:6px}
+.plan h3{font:400 24px/1.1 var(--serif)}
+.plan .price{font-size:14px;color:var(--ink-2);font-weight:600}
+.plan p{font-size:13px;color:var(--ink-3)}
+.plan .btn{margin-top:10px;align-self:flex-start}
+.plan.cur{border-color:var(--clay)}
+.meter{height:8px;border-radius:99px;background:var(--sunk-2);overflow:hidden;margin:10px 0 6px}
+.meter i{display:block;height:100%;background:var(--clay);border-radius:99px}
+.svc{display:flex;align-items:center;gap:8px;font-size:13px}
+.adm-row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1.2fr auto;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.adm-row:first-child{border-top:0}
+.adm-row .inp,.adm-row .sel{padding:6px 9px;font-size:13px}
+.adm-row b{font-size:13.5px;display:block}
+.adm-row small{font-size:12px;color:var(--ink-4);display:block}
+.plan-edit{display:grid;grid-template-columns:110px 1fr 1fr 1.4fr 110px;gap:8px;align-items:center;margin-bottom:8px}
+.plan-edit .inp{padding:6px 9px;font-size:13px}
+.plan-edit.h{font-size:11.5px;color:var(--ink-4);font-weight:600}
+@media (max-width:900px){.plans{grid-template-columns:1fr}.adm-row,.plan-edit{grid-template-columns:1fr}}

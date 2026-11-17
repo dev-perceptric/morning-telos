@@ -1,4 +1,4 @@
-// Postgres connection and schema. The schema is created on start (idempotent).
+// Postgres connection, schema and migrations (all idempotent, run on start).
 import pg from "pg";
 
 export const pool = new pg.Pool({
@@ -11,6 +11,23 @@ export const one = async (text, params) => (await pool.query(text, params)).rows
 export const all = async (text, params) => (await pool.query(text, params)).rows;
 
 const SCHEMA = `
+create table if not exists workspaces (
+  id serial primary key,
+  name text not null,
+  website text not null default '',
+  timezone text not null default 'America/Chicago',
+  plan text not null default 'trial',
+  status text not null default 'trialing',
+  trial_ends_at timestamptz not null default now() + interval '14 days',
+  period_start timestamptz not null default now(),
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  arrowsterr_brand text,
+  capybaroar_brand_id text,
+  setup_note text not null default '',
+  hook_token text,
+  created_at timestamptz not null default now()
+);
 create table if not exists users (
   id serial primary key,
   email text unique not null,
@@ -19,15 +36,15 @@ create table if not exists users (
   role text not null default 'member',
   created_at timestamptz not null default now()
 );
+alter table users add column if not exists workspace_id int references workspaces(id) on delete cascade;
+alter table users add column if not exists is_admin boolean not null default false;
 create table if not exists sessions (
   token text primary key,
   user_id int not null references users(id) on delete cascade,
   expires_at timestamptz not null
 );
-create table if not exists settings (
-  key text primary key,
-  value text
-);
+create table if not exists settings (key text primary key, value text);
+-- Platform connections: Morning Telos's own keys (Claude, Arrowsterr, Capybaroar, Stripe...).
 create table if not exists connections (
   tool text primary key,
   url text,
@@ -37,10 +54,12 @@ create table if not exists connections (
   error text,
   updated_at timestamptz not null default now()
 );
-create table if not exists agent_settings (
-  agent text primary key,
+create table if not exists agent_prefs (
+  workspace_id int not null references workspaces(id) on delete cascade,
+  agent text not null,
   enabled boolean not null default true,
-  trust int not null default 0
+  trust int not null default 0,
+  primary key (workspace_id, agent)
 );
 create table if not exists knowledge (
   id serial primary key,
@@ -85,7 +104,6 @@ create table if not exists approvals (
   created_at timestamptz not null default now(),
   decided_at timestamptz
 );
-create index if not exists approvals_status on approvals(status, id);
 create table if not exists activity (
   id serial primary key,
   agent text,
@@ -120,19 +138,49 @@ create table if not exists submissions (
   payload jsonb not null,
   created_at timestamptz not null default now()
 );
+create table if not exists plans (
+  key text primary key,
+  name text not null,
+  price_label text not null default '',
+  stripe_price_id text,
+  ai_budget_usd numeric not null default 10,
+  sort int not null default 0,
+  active boolean not null default true
+);
 `;
+const SCOPED = ["knowledge", "threads", "approvals", "activity", "usage", "routines", "submissions"];
 
 export async function migrate() {
-  for (let i = 0; i < 30; i++) {
-    try {
-      await pool.query(SCHEMA);
-      return;
-    } catch (e) {
-      if (i === 29) throw e;
+  for (let i = 0; ; i++) {
+    try { await pool.query(SCHEMA); break; }
+    catch (e) {
+      if (i >= 29) throw e;
       console.log("waiting for database…", e.code || e.message);
       await new Promise((r) => setTimeout(r, 2000));
     }
   }
+  for (const t of SCOPED) {
+    await q(`alter table ${t} add column if not exists workspace_id int references workspaces(id) on delete cascade`);
+    await q(`create index if not exists ${t}_ws on ${t}(workspace_id)`);
+  }
+  // Move users from the single-business version into a workspace.
+  const orphans = await one("select count(*)::int n from users where workspace_id is null");
+  if (orphans.n) {
+    const name = (await one("select value from settings where key='business_name'"))?.value || "Morning Telos";
+    const tz = (await one("select value from settings where key='timezone'"))?.value || "America/Chicago";
+    const ws = await one("insert into workspaces(name,timezone,plan,status,trial_ends_at) values($1,$2,'internal','active',now()+interval '100 years') returning id", [name, tz]);
+    await q("update users set workspace_id=$1 where workspace_id is null", [ws.id]);
+    await q("update users set is_admin=true where role='owner' and workspace_id=$1", [ws.id]);
+    for (const t of SCOPED) await q(`update ${t} set workspace_id=$1 where workspace_id is null`, [ws.id]);
+    const old = await one("select to_regclass('agent_settings') t");
+    if (old.t) await q("insert into agent_prefs(workspace_id,agent,enabled,trust) select $1, agent, enabled, trust from agent_settings on conflict do nothing", [ws.id]);
+    console.log("migrated existing users into workspace", ws.id);
+  }
+  await q(`insert into plans(key,name,price_label,ai_budget_usd,sort) values
+    ('trial','Free trial','14 days free',10,0),
+    ('starter','Starter','',50,1),
+    ('pro','Pro','',200,2)
+    on conflict(key) do nothing`);
 }
 
 export async function getSetting(key, fallback = null) {
@@ -142,6 +190,6 @@ export async function getSetting(key, fallback = null) {
 export async function setSetting(key, value) {
   await q("insert into settings(key,value) values($1,$2) on conflict(key) do update set value=excluded.value", [key, value]);
 }
-export async function log(agent, text, threadId = null) {
-  await q("insert into activity(agent,text,thread_id) values($1,$2,$3)", [agent, text, threadId]);
+export async function log(ws, agent, text, threadId = null) {
+  await q("insert into activity(workspace_id,agent,text,thread_id) values($1,$2,$3,$4)", [ws, agent, text, threadId]);
 }

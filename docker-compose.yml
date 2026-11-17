@@ -28,7 +28,6 @@ services:
       PORT: "3000"
       DATABASE_URL: postgres://mt:${DB_PASSWORD}@db:5432/mt
       APP_SECRET: ${APP_SECRET}
-      SETUP_CODE: ${SETUP_CODE}
     # On every start, download the app from GitHub, install packages and run it.
     entrypoint: ["/bin/sh", "-c"]
     command:
