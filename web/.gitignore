@@ -46,3 +46,8 @@ AGENTS.md
 
 # email previews (npm run emails)
 /email-previews/
+
+# Downloaded and decrypted backups (scripts/restore.ts). They hold customer data.
+/restore/
+*.dump
+*.dump.mtb
