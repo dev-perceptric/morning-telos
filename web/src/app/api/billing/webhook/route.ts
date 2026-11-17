@@ -1,4 +1,5 @@
 import { subscriptionOf, syncSubscription } from "@/lib/billing";
+import { afterPlanChange } from "@/lib/closeoutDb";
 import { adminClient } from "@/lib/serverAuth";
 import { getSubscription, readEvent, type Subscription } from "@/lib/stripe";
 
@@ -38,7 +39,10 @@ export async function POST(request: Request) {
         const ws = event.data.object.client_reference_id;
         if (typeof ws === "string") sub.metadata = { ...sub.metadata, workspace_id: ws };
       }
-      await syncSubscription(db, sub);
+      const ws = await syncSubscription(db, sub);
+      // A subscription that ended revokes the brand keys and queues the brands' removal; one that came back within
+      // 30 days stops the removal and makes fresh keys (src/lib/closeout.ts). Partner problems never fail this.
+      if (ws) await afterPlanChange(db, ws);
     }
     return Response.json({ received: true });
   } catch (e) {

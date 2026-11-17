@@ -24,6 +24,8 @@ export type Partner = {
   createKey(brandId: string): Promise<PartnerResult<BrandKey>>;
   /** Revokes every brand key for the brand. */
   revokeKeys(brandId: string): Promise<PartnerResult<null>>;
+  /** Deletes the brand and every brand key for it. */
+  removeBrand(brandId: string): Promise<PartnerResult<null>>;
   /** Capybaroar only: a one-time page, good for 24 hours, where the customer signs in to their social networks for this brand. */
   connectLink(brandId: string): Promise<PartnerResult<ConnectLink>>;
 };
@@ -98,6 +100,7 @@ export function partnerClient(o: { product: Product; url: string; key: string; f
       return r;
     },
     revokeKeys: (brandId) => call<null>("DELETE", `/brands/${id(brandId)}/keys`),
+    removeBrand: (brandId) => call<null>("DELETE", `/brands/${id(brandId)}`),
     async connectLink(brandId) {
       const r = await call<ConnectLink>("POST", `/brands/${id(brandId)}/connect-link`);
       if (r.ok && (typeof r.data.url !== "string" || !/^https?:\/\/\S+$/.test(r.data.url))) return { ok: false, status: r.status, code: "bad_response", message: "The connect link came back without an address.", retryable: true };

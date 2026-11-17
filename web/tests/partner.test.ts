@@ -124,3 +124,11 @@ test("connectLink posts to the brand's connect-link and needs a web address back
     assert.ok(!r.ok && r.code === "bad_response", JSON.stringify(body));
   }
 });
+
+test("removeBrand deletes the brand, and a 404 comes back typed", async () => {
+  const { f, calls } = fakeFetch((c) => (c.url.endsWith("/brands/b1") ? new Response(null, { status: 204 }) : json(404, { error: { code: "not_found", message: "No such brand." } })));
+  const api = partnerClient({ product: "arrowsterr", url: "https://aw.test", key: "k", fetch: f });
+  assert.deepEqual(await api.removeBrand("b1"), { ok: true, status: 204, data: null });
+  assert.deepEqual([calls[0].method, calls[0].url], ["DELETE", "https://aw.test/api/partner/brands/b1"]);
+  assert.deepEqual(await api.removeBrand("gone"), { ok: false, status: 404, code: "not_found", message: "No such brand.", retryable: false });
+});

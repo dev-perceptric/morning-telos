@@ -37,3 +37,6 @@ export function roleGate(request: Request, workspaceId: unknown) {
   const client = () => auth.db;
   return { gate, client };
 }
+
+/** Email is off in route tests, so nothing reaches Resend. */
+export const resendSettings = () => ({ key: "", from: "Morning Telos <meet@morningtelos.com>", fetch });

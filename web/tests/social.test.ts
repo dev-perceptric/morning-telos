@@ -29,6 +29,7 @@ function fakePartner(answer: PartnerResult<ConnectLink> = { ok: true, status: 20
     createBrand: no,
     createKey: no,
     revokeKeys: no,
+    removeBrand: no,
     async connectLink(brand) {
       calls.push(brand);
       return answer;

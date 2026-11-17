@@ -6,7 +6,8 @@
 type Row = Record<string, unknown>;
 type Filter = (r: Row) => boolean;
 
-export function fakeDb(uniques: Record<string, string[]> = {}) {
+export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: string[] } = {}) {
+  let nextId = 1000;
   const tables: Record<string, Row[]> = {};
   const table = (name: string) => (tables[name] ??= []);
   /** Every write, in order, so a test can check nothing changed. */
@@ -36,7 +37,7 @@ export function fakeDb(uniques: Record<string, string[]> = {}) {
       if (op === "insert") {
         const keys = uniques[name] ?? [];
         if (keys.length && rows.some((x) => keys.every((k) => x[k] === payload![k]))) return { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } };
-        rows.push({ ...payload });
+        rows.push({ ...(o.autoId?.includes(name) && payload!.id === undefined ? { id: ++nextId } : {}), ...payload });
         return { data: null, error: null };
       }
       if (op === "upsert") {
@@ -64,6 +65,7 @@ export function fakeDb(uniques: Record<string, string[]> = {}) {
       upsert: (p: Row, o: { onConflict: string }) => ((op = "upsert"), (payload = p), (conflict = o.onConflict.split(",").map((k) => k.trim())), q),
       delete: () => ((op = "delete"), q),
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
+      is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), q),
       maybeSingle: () => ((one = true), q),
       then: (ok: (v: unknown) => unknown, bad?: (e: unknown) => unknown) => Promise.resolve().then(run).then(ok, bad),
     };
