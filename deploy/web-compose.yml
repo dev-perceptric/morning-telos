@@ -29,6 +29,8 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
       APP_URL: ${APP_URL:-}
+      SEALING_KEYS: ${SEALING_KEYS:-}
+      SEALING_KEY_CURRENT: ${SEALING_KEY_CURRENT:-}
       # The browser copies of these are set at build time from repo variables. These are for server code.
       NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
       NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
