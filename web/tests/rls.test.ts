@@ -566,7 +566,7 @@ test("a new workspace queues exactly one provision job and two pending services"
   const before = (await db.query("select count(*)::int n from jobs")).rows[0].n;
   await signUp("prov-invited@example.com");
   assert.equal((await db.query("select count(*)::int n from jobs")).rows[0].n, before);
-  // Jobs go with their workspace.
+  // A deleted workspace's jobs stay, with no workspace (008_cancel.sql), so its brands can still be removed.
   await db.query("delete from workspaces where id = $1", [second]);
   assert.equal((await db.query("select count(*)::int n from jobs where workspace_id = $1", [second])).rows[0].n, 0);
 });
@@ -754,4 +754,23 @@ test("webhook_events: server only, and each source and id once", async (t) => {
       await assert.rejects(q("delete from webhook_events"), /permission denied/);
     });
   }
+});
+
+// ─────────────── P2.4: cancel and delete ───────────────
+
+test("jobs outlive a deleted workspace: workspace_id becomes null and the payload stays", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("close1@example.com", { business: "Close Co" });
+  const ws = await wsOf(o);
+  const payload = { product: "capybaroar", brand_id: "cb-9", workspace_id: ws };
+  const id = (await db.query("insert into jobs (kind, workspace_id, payload, run_at, max_attempts) values ('remove_brand', $1, $2, now() + interval '30 days', 12) returning id", [ws, payload])).rows[0].id;
+  await db.query("delete from workspaces where id = $1", [ws]);
+  const row = (await db.query("select kind, workspace_id, payload, done_at from jobs where id = $1", [id])).rows[0];
+  assert.deepEqual(row, { kind: "remove_brand", workspace_id: null, payload, done_at: null });
+  // The provision job made at sign-up stays too, and finds no workspace when it runs.
+  assert.ok((await db.query("select count(*)::int n from jobs where kind = 'provision' and workspace_id is null")).rows[0].n >= 1);
+  // Running 008 again keeps one foreign key, still on delete set null.
+  await db.query(readFileSync(new URL("008_cancel.sql", SQL_DIR), "utf8"));
+  const fks = (await db.query("select confdeltype from pg_constraint where conrelid = 'public.jobs'::regclass and contype = 'f'")).rows;
+  assert.deepEqual(fks, [{ confdeltype: "n" }]);
 });

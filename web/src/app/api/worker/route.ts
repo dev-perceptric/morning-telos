@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { brandJobHandlers } from "@/lib/closeoutDb";
 import { cronAllowed } from "@/lib/cronAuth";
 import { runJob, type Handler, type Job } from "@/lib/jobs";
 import { partnerFor, type Product } from "@/lib/partner";
@@ -32,6 +33,9 @@ type ServiceRow = { product: Product; status: ServiceStatus };
 /** Every job kind this worker knows. Any other kind fails with a clear last_error. */
 function handlers(db: SupabaseClient): Record<string, Handler> {
   return {
+    // Closing a deleted or canceled workspace's brands (src/lib/closeout.ts): a revoke that failed at close time,
+    // and the brand's removal 30 days later.
+    ...brandJobHandlers(db),
     provision: async (job) => {
       const ws = job.workspace_id;
       if (!ws) return { status: "failed", error: "A provision job needs a workspace." };
