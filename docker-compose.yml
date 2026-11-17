@@ -18,8 +18,40 @@ services:
       - traefik.http.routers.morningtelos.entrypoints=websecure
       - traefik.http.routers.morningtelos.tls.certresolver=letsencrypt
       - traefik.http.services.morningtelos.loadbalancer.server.port=80
-      # App on its own router, so its SSL certificate is separate from the main site's.
+
+  app:
+    image: node:22-alpine
+    restart: unless-stopped
+    depends_on: [db]
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgres://mt:${DB_PASSWORD}@db:5432/mt
+      APP_SECRET: ${APP_SECRET}
+      SETUP_CODE: ${SETUP_CODE}
+    # On every start, download the app from GitHub, install packages and run it.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        set -e;
+        wget -qO /tmp/src.tgz https://codeload.github.com/dev-perceptric/morning-telos/tar.gz/refs/heads/main;
+        mkdir -p /srv && tar -xzf /tmp/src.tgz -C /srv;
+        cd /srv/*/app && npm ci --omit=dev --no-audit --no-fund;
+        exec node server.js
+    labels:
+      - traefik.enable=true
       - traefik.http.routers.morningtelos-chat.rule=Host(`chat.morningtelos.com`)
       - traefik.http.routers.morningtelos-chat.entrypoints=websecure
       - traefik.http.routers.morningtelos-chat.tls.certresolver=letsencrypt
-      - traefik.http.routers.morningtelos-chat.service=morningtelos
+      - traefik.http.routers.morningtelos-chat.service=morningtelos-app
+      - traefik.http.services.morningtelos-app.loadbalancer.server.port=3000
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mt
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: mt
+    # Stored on the server outside the project folder, so redeploys keep the data.
+    volumes:
+      - /srv/morningtelos/pgdata:/var/lib/postgresql/data

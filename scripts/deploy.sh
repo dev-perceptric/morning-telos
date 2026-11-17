@@ -23,7 +23,20 @@ wait_for() {
 sha=$(git rev-parse HEAD)
 [ "$(git ls-remote origin refs/heads/main | cut -f1)" = "$sha" ] || { echo "Push your commits to main first"; exit 1; }
 # Pin the download to this exact commit so GitHub's cache can't serve an older copy.
-body=$(SHA="$sha" python3 -c 'import json,os; c=open("docker-compose.yml").read().replace("refs/heads/main", os.environ["SHA"]); print(json.dumps({"project_name":"morningtelos","content":c}))')
+# Keep the app's secrets (stored on the server, never in git). Create them on the first deploy.
+current_env=$(curl -sS "$API/docker/morningtelos" "${auth[@]}" | python3 -c 'import sys,json
+try: print(json.load(sys.stdin).get("environment") or "")
+except Exception: print("")')
+body=$(SHA="$sha" ENVIN="$current_env" python3 -c '
+import json, os, secrets
+env = {}
+for line in os.environ["ENVIN"].splitlines():
+    if "=" in line and not line.startswith("#"):
+        k, v = line.split("=", 1); env[k.strip()] = v.strip()
+for k in ("APP_SECRET", "DB_PASSWORD", "SETUP_CODE"):
+    env.setdefault(k, secrets.token_urlsafe(18 if k == "SETUP_CODE" else 32))
+c = open("docker-compose.yml").read().replace("refs/heads/main", os.environ["SHA"])
+print(json.dumps({"project_name": "morningtelos", "content": c, "environment": "\n".join(f"{k}={v}" for k, v in env.items())}))')
 
 # Take down the old project if it exists, then create it fresh.
 # (Recreating pulls the latest site from GitHub and makes Traefik retry the SSL certificate.)

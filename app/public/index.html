@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#faf9f5">
+<title>Morning Telos</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 20'%3E%3Cg fill='%23D97757'%3E%3Crect x='8' y='0' width='12' height='4'/%3E%3Crect x='4' y='4' width='20' height='4'/%3E%3Crect x='0' y='8' width='28' height='4'/%3E%3Crect x='0' y='16' width='28' height='4'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="boot" id="boot">Loading…</div>
+
+<!-- Auth -->
+<div class="auth" id="auth" hidden>
+  <form class="auth-card" id="authForm" novalidate>
+    <span class="logo"><svg viewBox="0 0 28 20" aria-hidden="true"><g fill="#D97757"><rect x="8" y="0" width="12" height="4"/><rect x="4" y="4" width="20" height="4"/><rect x="0" y="8" width="28" height="4"/><rect x="0" y="16" width="28" height="4"/></g></svg></span>
+    <h1 id="authT">Log in</h1>
+    <p class="sub" id="authS">Welcome back to your AI team.</p>
+    <label class="fld" id="fCode" hidden><span>Setup code</span><input class="inp" name="code" autocomplete="off"><small>The one-time code Morning Telos gave you.</small></label>
+    <label class="fld" id="fName" hidden><span>Your name</span><input class="inp" name="name" autocomplete="name"></label>
+    <label class="fld"><span>Email</span><input class="inp" name="email" type="email" autocomplete="email" required></label>
+    <label class="fld"><span>Password</span><input class="inp" name="password" type="password" autocomplete="current-password" required><small id="pwHint" hidden>At least 10 characters.</small></label>
+    <div class="err" id="authErr" role="alert"></div>
+    <button class="btn primary full" id="authBtn">Log in</button>
+  </form>
+</div>
+
+<div class="shell" id="shell" hidden>
+  <aside class="sb" aria-label="Main navigation">
+    <a class="ws" href="#settings">
+      <span class="logo"><svg viewBox="0 0 28 20" aria-hidden="true"><g fill="#D97757"><rect x="8" y="0" width="12" height="4"/><rect x="4" y="4" width="20" height="4"/><rect x="0" y="8" width="28" height="4"/><rect x="0" y="16" width="28" height="4"/></g></svg></span>
+      <span style="min-width:0"><b data-biz>Morning Telos</b><small>AI team</small></span>
+    </a>
+    <div class="sb-actions">
+      <button class="search-btn" data-pal><svg class="ico sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search or jump to<kbd>⌘K</kbd></button>
+      <button class="new-btn" data-new aria-label="New request"><svg class="ico sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
+    <nav class="grp" id="nav">
+      <a class="nl" href="#home" data-v="home"><svg class="ico" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></svg>Home</a>
+      <a class="nl" href="#approvals" data-v="approvals"><svg class="ico" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6Z"/></svg>Approvals<span class="count" data-count></span></a>
+      <a class="nl" href="#team" data-v="team"><svg class="ico" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14a5 5 0 0 1 5.5 5"/></svg>Team</a>
+      <a class="nl" href="#routines" data-v="routines"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Routines</a>
+      <div class="grp"><h6>Setup</h6>
+        <a class="nl" href="#knowledge" data-v="knowledge"><svg class="ico" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19V5M8 7h6"/></svg>Knowledge</a>
+        <a class="nl" href="#apps" data-v="apps"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Apps</a>
+        <a class="nl" href="#settings" data-v="settings"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</a>
+      </div>
+    </nav>
+    <div class="grp"><h6>Recent</h6><div id="recent"></div></div>
+    <div class="sb-foot">
+      <a class="me-btn" href="#settings"><span class="avatar-me" data-initial>·</span><span><b data-myname></b><small data-myrole></small></span></a>
+      <button class="icon-btn" data-logout aria-label="Log out" title="Log out"><svg class="ico" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+    </div>
+  </aside>
+
+  <div class="mainw">
+    <header class="mtop">
+      <span class="logo"><svg viewBox="0 0 28 20" aria-hidden="true"><g fill="#D97757"><rect x="8" y="0" width="12" height="4"/><rect x="4" y="4" width="20" height="4"/><rect x="0" y="8" width="28" height="4"/><rect x="0" y="16" width="28" height="4"/></g></svg></span>
+      <b data-biz>Morning Telos</b>
+      <button class="icon-btn" data-pal aria-label="Search"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+      <a class="avatar-me" href="#settings" data-initial>·</a>
+    </header>
+    <main id="main">
+      <!-- HOME -->
+      <section class="view narrow" id="v-home">
+        <div class="hero"><p id="greet">Hello</p><h1>What should your team do today?</h1></div>
+        <form class="composer down" id="homeForm">
+          <label class="sr" for="homeInput">Ask your team</label>
+          <textarea id="homeInput" rows="2" placeholder="Ask your team anything. Type @ to tag someone"></textarea>
+          <div class="ctools">
+            <button type="button" class="tool-b" data-at><span class="at">@</span>Tag</button>
+            <button type="button" class="tool-b" id="mpBtn" aria-haspopup="listbox" aria-expanded="false"><span id="mpLbl">Auto</span><svg class="ico sm" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+            <button class="send" aria-label="Send"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+          </div>
+          <div class="mp" id="mp" role="listbox" aria-label="Choose your AI model"></div>
+        </form>
+        <div class="hint"><span>Athena answers, or tag a teammate with @</span><span class="hide-m">Changes always wait for your approval</span></div>
+        <div class="sugg-l" id="sugg"></div>
+        <div class="sec" id="setupSec" hidden>
+          <div class="sh"><h2 class="setup-h">Finish setup <span class="num" id="setupN"></span></h2></div>
+          <div class="card list setup" id="setupList"></div>
+        </div>
+        <div class="sec"><div class="sh"><h2>Needs you <span class="num" data-count-txt></span></h2><a href="#approvals">View all</a></div><div class="card list" id="homeNeeds"></div></div>
+        <div class="sec"><div class="sh"><h2>This week</h2></div><div class="card kpis" id="homeKpis"></div></div>
+        <div class="sec"><div class="sh"><h2>Activity</h2></div><div class="card list" id="feed"></div></div>
+      </section>
+
+      <!-- CHAT -->
+      <section class="view narrow" id="v-chat">
+        <div class="thread">
+          <div class="th-h"><a class="icon-btn" href="#home" aria-label="Back to Home"><svg class="ico" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></a><h1 id="threadTitle">New request</h1></div>
+          <div class="msgs" id="chat" aria-live="polite"></div>
+          <div class="dock">
+            <form class="composer" id="chatForm">
+              <label class="sr" for="chatInput">Reply</label>
+              <textarea id="chatInput" rows="1" placeholder="Reply, or type @ to pull in a teammate"></textarea>
+              <div class="ctools"><button type="button" class="tool-b" data-at><span class="at">@</span>Tag</button><button class="send" aria-label="Send"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- APPROVALS -->
+      <section class="view" id="v-approvals">
+        <div class="ph"><div><h1>Approvals</h1><p>Changes your team prepared. Nothing runs until you approve it.</p></div><div class="dd" id="apDD"></div></div>
+        <div class="split"><div class="card list" id="apList"></div><div class="card pad pane" id="apPane"></div></div>
+      </section>
+
+      <!-- TEAM -->
+      <section class="view" id="v-team">
+        <div class="ph"><div><h1>Team</h1><p>AI employees that work inside your apps. Tag any of them with @.</p></div></div>
+        <div id="ucWrap"></div>
+      </section>
+
+      <!-- AGENT -->
+      <section class="view" id="v-agent">
+        <a class="back" href="#team"><svg class="ico sm" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Team</a>
+        <div class="ag-h">
+          <img id="agImg" src="" alt="">
+          <div class="tx"><span class="eyebrow" id="agGod"></span><h1 id="agName"></h1><p id="agJob"></p><div class="tools" id="agTools"></div></div>
+          <div class="ag-side">
+            <div class="onoff"><span id="agOnLbl">Working</span><button class="switch" id="agTog" role="switch" aria-checked="true" aria-label="Agent on or off"></button></div>
+            <button class="btn sm" data-tab="chat">Message</button>
+          </div>
+        </div>
+        <div class="tabs" role="tablist" id="agTabs">
+          <button role="tab" data-tab="ov" aria-selected="true">Overview</button>
+          <button role="tab" data-tab="chat" aria-selected="false">Chat</button>
+          <button role="tab" data-tab="set" aria-selected="false">Settings</button>
+        </div>
+        <div class="tp on" id="t-ov">
+          <div class="card kpis" id="agKpis"></div>
+          <div class="two sec" style="margin-top:16px">
+            <div><div class="sh"><h2>Needs you</h2></div><div class="card list" id="agNeeds"></div></div>
+            <div><div class="sh"><h2>Recent work</h2></div><div class="card list" id="agRecent"></div></div>
+          </div>
+        </div>
+        <div class="tp" id="t-chat">
+          <div class="thread" style="min-height:auto">
+            <div class="msgs" id="agChat"></div>
+            <div class="dock"><form class="composer" id="agForm"><label class="sr" for="agInput">Message</label><textarea id="agInput" rows="1" placeholder="Ask this teammate, or @ another one for help"></textarea><div class="ctools"><button type="button" class="tool-b" data-at><span class="at">@</span>Tag</button><button class="send" aria-label="Send"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div></form></div>
+          </div>
+        </div>
+        <div class="tp" id="t-set">
+          <div class="two">
+            <div><div class="sh"><h2>Trust level</h2></div><div class="card list" role="radiogroup" id="trust"></div></div>
+            <div><div class="sh"><h2>Rules and notes</h2><a href="#knowledge">Edit in Knowledge</a></div><div class="card list" id="agDocs"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ROUTINES -->
+      <section class="view" id="v-routines">
+        <div class="ph"><div><h1>Routines</h1><p>Work that runs on a schedule, whether you open the app or not.</p></div><button class="btn" id="rtNew"><svg class="ico sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New routine</button></div>
+        <div class="card list" id="rtList"></div>
+      </section>
+
+      <!-- KNOWLEDGE -->
+      <section class="view" id="v-knowledge">
+        <div class="ph"><div><h1>Knowledge</h1><p>What your team knows: services, prices, voice and rules. Every agent reads it before it acts.</p></div><button class="btn" id="kNew"><svg class="ico sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New doc</button></div>
+        <div class="split"><div class="card list" id="kList"></div><div class="card pad pane" id="kPane"></div></div>
+      </section>
+
+      <!-- APPS -->
+      <section class="view" id="v-apps">
+        <div class="ph"><div><h1>Apps</h1><p>Your team's hands. Keys are encrypted and never shown again after you save them.</p></div></div>
+        <div class="apps2" id="appsGrid"></div>
+        <div class="sec"><div class="sh"><h2>Form submissions</h2></div><div class="note-box">To send Claritia form submissions here, add this webhook address in Claritia: <br><code id="hookUrl"></code></div></div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" id="v-settings">
+        <div class="ph"><div><h1>Settings</h1><p>Your business, your people and your account.</p></div><button class="btn" data-logout>Log out</button></div>
+        <div class="two">
+          <form class="card pad" id="bizForm"><div class="sh"><h2>Business</h2></div>
+            <label class="fld"><span>Business name</span><input class="inp" name="business_name"></label>
+            <label class="fld"><span>Time zone</span><select class="sel" name="timezone" id="tzSel"></select><small>Routines run on this time zone.</small></label>
+            <button class="btn primary">Save</button> <span class="ok-t" id="bizOk"></span></form>
+          <form class="card pad" id="pwForm"><div class="sh"><h2>Change password</h2></div>
+            <label class="fld"><span>Current password</span><input class="inp" type="password" name="current" autocomplete="current-password"></label>
+            <label class="fld"><span>New password</span><input class="inp" type="password" name="password" autocomplete="new-password"><small>At least 10 characters.</small></label>
+            <div class="err" id="pwErr"></div><button class="btn primary">Update password</button></form>
+        </div>
+        <div class="sec"><div class="sh"><h2>People</h2></div><div class="card list" id="userList"></div>
+          <form class="card pad" id="userForm" style="margin-top:12px"><div class="sh"><h2>Add a teammate</h2></div>
+            <div class="form-grid"><label class="fld"><span>Name</span><input class="inp" name="name"></label><label class="fld"><span>Email</span><input class="inp" name="email" type="email"></label></div>
+            <label class="fld"><span>Temporary password</span><input class="inp" name="password" type="text" autocomplete="off"><small>Share it with them privately. They can change it in Settings.</small></label>
+            <div class="err" id="userErr"></div><button class="btn primary">Add teammate</button></form>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<nav class="tabbar" aria-label="Main" id="tabbar" hidden>
+  <a href="#home" data-v="home"><svg class="ico" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></svg>Home</a>
+  <a href="#approvals" data-v="approvals"><svg class="ico" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6Z"/></svg>Approvals<span class="count" data-count></span></a>
+  <a href="#team" data-v="team"><svg class="ico" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14a5 5 0 0 1 5.5 5"/></svg>Team</a>
+  <a href="#knowledge" data-v="knowledge"><svg class="ico" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19V5M8 7h6"/></svg>Knowledge</a>
+  <button data-more data-v="more"><svg class="ico" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>More</button>
+</nav>
+
+<div class="dw-wrap" id="dw">
+  <div class="dw-scrim" data-close></div>
+  <aside class="dw" role="dialog" aria-modal="true" aria-labelledby="dwT">
+    <span class="grab"></span>
+    <div class="dw-h"><b id="dwT">Review</b><button class="icon-btn" data-close aria-label="Close"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="dw-b" id="dwB"></div>
+  </aside>
+</div>
+<div class="pal-wrap" id="pal" role="dialog" aria-modal="true" aria-label="Search">
+  <div class="pal"><div class="field"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="palIn" placeholder="Search pages, teammates and chats" aria-label="Search"><kbd>esc</kbd></div><div class="pal-l" id="palL"></div></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="/app.js"></script>
+</body>
+</html>
