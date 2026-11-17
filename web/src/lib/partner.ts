@@ -11,6 +11,7 @@ export const PRODUCT_NAME: Record<Product, string> = { arrowsterr: "Arrowsterr",
 
 export type Brand = { id: string; name: string; domain: string | null; external_id: string };
 export type BrandKey = { key: string; prefix: string };
+export type ConnectLink = { url: string; expires_at: string | null };
 
 export type PartnerFailure = { ok: false; status: number; code: string; message: string; retryable: boolean };
 export type PartnerResult<T> = { ok: true; status: number; data: T } | PartnerFailure;
@@ -23,6 +24,8 @@ export type Partner = {
   createKey(brandId: string): Promise<PartnerResult<BrandKey>>;
   /** Revokes every brand key for the brand. */
   revokeKeys(brandId: string): Promise<PartnerResult<null>>;
+  /** Capybaroar only: a one-time page, good for 24 hours, where the customer signs in to their social networks for this brand. */
+  connectLink(brandId: string): Promise<PartnerResult<ConnectLink>>;
 };
 
 type Env = Record<string, string | undefined>;
@@ -95,6 +98,12 @@ export function partnerClient(o: { product: Product; url: string; key: string; f
       return r;
     },
     revokeKeys: (brandId) => call<null>("DELETE", `/brands/${id(brandId)}/keys`),
+    async connectLink(brandId) {
+      const r = await call<ConnectLink>("POST", `/brands/${id(brandId)}/connect-link`);
+      if (r.ok && (typeof r.data.url !== "string" || !/^https?:\/\/\S+$/.test(r.data.url))) return { ok: false, status: r.status, code: "bad_response", message: "The connect link came back without an address.", retryable: true };
+      if (r.ok) return { ...r, data: { url: r.data.url, expires_at: typeof r.data.expires_at === "string" ? r.data.expires_at : null } };
+      return r;
+    },
   };
 }
 

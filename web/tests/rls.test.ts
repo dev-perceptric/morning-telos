@@ -674,3 +674,84 @@ test("jobs only take known shapes", async (t) => {
   await assert.rejects(db.query("insert into jobs (kind, max_attempts) values ('x', 0)"), /jobs_max_attempts_check/);
   await assert.rejects(db.query("insert into jobs (kind, last_error) values ('x', repeat('a', 1001))"), /jobs_last_error_check/);
 });
+
+// ─────────────── P2.3: social channels and webhook events ───────────────
+
+test("social_channels: members read their own workspace's channels, never another's, and can't write them", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("soc1@example.com", { business: "Soc Co" });
+  const x = await signUp("soc2@example.com", { business: "Soc Other" });
+  const ws = await wsOf(o);
+  const xws = await wsOf(x);
+  // A viewer in the same workspace reads too.
+  const v = await signUp("soc-viewer@example.com");
+  await db.query("insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'viewer')", [ws, v.id]);
+  await db.query("set role service_role");
+  try {
+    assert.equal((await db.query("select save_social_channel($1, 'ch1', 'instagram', '@soc', 'connected', now()) ok", [ws])).rows[0].ok, true);
+    await db.query("select save_social_channel($1, 'chx', 'facebook', 'Other', 'connected', now())", [xws]);
+  } finally {
+    await db.query("reset role");
+  }
+  for (const u of [o, v]) {
+    await as(u, async (q) => {
+      const rows = (await q("select workspace_id, channel_id, network, name, status from social_channels")).rows;
+      assert.deepEqual(rows, [{ workspace_id: ws, channel_id: "ch1", network: "instagram", name: "@soc", status: "connected" }]);
+    });
+  }
+  await as(o, async (q) => {
+    await assert.rejects(q("insert into social_channels (workspace_id, channel_id, network, status) values ($1, 'ch2', 'x', 'connected')", [ws]), /permission denied/);
+  });
+  await as(o, async (q) => {
+    await assert.rejects(q("update social_channels set status = 'lost' where workspace_id = $1", [ws]), /permission denied/);
+  });
+  await as(o, async (q) => {
+    await assert.rejects(q("delete from social_channels where workspace_id = $1", [ws]), /permission denied/);
+  });
+  await as(o, async (q) => {
+    await assert.rejects(q("select save_social_channel($1, 'ch3', 'x', 'X', 'connected', now())", [ws]), /permission denied for function save_social_channel/);
+  });
+  await as(x, async (q) => {
+    assert.deepEqual((await q("select channel_id from social_channels")).rows, [{ channel_id: "chx" }]);
+    assert.equal((await q("select * from social_channels where workspace_id = $1", [ws])).rowCount, 0);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from social_channels"), /permission denied/);
+  });
+  // Channels go with their workspace.
+  await db.query("delete from workspaces where id = $1", [xws]);
+  assert.equal((await db.query("select count(*)::int n from social_channels where workspace_id = $1", [xws])).rows[0].n, 0);
+});
+
+test("save_social_channel: an older event never replaces a newer one, and only known values are saved", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("soc3@example.com", { business: "Soc3 Co" });
+  const ws = await wsOf(o);
+  const save = async (status: string, at: string) => (await db!.query("select save_social_channel($1, 'ch1', 'linkedin', 'Soc3', $2, $3::timestamptz) ok", [ws, status, at])).rows[0].ok as boolean;
+  assert.equal(await save("connected", "2027-01-15T08:00:00Z"), true);
+  assert.equal(await save("lost", "2027-01-16T08:00:00Z"), true);
+  assert.equal(await save("connected", "2027-01-15T09:00:00Z"), false, "a late retry of an older event");
+  assert.equal((await db.query("select status from social_channels where workspace_id = $1", [ws])).rows[0].status, "lost");
+  assert.equal(await save("connected", "2027-01-17T08:00:00Z"), true);
+  await assert.rejects(save("great", "2027-01-18T08:00:00Z"), /social_channels_status_check/);
+  await assert.rejects(db.query("select save_social_channel($1, 'ch2', 'Bad Network!', '', 'connected', now())", [ws]), /social_channels_network_check/);
+});
+
+test("webhook_events: server only, and each source and id once", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("whe1@example.com", { business: "Whe Co" });
+  await db.query("insert into webhook_events (source, id, type) values ('capybaroar', 'msg_rls_1', 'channel.connected')");
+  await assert.rejects(db.query("insert into webhook_events (source, id, type) values ('capybaroar', 'msg_rls_1', 'channel.lost')"), /duplicate key/);
+  await assert.rejects(db.query("insert into webhook_events (source, id, type) values ('stripe', 'msg_rls_2', 'x')"), /webhook_events_source_check/);
+  for (const u of [o, null]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select * from webhook_events"), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into webhook_events (source, id, type) values ('capybaroar', 'msg_fake', 'channel.connected')"), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("delete from webhook_events"), /permission denied/);
+    });
+  }
+});

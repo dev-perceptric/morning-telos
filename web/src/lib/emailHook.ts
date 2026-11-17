@@ -1,10 +1,12 @@
 // Supabase's Send Email hook, copied from Arrowsterr's src/app/api/auth/email-hook. Supabase calls the route for
 // every account email, and Morning Telos designs it and sends it through Resend. This file holds the logic: check
 // the signature, pick the email for each email_action_type, send. The route wires in the server's settings.
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { sendBuilt, type ResendDeps } from "./email.ts";
 import type { Email } from "./emailKit.ts";
 import { authEmail, securityNoticeEmail, type AuthData, type AuthKind } from "./emails.ts";
+import { verifyWebhook } from "./standardWebhooks.ts";
+
+export { HOOK_WINDOW, verifyWebhook } from "./standardWebhooks.ts";
 
 export type HookPayload = {
   user: { id?: string; email: string; new_email?: string; user_metadata?: Record<string, unknown> };
@@ -22,29 +24,6 @@ export type HookPayload = {
     factor_type?: string;
   };
 };
-
-/** How far a webhook's timestamp may be from now, in seconds. */
-export const HOOK_WINDOW = 300;
-
-/**
- * Standard Webhooks check: HMAC-SHA256 of "id.timestamp.body" with the secret, sent within 5 minutes.
- * The secret is the one Supabase shows, like "v1,whsec_<base64>".
- */
-export function verifyWebhook(headers: Headers, body: string, secretSetting: string | undefined, nowSeconds = Date.now() / 1000): boolean {
-  const secret = secretSetting?.trim().replace(/^v1,/, "").replace(/^whsec_/, "");
-  const id = headers.get("webhook-id");
-  const ts = headers.get("webhook-timestamp");
-  const sigs = headers.get("webhook-signature");
-  if (!secret || !id || !ts || !sigs) return false;
-  if (!/^\d+$/.test(ts) || Math.abs(nowSeconds - Number(ts)) > HOOK_WINDOW) return false;
-  const want = createHmac("sha256", Buffer.from(secret, "base64")).update(`${id}.${ts}.${body}`).digest();
-  return sigs.split(" ").some((part) => {
-    const [v, sig] = part.split(",");
-    if (v !== "v1" || !sig) return false;
-    const got = Buffer.from(sig, "base64");
-    return got.length === want.length && timingSafeEqual(got, want);
-  });
-}
 
 export type HookUrls = { supabaseUrl: string; appUrl: string };
 

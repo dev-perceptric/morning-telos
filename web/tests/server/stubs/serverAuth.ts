@@ -23,3 +23,17 @@ export async function requireRole(request: Request, workspaceId: unknown, min: M
 }
 
 export const adminClient = () => auth.db;
+
+/** Same shape as roleGate in src/lib/serverAuth.ts, on top of the stand-in requireRole. */
+export function roleGate(request: Request, workspaceId: unknown) {
+  const gate = async (min: Min) => {
+    const r = await requireRole(request, workspaceId, min);
+    if ("denied" in r) {
+      const body = (await r.denied.clone().json().catch(() => ({}))) as { error?: string };
+      return { ok: false as const, status: r.denied.status, error: body.error ?? "Not allowed." };
+    }
+    return { ok: true as const, userId: r.user.id, email: r.user.email };
+  };
+  const client = () => auth.db;
+  return { gate, client };
+}

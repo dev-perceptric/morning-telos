@@ -112,3 +112,15 @@ test("a success without the fields we need is a retryable bad answer", async () 
 test("isRetryable", () => {
   assert.deepEqual([0, 408, 429, 500, 503, 400, 401, 403, 404, 409, 422].map(isRetryable), [true, true, true, true, true, false, false, false, false, false, false]);
 });
+
+test("connectLink posts to the brand's connect-link and needs a web address back", async () => {
+  const { f, calls } = fakeFetch(() => json(201, { url: "https://cb.test/connect/tok", expires_at: "2026-11-18T10:00:00Z" }));
+  const api = partnerClient({ product: "capybaroar", url: "https://cb.test", key: "k", fetch: f });
+  assert.deepEqual(await api.connectLink("b 1"), { ok: true, status: 201, data: { url: "https://cb.test/connect/tok", expires_at: "2026-11-18T10:00:00Z" } });
+  assert.deepEqual([calls[0].method, calls[0].url], ["POST", "https://cb.test/api/partner/brands/b%201/connect-link"]);
+  for (const body of [{}, { url: "javascript:alert(1)" }, { url: "" }]) {
+    const { f: bad } = fakeFetch(() => json(201, body));
+    const r = await partnerClient({ product: "capybaroar", url: "https://cb.test", key: "k", fetch: bad }).connectLink("b1");
+    assert.ok(!r.ok && r.code === "bad_response", JSON.stringify(body));
+  }
+});

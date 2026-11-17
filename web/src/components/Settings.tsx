@@ -1,6 +1,6 @@
 "use client";
 
-// Workspace settings: the business details, members and invites, and deleting the workspace.
+// Workspace settings: the business details, members and invites, social accounts, and deleting the workspace.
 // Copied from Arrowsterr's SettingsPage.tsx, MembersPage.tsx and WorkspaceSettings.tsx (TimezoneSetting), trimmed down.
 // Row level security in Supabase decides what each person may change. These screens only hide what they can't do.
 
@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/routes";
 import { ASSIGNABLE, can, cleanSettings, deleteConfirmMatches, inviteLink, memberActions, roleLabel, ROLES, type MemberRow, type Role } from "@/lib/workspace";
 import { callApi, message, navigate } from "./nav";
+import { SocialSettings } from "./Social";
 import { btnDanger, btnPrimary, btnSmall, card, ErrorText, input, label, Notice } from "./ui";
 
 export type Workspace = { id: string; name: string; website: string | null; timezone: string; plan: string; trial_ends_at: string; role: Role };
@@ -60,8 +61,10 @@ export function SettingsPage({
             <GeneralSettings key={ws.id} sb={sb} ws={ws} onChanged={onChanged} />
             {can(ws.role, "deleteWorkspace") ? <DeleteWorkspace key={`del-${ws.id}`} sb={sb} ws={ws} onGone={onGone} /> : null}
           </>
-        ) : (
+        ) : tab === "members" ? (
           <MembersSettings key={ws.id} sb={sb} ws={ws} userId={userId} onGone={onGone} />
+        ) : (
+          <SocialSettings key={`social-${ws.id}`} sb={sb} ws={ws} />
         )}
       </div>
     </div>
