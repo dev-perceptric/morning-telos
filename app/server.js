@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, q, one, all, migrate, setSetting, log } from "./lib/db.js";
-import { hashPassword, checkPassword, encrypt, token } from "./lib/util.js";
+import { hashPassword, checkPassword, encrypt, decrypt, token } from "./lib/util.js";
 import { AGENTS, ORDER, APPS, SERVICES, runTurn, executeApproval, getConn, spendSince, canRun } from "./lib/agents.js";
 import * as mcp from "./lib/mcp.js";
 import * as billing from "./lib/billing.js";
@@ -398,7 +398,12 @@ route("POST", "/hooks/stripe", async (req, res) => {
 const ADMIN = { admin: true };
 async function appsState() {
   const by = Object.fromEntries((await all("select * from connections")).map((r) => [r.tool, r]));
-  return Object.entries(APPS).map(([k, a]) => ({ key: k, name: a.name, kind: a.kind, help: a.help, url: by[k]?.url || a.url || "", hasKey: !!by[k]?.secret_enc, status: by[k]?.status || "off", toolCount: by[k]?.tool_count || 0, error: by[k]?.error || null }));
+  return Object.entries(APPS).map(([k, a]) => {
+    const r = by[k];
+    // A key saved under an older APP_SECRET can't be unlocked anymore. Ask for it again.
+    const lost = r?.secret_enc && decrypt(r.secret_enc) == null;
+    return { key: k, name: a.name, kind: a.kind, help: a.help, url: r?.url || a.url || "", hasKey: !!r?.secret_enc && !lost, status: lost ? "error" : r?.status || "off", toolCount: r?.tool_count || 0, error: lost ? "The saved key can't be read anymore. Paste it again." : r?.error || null };
+  });
 }
 route("GET", "/api/admin/overview", async (req, res) => {
   const wss = await all(`select w.id, w.name, w.website, w.plan, w.status, w.trial_ends_at, w.arrowsterr_brand, w.capybaroar_brand_id, w.setup_note, w.created_at,
