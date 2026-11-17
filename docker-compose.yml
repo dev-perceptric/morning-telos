@@ -10,6 +10,7 @@ services:
         wget -qO /tmp/site.tgz https://codeload.github.com/dev-perceptric/morning-telos/tar.gz/refs/heads/main;
         mkdir -p /tmp/src && tar -xzf /tmp/site.tgz -C /tmp/src;
         rm -rf /usr/share/nginx/html/* && cp -r /tmp/src/*/site/. /usr/share/nginx/html/;
+        cp /tmp/src/*/deploy/nginx.conf /etc/nginx/conf.d/default.conf;
         exec /docker-entrypoint.sh nginx -g 'daemon off;'
     labels:
       - traefik.enable=true
@@ -17,3 +18,8 @@ services:
       - traefik.http.routers.morningtelos.entrypoints=websecure
       - traefik.http.routers.morningtelos.tls.certresolver=letsencrypt
       - traefik.http.services.morningtelos.loadbalancer.server.port=80
+      # App on its own router, so its SSL certificate is separate from the main site's.
+      - traefik.http.routers.morningtelos-chat.rule=Host(`chat.morningtelos.com`)
+      - traefik.http.routers.morningtelos-chat.entrypoints=websecure
+      - traefik.http.routers.morningtelos-chat.tls.certresolver=letsencrypt
+      - traefik.http.routers.morningtelos-chat.service=morningtelos
