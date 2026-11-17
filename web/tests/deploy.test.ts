@@ -9,6 +9,14 @@ const workflow = read("../../.github/workflows/build-images.yml");
 
 const exampleKeys = [...envExample.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]);
 
+test(".env.example lists each key once", () => {
+  const seen = new Set<string>();
+  for (const k of exampleKeys) {
+    assert.ok(!seen.has(k), `${k} is listed twice in .env.example`);
+    seen.add(k);
+  }
+});
+
 test(".env.example lists keys with empty values only", () => {
   assert.ok(exampleKeys.length > 0);
   for (const line of envExample.split("\n")) {
