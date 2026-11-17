@@ -1,0 +1,35 @@
+# The new Morning Telos app at new.morningtelos.com. A separate project from docker-compose.yml, so the old app keeps running.
+# GitHub Actions builds the image (.github/workflows/build-images.yml). To update: docker compose -f deploy/web-compose.yml pull && docker compose -f deploy/web-compose.yml up -d
+# Keys come from the server's environment, with the names in web/.env.example. Never put a value in this file.
+services:
+  web-new:
+    image: ghcr.io/dev-perceptric/morningtelos-web:latest
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ARROWSTERR_PARTNER_KEY: ${ARROWSTERR_PARTNER_KEY:-}
+      CAPYBAROAR_PARTNER_KEY: ${CAPYBAROAR_PARTNER_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      # The browser copies of these are set at build time from repo variables. These are for server code.
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.morningtelos-new.rule=Host(`new.morningtelos.com`)
+      - traefik.http.routers.morningtelos-new.entrypoints=websecure
+      - traefik.http.routers.morningtelos-new.tls.certresolver=letsencrypt
+      - traefik.http.routers.morningtelos-new.service=morningtelos-web-new
+      - traefik.http.services.morningtelos-web-new.loadbalancer.server.port=3000
