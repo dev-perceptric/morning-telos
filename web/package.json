@@ -13,7 +13,8 @@
     "restore": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/restore.ts"
   },
   "dependencies": {
-    "@sentry/nextjs": "10.75.3",
+    "@sentry/nextjs": "10.78.0",
+    "@supabase/supabase-js": "^2.119.0",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -22,14 +23,19 @@
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "pg": "^8.23.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
   "engines": {
     "node": ">=22"
+  },
+  "overrides": {
+    "glob": "^14.0.2"
   }
 }

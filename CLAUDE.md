@@ -30,7 +30,9 @@ cd web && npm ci && npm run lint && npm run typecheck && npm test && npm run bui
 cd app && npm ci && npm run verify   # only if you touched app/
 ```
 
-Add tests for every pure function, route handler and SQL policy you write. CI runs the same checks on every pull request.
+`web/tests/rls.test.ts` loads `web/supabase/*.sql` into a throwaway database (through `TEST_DATABASE_URL`, default `postgres://mt:mt@localhost:5432/mt`) with a test-only Supabase stand-in (`web/tests/sql/supabase-shim.sql`), then signs in as different users to check RLS. The `mt` role must be a superuser so it can create the API roles. It skips if no database answers, so start Postgres first.
+
+Add tests for every pure function, route handler and SQL policy you write. New tables get an RLS test in `rls.test.ts`. CI runs the same checks on every pull request.
 
 ## Rules
 

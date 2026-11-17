@@ -36,5 +36,8 @@ export default async function Home() {
       </main>
     );
   }
-  return <ClientApp />;
+  const supabase = { url: (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, ""), key: (process.env.SUPABASE_PUBLISHABLE_KEY ?? "").trim() };
+  // Cloudflare Turnstile bot check on sign-up and log-in. Turn on bot protection in Supabase's Auth settings with the same keys.
+  const turnstileSiteKey = process.env.TURNSTILE_SITE_KEY?.trim() || null;
+  return <ClientApp supabase={supabase} turnstileSiteKey={turnstileSiteKey} />;
 }
