@@ -5,6 +5,7 @@
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabase, type SupaConfig } from "@/lib/supa";
+import { setupCard, type SetupCard } from "@/lib/setupStatus";
 import { cleanWebsite } from "@/lib/signup";
 import { inviteTokenFromPath, roleLabel } from "@/lib/workspace";
 import { AuthScreen, NewPassword } from "./AuthScreen";
@@ -168,7 +169,7 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
           {route.page === "settings" ? (
             <SettingsPage sb={sb} ws={ws} userId={session.user.id} tab={route.tab} onChanged={load} onGone={gone} />
           ) : (
-            <Home ws={ws} />
+            <Home sb={sb} ws={ws} />
           )}
         </div>
       </main>
@@ -176,13 +177,51 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
   );
 }
 
-function Home({ ws }: { ws: Workspace }) {
+function Home({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {
   return (
-    <section className="py-4">
-      <p className="mb-1 text-[14px] text-ink-3">{ws.name}</p>
-      <h1 className="mb-3 font-serif text-[34px] leading-tight">What should your team do today?</h1>
-      <p className="text-[15px] text-ink-3">Your AI team is getting set up. Chat and approvals are coming next.</p>
+    <section className="flex flex-col gap-6 py-4">
+      <div>
+        <p className="mb-1 text-[14px] text-ink-3">{ws.name}</p>
+        <h1 className="mb-3 font-serif text-[34px] leading-tight">What should your team do today?</h1>
+        <p className="text-[15px] text-ink-3">Your AI team is getting set up. Chat and approvals are coming next.</p>
+      </div>
+      <SetupStatus key={ws.id} sb={sb} workspaceId={ws.id} />
     </section>
+  );
+}
+
+/** A small card while the workspace's brands in Arrowsterr and Capybaroar are being set up. Nothing once both are ready. */
+function SetupStatus({ sb, workspaceId }: { sb: SupabaseClient; workspaceId: string }) {
+  const [card, setCard] = useState<SetupCard | null>(null);
+  useEffect(() => {
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const check = () => {
+      sb.rpc("service_status", { ws: workspaceId }).then(({ data, error }) => {
+        if (!live) return;
+        // Before 006_jobs.sql runs, or on a hiccup, say nothing rather than show an error here.
+        const next = error ? null : setupCard((data ?? []) as { status: string }[]);
+        setCard(next);
+        // Look again while it's working: every 10 seconds while pending, every minute while a problem is being fixed.
+        if (next) timer = setTimeout(check, next.tone === "working" ? 10_000 : 60_000);
+      });
+    };
+    check();
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [sb, workspaceId]);
+
+  if (!card) return null;
+  return (
+    <div className={`${card.tone === "problem" ? "bg-clay-bg" : "bg-sunk"} flex items-start gap-3 rounded-[12px] px-4 py-3`} role="status">
+      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${card.tone === "problem" ? "bg-clay" : "bg-ink-4"}`} aria-hidden />
+      <div className="min-w-0">
+        <p className="text-[15px] font-semibold text-ink">{card.title}</p>
+        <p className="text-[14px] text-ink-3">{card.text}</p>
+      </div>
+    </div>
   );
 }
 

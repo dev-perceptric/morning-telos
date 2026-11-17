@@ -18,6 +18,8 @@ const BASE = process.env.TEST_DATABASE_URL || "postgres://mt:mt@localhost:5432/m
 const dbName = `mt_rls_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
 let admin: pg.Client | null = null;
 let db: pg.Client | null = null;
+/** The throwaway database's address, for tests that need a second connection. */
+let dbUrl = "";
 
 async function connect(url: string) {
   const c = new pg.Client({ connectionString: url, connectionTimeoutMillis: 2000 });
@@ -35,7 +37,8 @@ before(async () => {
   await admin.query(`create database ${dbName}`);
   const url = new URL(BASE);
   url.pathname = `/${dbName}`;
-  db = await connect(url.toString());
+  dbUrl = url.toString();
+  db = await connect(dbUrl);
   await db.query(readFileSync(new URL("./sql/supabase-shim.sql", import.meta.url), "utf8"));
   for (const f of ["schema.sql", ...MIGRATIONS]) await db.query(readFileSync(new URL(f, SQL_DIR), "utf8"));
 });
@@ -496,6 +499,8 @@ test("services: members see each product's status, never the brand id or key; ot
   const o = await signUp("svc1@example.com", { business: "Svc Co" });
   const x = await signUp("svc2@example.com", { business: "Other Co" });
   const ws = await wsOf(o);
+  // The workspace's pending rows from 006_jobs.sql, replaced with a ready one and a pending one.
+  await db.query("delete from services where workspace_id = $1", [ws]);
   await db.query(
     "insert into services (workspace_id, product, brand_id, sealed_key, key_prefix, status) values ($1, 'arrowsterr', 'b1', 'v2.a.iv.tag.body', 'aw_brand_ab', 'ready'), ($1, 'capybaroar', null, null, null, 'pending')",
     [ws],
@@ -526,10 +531,146 @@ test("services: one row per product, known products and statuses only, gone with
   if (!db) return t.skip("no test database");
   const o = await signUp("svc3@example.com", { business: "Svc3 Co" });
   const ws = await wsOf(o);
+  await db.query("delete from services where workspace_id = $1", [ws]);
   await db.query("insert into services (workspace_id, product) values ($1, 'arrowsterr')", [ws]);
   await assert.rejects(db.query("insert into services (workspace_id, product) values ($1, 'arrowsterr')", [ws]), /duplicate key/);
   await assert.rejects(db.query("insert into services (workspace_id, product) values ($1, 'zapier')", [ws]), /services_product_check/);
   await assert.rejects(db.query("insert into services (workspace_id, product, status) values ($1, 'capybaroar', 'great')", [ws]), /services_status_check/);
   await db.query("delete from workspaces where id = $1", [ws]);
   assert.equal((await db.query("select count(*)::int n from services where workspace_id = $1", [ws])).rows[0].n, 0);
+});
+
+// ─────────────── P2.2: the job queue and the provision job ───────────────
+
+test("a new workspace queues exactly one provision job and two pending services", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("prov1@example.com", { business: "Prov Co", website: "prov.example" });
+  const ws = await wsOf(o);
+  const jobs = (await db.query("select kind, payload, attempts, max_attempts, done_at, run_at <= now() as due from jobs where workspace_id = $1", [ws])).rows;
+  assert.deepEqual(jobs, [{ kind: "provision", payload: {}, attempts: 0, max_attempts: 5, done_at: null, due: true }]);
+  const svc = (await db.query("select product, status, brand_id, sealed_key from services where workspace_id = $1 order by product", [ws])).rows;
+  assert.deepEqual(svc, [
+    { product: "arrowsterr", status: "pending", brand_id: null, sealed_key: null },
+    { product: "capybaroar", status: "pending", brand_id: null, sealed_key: null },
+  ]);
+  // The same for a workspace made in the app (create_workspace), and the owner sees it as pending.
+  const second = await asCommit(o, async (q) => (await q("select create_workspace('Prov Two') id")).rows[0].id as string);
+  assert.equal((await db.query("select count(*)::int n from jobs where workspace_id = $1 and kind = 'provision'", [second])).rows[0].n, 1);
+  await as(o, async (q) => {
+    assert.deepEqual((await q("select product, status from service_status($1)", [second])).rows, [
+      { product: "arrowsterr", status: "pending" },
+      { product: "capybaroar", status: "pending" },
+    ]);
+  });
+  // A sign-up from an invite makes no workspace, so no job.
+  const before = (await db.query("select count(*)::int n from jobs")).rows[0].n;
+  await signUp("prov-invited@example.com");
+  assert.equal((await db.query("select count(*)::int n from jobs")).rows[0].n, before);
+  // Jobs go with their workspace.
+  await db.query("delete from workspaces where id = $1", [second]);
+  assert.equal((await db.query("select count(*)::int n from jobs where workspace_id = $1", [second])).rows[0].n, 0);
+});
+
+test("jobs: members and visitors can't read or write jobs, or call claim_jobs", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("jobs1@example.com", { business: "Jobs Co" });
+  const ws = await wsOf(o);
+  for (const u of [o, null]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select * from jobs"), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("select * from jobs where workspace_id = $1", [ws]), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into jobs (kind, workspace_id) values ('provision', $1)", [ws]), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("update jobs set attempts = 0 where workspace_id = $1", [ws]), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("delete from jobs where workspace_id = $1", [ws]), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("select * from claim_jobs(10)"), /permission denied for function claim_jobs/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("select queue_provision()"), /permission denied|trigger functions can only be called as triggers/);
+    });
+  }
+  // Even with table rights back, RLS with no policies still shows nothing.
+  await db.query("grant select on jobs to authenticated");
+  try {
+    await as(o, async (q) => {
+      assert.equal((await q("select * from jobs")).rowCount, 0);
+    });
+  } finally {
+    await db.query("revoke select on jobs from authenticated");
+  }
+});
+
+test("claim_jobs: two callers at once never get the same job; leases and max_attempts hold", async (t) => {
+  if (!db) return t.skip("no test database");
+  // Park every other test's jobs so only this test's jobs are due.
+  await db.query("update jobs set run_at = run_at + interval '100 years' where kind <> 'claim_test'");
+  const c1 = await connect(dbUrl);
+  const c2 = await connect(dbUrl);
+  const claim = async (c: pg.Client, n: number) => {
+    await c.query("begin");
+    await c.query("set local role service_role");
+    const r = await c.query("select id, attempts from claim_jobs($1, interval '5 minutes')", [n]);
+    return r.rows as { id: string; attempts: number }[];
+  };
+  try {
+    const one = (await db.query("insert into jobs (kind) values ('claim_test') returning id")).rows[0].id as string;
+    // c1 holds the job in an open transaction. c2 doesn't wait for it and doesn't get it.
+    const a = await claim(c1, 5);
+    const b = await claim(c2, 5);
+    assert.deepEqual(a, [{ id: one, attempts: 1 }]);
+    assert.deepEqual(b, []);
+    await c1.query("commit");
+    await c2.query("commit");
+    // Leased now: a third caller doesn't get it either.
+    assert.deepEqual(await claim(c2, 5), []);
+    await c2.query("commit");
+    // When the lease runs out (the worker died) it comes back, as a second attempt.
+    await db.query("update jobs set locked_until = now() - interval '1 second' where id = $1", [one]);
+    assert.deepEqual(await claim(c1, 5), [{ id: one, attempts: 2 }]);
+    await c1.query("commit");
+    // A job that used up its attempts, a finished one and a later one are never taken.
+    await db.query("update jobs set locked_until = null, attempts = max_attempts where id = $1", [one]);
+    await db.query("insert into jobs (kind, done_at) values ('claim_test', now())");
+    await db.query("insert into jobs (kind, run_at) values ('claim_test', now() + interval '1 hour')");
+    assert.deepEqual(await claim(c1, 5), []);
+    await c1.query("commit");
+
+    // 30 due jobs, two workers racing: every job claimed once, none twice.
+    await db.query("insert into jobs (kind) select 'claim_test' from generate_series(1, 30)");
+    const race = async (c: pg.Client) => {
+      const got: string[] = [];
+      for (let i = 0; i < 10; i++) {
+        got.push(...(await claim(c, 4)).map((r) => r.id));
+        await c.query("commit");
+      }
+      return got;
+    };
+    const [x, y] = await Promise.all([race(c1), race(c2)]);
+    const all = [...x, ...y];
+    assert.equal(all.length, 30);
+    assert.equal(new Set(all).size, 30);
+  } finally {
+    await c1.query("rollback").catch(() => {});
+    await c2.query("rollback").catch(() => {});
+    await c1.end();
+    await c2.end();
+    await db.query("delete from jobs where kind = 'claim_test'");
+    await db.query("update jobs set run_at = run_at - interval '100 years' where run_at > now() + interval '50 years'");
+  }
+});
+
+test("jobs only take known shapes", async (t) => {
+  if (!db) return t.skip("no test database");
+  await assert.rejects(db.query("insert into jobs (kind) values ('')"), /jobs_kind_check/);
+  await assert.rejects(db.query("insert into jobs (kind, max_attempts) values ('x', 0)"), /jobs_max_attempts_check/);
+  await assert.rejects(db.query("insert into jobs (kind, last_error) values ('x', repeat('a', 1001))"), /jobs_last_error_check/);
 });
