@@ -8,8 +8,10 @@ const files = readdirSync(dir).filter((f) => f.endsWith(".sql"));
 const sql = files.map((f) => readFileSync(new URL(f, dir), "utf8")).join("\n").replace(/--.*$/gm, "");
 
 const tables = [...sql.matchAll(/create table (?:if not exists )?public\.(\w+)\s*\(([\s\S]*?)\n\);/g)].map((m) => ({ name: m[1], body: m[2] }));
-// Tables that hold no customer data, or are the workspace itself.
-const NOT_CUSTOMER = new Set(["workspaces", "stripe_events", "email_log", "app_errors"]);
+// A table with RLS policies is a customer table. A table with RLS on and no policies is server-only (CLAUDE.md).
+const withPolicies = new Set([...sql.matchAll(/create policy "[^"]+" on public\.(\w+)/g)].map((m) => m[1]));
+// The workspace itself is keyed by id, not workspace_id.
+const NOT_CUSTOMER = new Set(["workspaces", ...tables.filter((t) => !withPolicies.has(t.name)).map((t) => t.name)]);
 
 test("found the tables", () => {
   assert.ok(tables.length >= 3, `only found ${tables.length} tables`);
