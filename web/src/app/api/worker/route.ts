@@ -39,7 +39,7 @@ function handlers(db: SupabaseClient): Record<string, Handler> {
     provision: async (job) => {
       const ws = job.workspace_id;
       if (!ws) return { status: "failed", error: "A provision job needs a workspace." };
-      const { result } = await provision({
+      const { result, products } = await provision({
         workspace: async () => {
           const { data, error } = await db.from("workspaces").select("id, name, website").eq("id", ws).maybeSingle();
           if (error) throw new Error(`Could not read the workspace: ${error.message}`);
@@ -58,6 +58,11 @@ function handlers(db: SupabaseClient): Record<string, Handler> {
           if (error) throw new Error(`Could not save the ${product} service: ${error.message}`);
         },
       });
+      // A product that won't fix itself (domain_taken, plan_limit, a 403 or 404) is told to staff now, even while the
+      // other product's hiccup keeps the job retrying. When the whole job fails, runJob alerts instead.
+      if (result.status === "retry") {
+        for (const p of products.filter((x) => x.status === "failed" && !x.retryable)) alert(`Provision for workspace ${ws}: ${p.error}`, job);
+      }
       return result;
     },
   };

@@ -25,6 +25,8 @@ const { open } = await import("../../src/lib/sealing.ts");
 
 let brands: { host: string; id: string; external_id: string; name: string; domain: string | null }[];
 let partnerCalls: string[];
+/** A test can answer some calls itself. */
+let answer: ((host: string, method: string, path: string) => Response | null) | null = null;
 
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
@@ -34,6 +36,8 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   const method = init?.method ?? "GET";
   partnerCalls.push(`${method} ${url.hostname}${url.pathname}`);
   const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+  const own = answer?.(url.hostname, method, url.pathname);
+  if (own) return own;
   if (method === "POST" && url.pathname === "/api/partner/brands") {
     const body = JSON.parse(String(init?.body));
     const had = brands.find((b) => b.host === url.hostname && b.external_id === body.external_id);
@@ -53,6 +57,7 @@ let db: ReturnType<typeof fakeDb>;
 let claims: Record<string, unknown>[];
 
 beforeEach(() => {
+  answer = null;
   brands = [];
   partnerCalls = [];
   claims = [];
@@ -160,4 +165,35 @@ test("no database settings or no 006_jobs.sql is a clear 500", async () => {
   const r2 = await call({ Authorization: `Bearer ${SECRET}` });
   assert.equal(r2.status, 500);
   assert.deepEqual(await r2.json(), { error: "Run supabase/006_jobs.sql in Supabase." });
+});
+
+test("Arrowsterr's 409 domain_taken alerts staff at once, even while Capybaroar's hiccup keeps the job retrying", async () => {
+  answer = (host, method, path) => {
+    if (host === "aw.test" && method === "POST" && path === "/api/partner/brands") return new Response(JSON.stringify({ error: { code: "domain_taken", message: "Another brand in this workspace already tracks anasbakery.com." } }), { status: 409 });
+    if (host === "cb.test") return new Response(JSON.stringify({ error: { code: "unavailable", message: "Down." } }), { status: 503 });
+    return null;
+  };
+  db.tables.jobs = [db.tables.jobs[0]];
+  const logged: string[] = [];
+  const was = console.error;
+  console.error = (...a: unknown[]) => void logged.push(a.join(" "));
+  try {
+    const res = await call({ Authorization: `Bearer ${SECRET}` });
+    assert.deepEqual(await res.json(), { claimed: 1, done: 0, retry: 1, failed: 0 });
+  } finally {
+    console.error = was;
+  }
+  const aw = db.tables.services.find((s) => s.product === "arrowsterr")!;
+  assert.deepEqual([aw.status, aw.last_error], ["failed", "Another customer already tracks this website in SEO. We'll sort it out."]);
+  assert.ok(logged.some((l) => l.startsWith(`Provision for workspace ${WS}: Another customer already tracks this website in SEO.`)), logged.join("\n"));
+});
+
+test("a workspace with no website: Arrowsterr waits, Capybaroar is made, the job is done", async () => {
+  db.tables.workspaces[0].website = null;
+  db.tables.jobs = [db.tables.jobs[0]];
+  const res = await call({ Authorization: `Bearer ${SECRET}` });
+  assert.deepEqual(await res.json(), { claimed: 1, done: 1, retry: 0, failed: 0 });
+  assert.deepEqual(db.tables.services.map((s) => [s.product, s.status, s.last_error]), [["arrowsterr", "waiting", null], ["capybaroar", "ready", null]]);
+  assert.ok(!partnerCalls.some((c) => c.includes("aw.test")), "no call to Arrowsterr");
+  assert.equal(brands.find((b) => b.host === "cb.test")!.domain, null);
 });

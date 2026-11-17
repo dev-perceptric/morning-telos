@@ -774,3 +774,57 @@ test("jobs outlive a deleted workspace: workspace_id becomes null and the payloa
   const fks = (await db.query("select confdeltype from pg_constraint where conrelid = 'public.jobs'::regclass and contype = 'f'")).rows;
   assert.deepEqual(fks, [{ confdeltype: "n" }]);
 });
+
+// ─────────────── website gate: Arrowsterr waits for the website ───────────────
+
+test("services take 'waiting', and members see it through service_status()", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("wait1@example.com", { business: "Wait Co" });
+  const ws = await wsOf(o);
+  await db.query("update services set status = 'waiting' where workspace_id = $1 and product = 'arrowsterr'", [ws]);
+  await db.query("update services set status = 'ready' where workspace_id = $1 and product = 'capybaroar'", [ws]);
+  await as(o, async (q) => {
+    assert.deepEqual((await q("select product, status from service_status($1)", [ws])).rows, [
+      { product: "arrowsterr", status: "waiting" },
+      { product: "capybaroar", status: "ready" },
+    ]);
+  });
+  await assert.rejects(db.query("update services set status = 'sleeping' where workspace_id = $1", [ws]), /services_status_check/);
+});
+
+test("adding the website sets a waiting Arrowsterr service pending and queues provision once", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("wait2@example.com", { business: "Wait Two" });
+  const ws = await wsOf(o);
+  // The sign-up provision job ran and found no website.
+  await db.query("update jobs set done_at = now() where workspace_id = $1", [ws]);
+  await db.query("update services set status = 'waiting' where workspace_id = $1 and product = 'arrowsterr'", [ws]);
+  await db.query("update services set status = 'ready' where workspace_id = $1 and product = 'capybaroar'", [ws]);
+  const open = async () => (await db!.query("select count(*)::int n from jobs where workspace_id = $1 and kind = 'provision' and done_at is null", [ws])).rows[0].n as number;
+
+  // Changing the name, or clearing the website, starts nothing.
+  await asCommit(o, (q) => q("update workspaces set name = 'Wait Two Co' where id = $1", [ws]));
+  await asCommit(o, (q) => q("update workspaces set website = '' where id = $1", [ws]));
+  assert.equal(await open(), 0);
+
+  // The owner adds the website in Settings (as themselves, through row level security).
+  await asCommit(o, (q) => q("update workspaces set website = 'waittwo.example' where id = $1", [ws]));
+  assert.equal(await open(), 1);
+  const svc = (await db.query("select product, status, last_error from services where workspace_id = $1 order by product", [ws])).rows;
+  assert.deepEqual(svc, [
+    { product: "arrowsterr", status: "pending", last_error: null },
+    { product: "capybaroar", status: "ready", last_error: null },
+  ]);
+  // Changing it again while the job waits doesn't queue a second one. A ready service starts nothing either.
+  await db.query("update services set status = 'waiting' where workspace_id = $1 and product = 'arrowsterr'", [ws]);
+  await asCommit(o, (q) => q("update workspaces set website = 'waittwo.example/home' where id = $1", [ws]));
+  assert.equal(await open(), 1);
+  await db.query("update jobs set done_at = now() where workspace_id = $1", [ws]);
+  await db.query("update services set status = 'ready' where workspace_id = $1", [ws]);
+  await asCommit(o, (q) => q("update workspaces set website = 'other.example' where id = $1", [ws]));
+  assert.equal(await open(), 0);
+  // Members still can't call the trigger function.
+  await as(o, async (q) => {
+    await assert.rejects(q("select website_added()"), /permission denied|trigger functions can only be called as triggers/);
+  });
+});

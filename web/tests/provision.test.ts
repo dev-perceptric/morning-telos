@@ -267,11 +267,80 @@ test("the Home card: working while pending, a calm problem line when failed, not
   const problem = setupCard([{ status: "failed" }, { status: "pending" }]);
   assert.equal(problem?.title, "We're fixing a setup problem");
   assert.equal(problem?.tone, "problem");
-  for (const c of [setupCard([{ status: "pending" }])!, problem!]) {
+  for (const c of [setupCard([{ status: "pending" }])!, problem!, setupCard([{ status: "waiting" }, { status: "ready" }])!]) {
     for (const s of [c.title, c.text]) {
       assert.doesNotMatch(s, /[–—]/);
       assert.doesNotMatch(s, /error|partner|key|503|Arrowsterr|Capybaroar/i, "no raw errors or product names");
       for (const sentence of s.split(/[.!?]\s*/).filter(Boolean)) assert.ok(sentence.split(/\s+/).length <= 14, `short sentences: ${sentence}`);
     }
+  }
+});
+
+// ─────────────── the website gate and partner 409s ───────────────
+
+test("no website: Arrowsterr waits with no call and no error, Capybaroar is made with no domain, the job is done", async () => {
+  for (const website of [null, "", "not a site"]) {
+    const w = world();
+    w.deps.workspace = async () => ({ ...WS, website });
+    const { result, products } = await provision(w.deps);
+    assert.deepEqual(result, { status: "done" }, String(website));
+    assert.deepEqual(products.map((p) => [p.product, p.status]), [["arrowsterr", "waiting"], ["capybaroar", "ready"]]);
+    assert.deepEqual(w.services.get("arrowsterr"), { status: "waiting", last_error: null });
+    assert.deepEqual(w.products.arrowsterr.calls, []);
+    assert.equal(w.products.capybaroar.brands[0].domain, null);
+    // The Home card asks for the website, with a way to Settings.
+    const card = setupCard([...w.services.values()]);
+    assert.deepEqual(card, { tone: "action", title: "Add your website to turn on SEO", text: "Add your website in Settings to turn on SEO.", action: { label: "Open Settings", path: "/settings" } });
+  }
+});
+
+test("once the website is added, the next provision makes the Arrowsterr brand and leaves Capybaroar alone", async () => {
+  const w = world();
+  let website: string | null = null;
+  w.deps.workspace = async () => ({ ...WS, website });
+  await provision(w.deps);
+  website = "anasbakery.com";
+  // 009_website_gate.sql sets the waiting service pending and queues provision.
+  w.services.set("arrowsterr", { status: "pending" });
+  assert.deepEqual((await provision(w.deps)).result, { status: "done" });
+  assert.equal(w.services.get("arrowsterr")!.status, "ready");
+  assert.equal(w.products.arrowsterr.brands[0].domain, "anasbakery.com");
+  assert.deepEqual(w.products.capybaroar.calls, ["createBrand", "createKey"], "Capybaroar only once");
+  assert.equal(setupCard([...w.services.values()]), null);
+});
+
+test("Arrowsterr 409 domain_taken fails with a plain line and isn't retried; the alert says why", async () => {
+  const w = world();
+  w.products.arrowsterr.setDown({ ok: false, status: 409, code: "domain_taken", message: "Another brand in this workspace already tracks anasbakery.com.", retryable: false });
+  const alerts: string[] = [];
+  const out = await runJob(job({ attempts: 1 }), { provision: async () => (await provision(w.deps)).result }, { now: () => new Date(), alert: (m) => void alerts.push(m) });
+  assert.equal(out.outcome, "failed");
+  assert.equal(out.patch.attempts, 5, "not retried");
+  const line = "Another customer already tracks this website in SEO. We'll sort it out.";
+  assert.deepEqual(w.services.get("arrowsterr"), { status: "failed", last_error: line });
+  assert.equal(w.services.get("capybaroar")!.status, "ready");
+  assert.equal(alerts.length, 1);
+  assert.match(alerts[0], /already tracks this website/);
+  // The customer sees only the calm problem card.
+  assert.equal(setupCard([...w.services.values()])?.title, "We're fixing a setup problem");
+});
+
+test("Capybaroar 409 conflict retries; 409 plan_limit fails for staff; Arrowsterr 403 and 404 fail too", async () => {
+  const conflict = world();
+  conflict.products.capybaroar.setDown({ ok: false, status: 409, code: "conflict", message: "A brand with this external_id is being made. Try again.", retryable: true });
+  assert.equal((await provision(conflict.deps)).result.status, "retry");
+
+  const full = world();
+  full.products.capybaroar.setDown({ ok: false, status: 409, code: "plan_limit", message: "Your plan allows 50 brands.", retryable: false });
+  const r = await provision(full.deps);
+  assert.deepEqual(r.result, { status: "failed", error: "Our Capybaroar partner plan is full. Raise its limit, then run provision again." });
+
+  for (const [status, code, line] of [
+    [403, "not_your_brand", "Arrowsterr says this brand belongs to another partner."],
+    [404, "not_found", "Arrowsterr could not find the brand."],
+  ] as const) {
+    const w = world();
+    w.products.arrowsterr.setDown({ ok: false, status, code, message: "x", retryable: false });
+    assert.deepEqual((await provision(w.deps)).result, { status: "failed", error: line });
   }
 });
