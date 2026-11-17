@@ -386,10 +386,68 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
 .sb-demo a:hover{color:var(--clay-2)}
 .sb-demo+.sb-foot{margin-top:0}
 .demo-tag{font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--clay-2);background:var(--clay-bg);border-radius:6px;padding:4px 7px}
+/* use cases */
+.uc-sec{margin-top:28px}
+.uc-sec:first-of-type{margin-top:0}
+.uc-sec h2{font-size:14px;font-weight:600;color:var(--ink-3);margin-bottom:10px}
+.uc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.uc{padding:18px 18px 16px;display:flex;flex-direction:column;transition:border-color .2s,box-shadow .2s}
+.uc:hover{border-color:var(--line-2);box-shadow:0 10px 28px rgba(20,20,19,.07)}
+.uc .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.uc .top img{width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--sunk)}
+.ics{display:flex;gap:5px}
+.ic{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:#fff;font-size:10.5px;font-weight:700;border:1px solid rgba(0,0,0,.04)}
+.uc .r1{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.uc h3{font-size:15.5px;font-weight:600;margin-top:2px}
+.uc p{font-size:13px;color:var(--ink-3);margin-top:3px;line-height:1.45}
+.uc ul{list-style:none;display:grid;gap:5px;margin:12px 0 14px}
+.uc li{font-size:13px;color:var(--ink-2);display:flex;gap:8px}
+.uc li:before{content:"";width:14px;height:14px;flex:none;margin-top:2px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.3 5.6 10 11 4' fill='none' stroke='%2365645f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat}
+.uc .ft{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.uc .ft a{font-size:13px;font-weight:500;color:var(--ink-2)}
+.uc .ft a:hover{color:var(--clay-2)}
+.uc .try{opacity:0;transition:opacity .2s}
+.uc:hover .try,.uc:focus-within .try{opacity:1}
+.uc.soon{background:transparent;box-shadow:none;border-style:dashed}
+.uc.soon .lock{font-size:11.5px;font-weight:600;color:var(--ink-4);display:inline-flex;align-items:center;gap:5px}
+.uc.custom{background:var(--ink);color:#fff;border-color:var(--ink)}
+.uc.custom p,.uc.custom li{color:#c9c7bd}
+.uc.custom li:before{filter:invert(1)}
+/* model picker */
+.mp{position:absolute;left:8px;top:calc(100% + 6px);width:300px;max-width:calc(100% - 16px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-lg);padding:6px;z-index:45;display:none}
+.mp.on{display:block;animation:in .15s var(--ease)}
+.mp h5{font-size:13px;font-weight:600;padding:8px 8px 6px}
+.mp h6{font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);padding:8px 8px 4px}
+.mp button{display:flex;align-items:center;gap:10px;width:100%;padding:8px;border-radius:8px;font-size:13.5px}
+.mp button:hover,.mp button[aria-selected="true"]{background:var(--sunk)}
+.mp button small{color:var(--ink-4);font-size:12px}
+.mp button .rt{margin-left:auto;color:var(--ink-4);font-size:12px}
+.mp .mi{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;background:var(--clay-bg);color:var(--clay-2);font-size:12px;flex:none}
+/* setup */
+.setup .row{padding:12px 16px}
+.setup .si{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;background:var(--sunk);font-size:14px}
+.setup .row.ok .main b{color:var(--ink-4);text-decoration:line-through}
+.setup-h{display:flex;align-items:center;gap:8px}
+.setup-h:before{content:"";width:7px;height:7px;border-radius:50%;background:#e8a33d}
+/* meetings */
+.bl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px}
+.bl{background:var(--sunk);border-radius:10px;padding:14px 16px}
+.bl .len{font:400 26px/1 var(--serif)}
+.bl .len small{font:400 13px var(--sans);color:var(--ink-4);margin-left:3px}
+.bl .nm{font-size:13.5px;font-weight:600;margin-top:10px;padding-left:8px;border-left:3px solid var(--clay)}
+.bl .av-t{font-size:12.5px;color:var(--ink-4);margin-top:4px;line-height:1.4}
+.bl .bot{display:flex;align-items:center;justify-content:space-between;margin-top:14px;font-size:12.5px;color:var(--ink-3)}
+.bl-add{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:12px;border-top:1px solid var(--line);font-size:13px;font-weight:500;color:var(--ink-3)}
+.bl-add:hover{color:var(--clay-2)}
+.mt-when{font:500 11.5px var(--mono);color:var(--ink-3);min-width:78px}
+.recap h4{font-size:13px;font-weight:600;margin:16px 0 6px}
+.recap ul{margin-left:18px;display:grid;gap:4px;font-size:14px;color:var(--ink-2)}
+.recap p{font-size:14px;color:var(--ink-2);line-height:1.55}
 /* mobile tab bar */
 .tabbar{display:none}
 
 @media (max-width:1180px){
+  .uc-grid{grid-template-columns:repeat(2,1fr)}
   .team{grid-template-columns:repeat(3,1fr)}
   .apps{grid-template-columns:repeat(2,1fr)}
   .split{grid-template-columns:320px 1fr}
@@ -430,6 +488,8 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
   .thread{min-height:calc(100vh - 220px)}
   .dock{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 8px)}
   .hint .hide-m{display:none}
+  .uc-grid,.bl-grid{grid-template-columns:1fr}
+  .uc .try{opacity:1}
   .chips.scroll{flex-wrap:nowrap;overflow-x:auto;margin-left:-16px;margin-right:-16px;padding:0 16px;scrollbar-width:none}
   .chips.scroll::-webkit-scrollbar{display:none}
 }
@@ -455,6 +515,7 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
       <a class="nl" href="#team" data-v="team"><svg class="ico" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14a5 5 0 0 1 5.5 5"/></svg>Team</a>
       <a class="nl" href="#contacts" data-v="contacts"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/></svg>Contacts</a>
       <div class="grp"><h6>Work</h6>
+        <a class="nl" href="#meetings" data-v="meetings"><svg class="ico" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/></svg>Meetings</a>
         <a class="nl" href="#routines" data-v="routines"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Routines</a>
         <a class="nl" href="#reports" data-v="reports"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</a>
       </div>
@@ -493,12 +554,22 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
           <div class="ctools">
             <button type="button" class="tool-b" aria-label="Attach a file" data-toast="Attach files, photos or voice memos"><svg class="ico" viewBox="0 0 24 24"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4L15.5 7"/></svg></button>
             <button type="button" class="tool-b" data-at><span class="at">@</span>Tag</button>
+            <button type="button" class="tool-b" id="mpBtn" aria-haspopup="listbox" aria-expanded="false"><span id="mpLbl">Auto</span><svg class="ico sm" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
             <button type="button" class="tool-b" aria-label="Voice" data-toast="Hold to talk to your team"><svg class="ico" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
             <button class="send" aria-label="Send"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
           </div>
+          <div class="mp" id="mp" role="listbox" aria-label="Choose your AI model"></div>
         </form>
-        <div class="hint"><span>Athena routes it to the right teammate</span><span class="hide-m">Or email <b>team@brightside.morningtelos.com</b></span></div>
+        <div class="hint"><span>Athena routes it to the right teammate</span><span class="hide-m">Or text your team at <b>(512) 555-0142</b></span></div>
         <div class="sugg" id="sugg"></div>
+
+        <div class="sec" id="setupSec">
+          <div class="sh"><h2 class="setup-h">Finish setup <span class="num" id="setupN">2</span></h2><button class="icon-btn" id="setupX" aria-label="Hide setup"><svg class="ico sm" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+          <div class="card list setup">
+            <div class="row" data-setup><span class="si">💬</span><span class="main"><b>Add your phone number</b><small>Text your team and get approvals by text</small></span><button class="btn sm" data-setup-btn="Phone added. Text (512) 555-0142 anytime.">Add</button></div>
+            <div class="row" data-setup><span class="si">#</span><span class="main"><b>Connect Slack</b><small>Briefings and approvals in #brightside-team</small></span><button class="btn sm" data-setup-btn="Slack connected">Connect</button></div>
+          </div>
+        </div>
 
         <div class="sec">
           <div class="sh"><h2>Needs you <span class="num" data-count-txt></span></h2><a href="#approvals">View all</a></div>
@@ -552,8 +623,8 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
 
       <!-- TEAM -->
       <section class="view" id="v-team">
-        <div class="ph"><div><h1>Team</h1><p>Eight AI employees, each named after a Greek god. Tag any of them with @.</p></div><button class="btn" data-toast="Coming next: Receptionist, Operations, Media Buyer, Bookkeeper"><svg class="ico sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Hire another</button></div>
-        <div class="team" id="teamGrid"></div>
+        <div class="ph"><div><h1>Team</h1><p>AI employees for the jobs that eat your week. Each one works inside the apps you already use.</p></div><div class="field" style="width:240px"><svg class="ico sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="ucQ" placeholder="Search roles" aria-label="Search roles"></div></div>
+        <div id="ucWrap"></div>
       </section>
 
       <!-- AGENT -->
@@ -611,6 +682,19 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
         <div class="card week" id="week"></div>
         <div class="sec"><div class="sh"><h2>Running</h2></div><div class="card list" id="rtList"></div></div>
         <div class="sec"><div class="sh"><h2>Suggested for Brightside</h2></div><div class="card list" id="rtSugg"></div></div>
+      </section>
+
+      <!-- MEETINGS -->
+      <section class="view" id="v-meetings">
+        <div class="ph"><div><h1>Meetings</h1><p>Booking links, upcoming visits and recaps. Hora books them in Claritia and Omniscient takes the notes.</p></div><button class="btn" data-toast="Settings: calendars, buffers and reminders"><svg class="ico sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Settings</button></div>
+        <div class="sh"><h2>Booking links</h2><span class="num" style="font-size:12px;color:var(--ink-4)">via Claritia</span></div>
+        <div class="card"><div class="bl-grid" id="blGrid"></div><button class="bl-add" data-try="forms" data-say="Make a new booking link for "><svg class="ico sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Create custom</button></div>
+        <div class="sh" style="margin-top:16px"><h2 style="font-weight:500;color:var(--ink-3)">or just ask Hora</h2></div>
+        <div class="chips scroll" id="mtChips"></div>
+        <div class="two sec">
+          <div><div class="sh"><h2>Upcoming</h2></div><div class="card list" id="mtUp"></div></div>
+          <div><div class="sh"><h2>Past meetings</h2><span class="num" style="font-size:12px;color:var(--ink-4)">notes by Omniscient</span></div><div class="card list" id="mtPast"></div></div>
+        </div>
       </section>
 
       <!-- REPORTS -->
@@ -860,7 +944,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-at]");if(!
 /* ---------- chat ---------- */
 function route(t){t=t.toLowerCase();
   if(/post|social|instagram|facebook|tiktok/.test(t))return"social";
-  if(/form|booking page|sign.?up/.test(t))return"forms";
+  if(/form|booking|book|link|meeting|schedul|sign.?up/.test(t))return"forms";
   if(/newsletter|email|campaign/.test(t))return"email";
   if(/article|seo|rank|blog|google search/.test(t))return"seo";
   if(/website|page|site/.test(t))return"web";
@@ -869,6 +953,9 @@ function route(t){t=t.toLowerCase();
   return"chief";}
 function answer(k,t){
   if(k==="seo"&&/newsletter|email/i.test(t))return{steps:["Opening the article in Arrowsterr","Pulling the key points"],html:`The <b>"How much does a new AC cost in Austin?"</b> article is live and ranks #7. I pulled the 3 key points and the booking link so Iris can build the email.`,btn:["Open article","Article opened in a new tab"]};
+  if(k==="forms"&&/text me/i.test(t))return{steps:["Checking your Claritia booking links"],html:`Done. When someone books any of your links, you'll get a text at <b>(512) 555-0142</b> with their name, time and what they need.`,btn:["Send a test text","Test text sent"]};
+  if(k==="forms"&&/only take/i.test(t))return{steps:["Checking your calendar","Updating 3 booking links in Claritia"],html:`Your booking links now stop taking visits after <b>Sunday</b>. 6 open slots are left this week. I'll turn them back on Monday unless you say otherwise.`,btn:["Keep it","Saved in Claritia"]};
+  if(k==="forms"&&/link|meeting/i.test(t))return{steps:["Reading your services","Creating the link in Claritia","Matching your crew's calendars"],html:`New booking link: <b>"Maintenance plan check"</b>, 20 minutes, Mon–Sat 8am–5pm, with a reminder by text the day before.`,btn:["Copy link","Link copied"]};
   if(k==="sales"&&/dana/i.test(t))return{steps:["Opening Dana's deal in Omniscient","Reading the text thread"],html:`Dana asked about financing yesterday. I drafted a day-3 follow-up with the 0% Synchrony offer. It mentions financing, so <b>it's waiting for your OK</b>.`,btn:["Review the draft","Opened in Approvals"]};
   const R={
     social:{steps:["Reading your brand voice","Checking the Capybaroar calendar","Making images in your style"],html:`Here are 3 posts for the $89 tune-up, set for Mon, Wed and Fri at 9am.<div class="posts res"><div class="post"><i></i><p>Cold night tonight? Book a $89 furnace tune-up before Dec 31.<small>Mon · FB + IG</small></p></div><div class="post"><i class="b"></i><p>45 minutes, free carbon monoxide check, done.<small>Wed · IG</small></p></div><div class="post"><i class="c"></i><p>Last call: $89 tune-ups end Dec 31.<small>Fri · Google</small></p></div></div>`,btn:["Schedule all 3","Scheduled in Capybaroar: Mon, Wed, Fri at 9am"]},
@@ -909,7 +996,23 @@ document.addEventListener("click",e=>{if(e.target.closest("[data-new]")){locatio
 /* ---------- team + agent ---------- */
 const stCls=s=>s==="Idle"?"idle":s==="Waiting"?"wait":"";
 const stTxt=s=>s==="Waiting"?"Needs you":s==="Idle"?"Paused":"Working";
-function renderTeam(){$("#teamGrid").innerHTML=ORDER.map(k=>{const a=A[k];return `<a class="card ac" href="#agent/${k}"><div class="img"><img src="${FULL(k)}" alt="Marble statue of ${a.god}" loading="lazy"></div><div class="bd"><div class="r1"><span class="eyebrow">${a.god}</span><span class="status ${stCls(a.st)}">${stTxt(a.st)}</span></div><b>${a.name}</b><p>${a.job}</p></div></a>`}).join("")+`<button class="hire" data-toast="Coming next: Receptionist, Operations, Media Buyer, Bookkeeper"><span><svg class="ico" viewBox="0 0 24 24" style="margin:0 auto"><path d="M12 5v14M5 12h14"/></svg><b>Hire another</b><small>Receptionist, Bookkeeper, Media Buyer</small></span></button>`}
+const ICON={Omniscient:["O","#5b8def"],Claritia:["C","#d97757"],MagpieReply:["M","#3f8f5e"],Capybaroar:["C","#c084a7"],Arrowsterr:["A","#d9a441"],Gmail:["G","#ea4335"],Slack:["S","#611f69"],Twilio:["T","#f22f46"],WordPress:["W","#21759b"],"Google Calendar":["31","#4285f4"],"Meta Ads":["M","#0866ff"],"Google Ads":["Ad","#e3a008"],QuickBooks:["Q","#2ca01c"],Stripe:["S","#635bff"],DocuSign:["D","#d4a500"]};
+const ics=t=>`<span class="ics">${t.slice(0,4).map(x=>`<span class="ic" title="${x}" style="background:${(ICON[x]||["?","#999"])[1]}">${(ICON[x]||["?"])[0]}</span>`).join("")}</span>`;
+const CATS=[["Marketing",["social","seo","email","web"]],["Sales and scheduling",["sales","forms"]],["Customer service",["support"]],["Operations",["chief"]]];
+const SOON=[["Receptionist","Answers every call and books jobs on the call.",["Every call answered","Appointments booked on the call","Quotes followed up"],["MagpieReply","Twilio","Claritia"]],["Media buyer","Runs your Meta and Google ads every day.",["Cuts wasted spend daily","Shifts budget to what books jobs","Catches tired ads early"],["Meta Ads","Google Ads"]],["Bookkeeper","Keeps your books current and your cash coming in.",["Every invoice logged","Unpaid invoices chased","Month-end close on time"],["QuickBooks","Stripe"]],["Operations manager","Handles vendors, contracts and renewals.",["Vendors compared for you","Signatures chased to done","Renewals caught in time"],["Omniscient","DocuSign"]]];
+function renderTeam(){
+  const q=($("#ucQ")&&$("#ucQ").value||"").toLowerCase();
+  const match=(...t)=>!q||t.join(" ").toLowerCase().includes(q);
+  const card=k=>{const a=A[k];return `<article class="card uc"><div class="top"><img src="${IMG(k)}" alt="${a.god}">${ics(a.tools)}</div><div class="r1"><span class="eyebrow">${a.god}</span><span class="status ${stCls(a.st)}">${stTxt(a.st)}</span></div><h3>${a.name}</h3><p>${a.job}</p><ul>${a.out.map(o=>`<li>${o}</li>`).join("")}</ul><div class="ft"><a href="#agent/${k}">See how it works →</a><button class="btn primary sm try" data-try="${k}">Try in chat</button></div></article>`};
+  let html=CATS.map(([c,ks])=>{const l=ks.filter(k=>match(A[k].name,A[k].god,A[k].job,c));return l.length?`<section class="uc-sec"><h2>${c}</h2><div class="uc-grid">${l.map(card).join("")}</div></section>`:""}).join("");
+  const soon=SOON.filter(s=>match(s[0],s[1]));
+  if(soon.length)html+=`<section class="uc-sec"><h2>Coming soon</h2><div class="uc-grid">${soon.map(s=>`<article class="card uc soon"><div class="top"><span class="lock"><svg class="ico sm" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Coming soon</span>${ics(s[3])}</div><h3>${s[0]}</h3><p>${s[1]}</p><ul>${s[2].map(o=>`<li>${o}</li>`).join("")}</ul><div class="ft"><span></span><button class="btn sm" data-toast="You're on the list for ${s[0]}">Join waitlist</button></div></article>`).join("")}</div></section>`;
+  html+=`<section class="uc-sec"><h2>Custom work</h2><div class="uc-grid"><article class="card uc custom"><h3>Anything else</h3><p>Describe the job in your own words. If it happens in your tools, Morning Telos can build an employee for it.</p><ul><li>Your process, your rules</li><li>Works in the tools you use</li><li>Built for you in about a week</li></ul><div class="ft"><a href="/book/" style="color:#fff">Book a Telos Session →</a></div></article></div></section>`;
+  $("#ucWrap").innerHTML=html||emptyHTML("No roles found","Try another word.");
+}
+$("#ucQ").addEventListener("input",renderTeam);
+document.addEventListener("click",e=>{const b=e.target.closest("[data-try]");if(!b)return;const k=b.dataset.try;location.hash="home";setTimeout(()=>{const ta=$("#homeInput");ta.value="@"+A[k].god+" "+(b.dataset.say||"");ta.focus();ta.selectionStart=ta.selectionEnd=ta.value.length},80)});
+
 const TRUST=[["Approve everything","Every draft comes to you first"],["Important only","Price, contracts and new campaigns need you"],["Autopilot","A daily summary, and you can undo anything"]];
 function setTab(t){$$("#agTabs [role=tab]").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t));$$("#v-agent .tp").forEach(p=>p.classList.toggle("on",p.id==="t-"+t));if(t==="chat")setTimeout(()=>$("#agInput").focus(),60)}
 document.addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b&&b.closest("#v-agent"))setTab(b.dataset.tab)});
@@ -996,8 +1099,36 @@ $("#kFilters").addEventListener("click",e=>{const b=e.target.closest("[data-kf]"
 $("#kList").addEventListener("click",e=>{const r=e.target.closest("[data-kd]");if(!r)return;ksel=+r.dataset.kd;renderKnowledge();if(isMobile())openDrawer("Knowledge",kDetail(KD[ksel]))});
 $("#teach").onsubmit=e=>{e.preventDefault();const v=$("#teachIn").value.trim();if(!v)return;KD.unshift({t:v,s:"Company",i:"NEW",c:"l",by:"all",m:"Added by Alex · just now",b:v});ksel=0;kf="All";$("#teachIn").value="";renderKnowledge();toast("Added. Every agent will use it from now on.")};
 
+/* ---------- model picker ---------- */
+const MODELS=[["auto","Auto","Picks the best model for each step","Varies"],["opus","Opus 5.5","Smartest, for plans and proposals","Slower"],["sonnet","Sonnet 5.5","Great writing, quick","Fast"],["haiku","Haiku 5.5","Sorting and short replies","Fastest"]];
+let model="auto";
+function renderMP(){$("#mp").innerHTML=`<h5>Choose your AI model</h5>`+MODELS.map((m,i)=>`${i===1?"<h6>Claude</h6>":""}<button type="button" role="option" aria-selected="${model===m[0]}" data-model="${m[0]}"><span class="mi">${i?"✳":"✦"}</span><span><b>${m[1]}</b><br><small>${m[2]}</small></span><span class="rt">${m[3]}${model===m[0]?" ✓":""}</span></button>`).join("")}
+$("#mpBtn").addEventListener("click",e=>{e.stopPropagation();renderMP();const on=!$("#mp").classList.contains("on");$("#mp").classList.toggle("on",on);$("#mpBtn").setAttribute("aria-expanded",on)});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-model]");if(b){model=b.dataset.model;$("#mpLbl").textContent=MODELS.find(m=>m[0]===model)[1];$("#mp").classList.remove("on");$("#mpBtn").setAttribute("aria-expanded",false);toast(model==="auto"?"Auto picks the right model for each step":`Your team will use ${$("#mpLbl").textContent}`);return}if(!e.target.closest("#mp"))$("#mp").classList.remove("on")});
+
+/* ---------- setup ---------- */
+document.addEventListener("click",e=>{const b=e.target.closest("[data-setup-btn]");if(!b)return;const r=b.closest("[data-setup]");r.classList.add("ok");b.replaceWith(Object.assign(document.createElement("span"),{className:"conn",textContent:"Done"}));toast("✓ "+b.dataset.setupBtn);const left=$$("#setupSec [data-setup]:not(.ok)").length;$("#setupN").textContent=left||"";if(!left)setTimeout(()=>$("#setupSec").remove(),900)});
+$("#setupX").addEventListener("click",()=>$("#setupSec").remove());
+
+/* ---------- meetings ---------- */
+const BL=[[15,"Quick call","#d9a441","Mon–Sat · 7am–7pm",12,1],[30,"Free estimate visit","#3f8f5e","Mon–Sat · 8am–5pm",9,1],[60,"Install consult","#5b8def","Tue and Thu · 9am–3pm",3,0]];
+const MT_CHIPS=["Make a 20-min link for maintenance plans","Only take bookings this week","Text me when someone books"];
+const UP=[["Thu 10:00","Dana Lee","Install walkthrough · with Luis",1],["Thu 10:00","Marcus Hill","Furnace tune-up · with Sam",0],["Thu 2:30","Owens Dental","Rooftop unit quote · with Luis",1],["Fri 9:00","Priya Shah","Tune-up (moved by Hestia) · with Sam",0]];
+const PAST=[["Mon","Dana Lee","Site visit · 42 min"],["Fri","Jen Ortiz","Heat pump consult · 35 min"],["Thu","Riverside Apartments","Maintenance plan call · 28 min"]];
+function renderMeetings(){
+  $("#blGrid").innerHTML=BL.map((b,i)=>`<div class="bl"><div class="len">${b[0]}<small>min</small></div><div class="nm" style="border-color:${b[2]}">${b[1]}</div><div class="av-t">${b[3]}</div><div class="bot"><span>${b[4]} booked this month</span><button class="switch" role="switch" aria-checked="${!!b[5]}" data-bl="${i}" aria-label="${b[1]} link on or off"></button></div></div>`).join("");
+  $("#mtChips").innerHTML=MT_CHIPS.map(c=>`<button class="chip" data-chip="@Hora ${esc(c)}">${esc(c)}</button>`).join("");
+  $("#mtUp").innerHTML=UP.map((m,i)=>`<button class="row" data-brief="${i}"><span class="mt-when">${m[0]}</span><span class="main"><b>${m[1]}</b><small>${m[2]}</small></span>${m[3]?'<span class="tag green">Brief ready</span>':'<span class="meta">Brief at 9am</span>'}</button>`).join("");
+  $("#mtPast").innerHTML=PAST.map((m,i)=>`<button class="row" data-recap="${i}"><span class="mt-when">${m[0]}</span><span class="main"><b>${m[1]}</b><small>${m[2]}</small></span><span class="go">Recap</span></button>`).join("");
+}
+$("#blGrid").addEventListener("click",e=>{const b=e.target.closest("[data-bl]");if(!b)return;const on=b.getAttribute("aria-checked")!=="true";b.setAttribute("aria-checked",on);toast(BL[+b.dataset.bl][1]+(on?" link is live":" link is off"))});
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-brief]");if(b){const m=UP[+b.dataset.brief];openDrawer("Meeting brief",`<div class="recap"><span class="eyebrow">Omniscient · brief for Luis</span><h3 style="font:400 22px/1.2 var(--serif);margin:4px 0 2px">${m[1]}</h3><div style="font-size:12.5px;color:var(--ink-4)">${m[0]} · ${m[2]}</div><h4>Who they are</h4><p>${m[1]==="Dana Lee"?"Homeowner in Round Rock. 2,100 sq ft, 14-year-old AC. Found you through the 'AC not cooling' Google search.":"Repeat customer since 2023. Last visit was a spring AC check."}</p><h4>What they care about</h4><ul><li>${m[1]==="Dana Lee"?"Monthly cost. Asked about financing by text.":"Getting it done before the cold snap"}</li><li>Install timing (wants it before Dec 15)</li></ul><h4>Bring up</h4><ul><li>12 months at 0% through Synchrony</li><li>The 10-year parts warranty</li></ul></div>`);return}
+  const r=e.target.closest("[data-recap]");if(r){const m=PAST[+r.dataset.recap];openDrawer("Meeting recap",`<div class="recap"><span class="eyebrow">Recorded by Omniscient</span><h3 style="font:400 22px/1.2 var(--serif);margin:4px 0 2px">${m[1]}</h3><div style="font-size:12.5px;color:var(--ink-4)">${m[0]} · ${m[2]}</div><h4>Summary</h4><p>Walked the property and checked the current system. The customer wants a quote this week and asked about payment options.</p><h4>Action items</h4><ul><li>Hermes: send the quote by tomorrow</li><li>Hermes: include financing options</li><li>Luis: add photos of the unit to the deal</li></ul><h4>Follow-up</h4><p>Hermes sent the recap email 4 minutes after the call ended.</p><div class="rv-act"><button class="btn sm" data-toast="Transcript opened">Transcript</button><button class="btn ghost sm" data-try="sales" data-say="about the ${esc(m[1])} meeting, ">Ask Hermes</button></div></div>`)}
+});
+
 /* ---------- command palette ---------- */
-const PAGES=[["home","Home","⌂"],["approvals","Approvals","✓"],["team","Team","☺"],["contacts","Contacts","☰"],["routines","Routines","◷"],["reports","Reports","▤"],["knowledge","Knowledge","✎"],["apps","Apps","⊞"]];
+const PAGES=[["home","Home","⌂"],["approvals","Approvals","✓"],["team","Team","☺"],["contacts","Contacts","☰"],["meetings","Meetings","▶"],["routines","Routines","◷"],["reports","Reports","▤"],["knowledge","Knowledge","✎"],["apps","Apps","⊞"]];
 let palSel=0,palItems=[];
 function renderPal(){
   const q=$("#palIn").value.toLowerCase().trim();
@@ -1018,7 +1149,7 @@ $("#palIn").addEventListener("input",()=>{palSel=0;renderPal()});
 $("#palIn").addEventListener("keydown",e=>{if(e.key==="ArrowDown"){e.preventDefault();palSel=(palSel+1)%palItems.length;renderPal()}else if(e.key==="ArrowUp"){e.preventDefault();palSel=(palSel-1+palItems.length)%palItems.length;renderPal()}else if(e.key==="Enter"){e.preventDefault();runPal(palSel)}});
 
 /* ---------- mobile more ---------- */
-document.addEventListener("click",e=>{if(!e.target.closest("[data-more]"))return;openDrawer("More",`<div class="card list">${[["contacts","Contacts"],["routines","Routines"],["reports","Reports"],["apps","Apps"]].map(p=>`<a class="row" href="#${p[0]}" data-close><span class="main"><b>${p[1]}</b></span><svg class="ico sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></a>`).join("")}</div><div class="card list" style="margin-top:12px"><button class="row" data-toast="Invite link copied"><span class="main"><b>Invite your crew</b></span></button><button class="row" data-toast="Referral link copied"><span class="main"><b>Rewards</b><small>Give $200, get 30%</small></span></button></div>`)});
+document.addEventListener("click",e=>{if(!e.target.closest("[data-more]"))return;openDrawer("More",`<div class="card list">${[["contacts","Contacts"],["meetings","Meetings"],["routines","Routines"],["reports","Reports"],["apps","Apps"]].map(p=>`<a class="row" href="#${p[0]}" data-close><span class="main"><b>${p[1]}</b></span><svg class="ico sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></a>`).join("")}</div><div class="card list" style="margin-top:12px"><button class="row" data-toast="Invite link copied"><span class="main"><b>Invite your crew</b></span></button><button class="row" data-toast="Referral link copied"><span class="main"><b>Rewards</b><small>Give $200, get 30%</small></span></button></div>`)});
 
 /* ---------- router ---------- */
 function show(){
@@ -1026,7 +1157,7 @@ function show(){
   if(!document.getElementById("v-"+v))v="home";
   $$(".view").forEach(x=>x.classList.toggle("on",x.id==="v-"+v));
   const navV=v==="agent"?"team":v==="chat"?"home":v;
-  $$("[data-v]").forEach(a=>{const on=a.dataset.v===navV||(a.dataset.v==="more"&&["contacts","routines","reports","apps"].includes(navV));a.classList.toggle("on",on);if(a.tagName==="A")a.toggleAttribute("aria-current",on)});
+  $$("[data-v]").forEach(a=>{const on=a.dataset.v===navV||(a.dataset.v==="more"&&["contacts","meetings","routines","reports","apps"].includes(navV));a.classList.toggle("on",on);if(a.tagName==="A")a.toggleAttribute("aria-current",on)});
   if(v!=="agent")window._agent=null;
   if(v==="agent")openAgent(A[arg]?arg:"chief");
   if(v==="reports")renderChart();
@@ -1035,7 +1166,7 @@ function show(){
   document.title=(v==="home"?"Home":v==="agent"?A[window._agent].god:v[0].toUpperCase()+v.slice(1))+" · Morning Telos";
 }
 window.addEventListener("hashchange",show);
-renderHome();renderTeam();renderAppr();renderContacts();renderRoutines();renderApps();renderKnowledge();show();
+renderHome();renderTeam();renderMeetings();renderAppr();renderContacts();renderRoutines();renderApps();renderKnowledge();show();
 </script>
 </body>
 </html>
