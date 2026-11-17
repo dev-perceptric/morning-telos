@@ -5,8 +5,15 @@
   "version": "0.1.0",
   "description": "Morning Telos AI team app (chat.morningtelos.com)",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.js",
+    "check": "node scripts/check.js",
+    "test": "node --test test/*.test.js",
+    "verify": "npm run check && npm test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0",
     "pg": "^8.13.0"
