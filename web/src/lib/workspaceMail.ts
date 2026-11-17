@@ -52,4 +52,5 @@ export async function sendMail(r: ResendSettings, to: string, mail: Mail): Promi
   return true;
 }
 
-export const DEFAULT_FROM = "Morning Telos <hello@morningtelos.com>";
+// Same sender as account emails (src/lib/email.ts) and the current app.
+export const DEFAULT_FROM = "Morning Telos <meet@morningtelos.com>";

@@ -36,6 +36,13 @@ test("policies check roles through has_role or the signed-in user", () => {
   for (const p of policies) assert.match(p, /has_role\(|auth\.uid\(\)/, `policy without a role check:\n${p}`);
 });
 
+test("server-only tables have no policies", () => {
+  for (const t of ["stripe_events"]) {
+    assert.ok(tables.some((x) => x.name === t), `${t} not found`);
+    assert.doesNotMatch(sql, new RegExp(`create policy "[^"]+" on public\\.${t}\\b`), `${t} is server-only but has a policy`);
+  }
+});
+
 test("security definer functions pin search_path", () => {
   for (const m of sql.matchAll(/create (?:or replace )?function ([\w.]+)\([\s\S]*?\$\$/g)) {
     if (/security definer/.test(m[0])) assert.match(m[0], /set search_path = ''/, `${m[1]} is security definer without search_path`);

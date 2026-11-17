@@ -1,10 +1,18 @@
-// Loads schema.sql into a throwaway Postgres database and checks who can see and change what.
+// Loads schema.sql and then every numbered migration (002_*.sql, ...) in order into a throwaway Postgres database,
+// and checks who can see and change what.
 // Uses TEST_DATABASE_URL only (default: local mt/mt), never DATABASE_URL. Skips when no database answers.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import pg from "pg";
+import { effectivePlan } from "../src/lib/plans.ts";
+
+// schema.sql first, then the numbered migrations in number order, the way they are run in Supabase.
+const SQL_DIR = new URL("../supabase/", import.meta.url);
+const MIGRATIONS = readdirSync(SQL_DIR)
+  .filter((f) => /^\d+_.*\.sql$/.test(f))
+  .sort((a, b) => parseInt(a, 10) - parseInt(b, 10) || a.localeCompare(b));
 
 const BASE = process.env.TEST_DATABASE_URL || "postgres://mt:mt@localhost:5432/mt";
 const dbName = `mt_rls_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
@@ -29,10 +37,7 @@ before(async () => {
   url.pathname = `/${dbName}`;
   db = await connect(url.toString());
   await db.query(readFileSync(new URL("./sql/supabase-shim.sql", import.meta.url), "utf8"));
-  await db.query(readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8"));
-  // Then every numbered change, in order, the way they run on Supabase.
-  const dir = new URL("../supabase/", import.meta.url);
-  for (const f of readdirSync(dir).filter((f) => /^\d{3}_.*\.sql$/.test(f)).sort()) await db.query(readFileSync(new URL(f, dir), "utf8"));
+  for (const f of ["schema.sql", ...MIGRATIONS]) await db.query(readFileSync(new URL(f, SQL_DIR), "utf8"));
 });
 
 after(async () => {
@@ -388,4 +393,98 @@ test("deleting a workspace removes its members and invites, and only the owner c
   assert.equal((await db.query("select count(*)::int n from workspace_members where workspace_id = $1", [ws])).rows[0].n, 0);
   assert.equal((await db.query("select count(*)::int n from workspace_invites where workspace_id = $1", [ws])).rows[0].n, 0);
   assert.equal((await db.query("select count(*)::int n from workspaces where id = $1", [ws])).rows[0].n, 0);
+});
+
+test("every SQL file is loaded: schema.sql, then the numbered migrations in order", () => {
+  const all = readdirSync(SQL_DIR).filter((f) => f.endsWith(".sql"));
+  assert.deepEqual([...all].sort(), ["schema.sql", ...MIGRATIONS].sort(), "a .sql file in supabase/ is neither schema.sql nor numbered");
+  assert.ok(MIGRATIONS.includes("002_billing.sql"));
+  const nums = MIGRATIONS.map((f) => parseInt(f, 10));
+  assert.deepEqual(nums, [...nums].sort((a, b) => a - b));
+});
+
+test("members can't read or write Stripe events", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("se1@example.com", { business: "Events Co" });
+  await db.query("insert into stripe_events (id, type) values ('evt_rls_1', 'invoice.paid')");
+  await as(o, async (q) => {
+    await assert.rejects(q("select * from stripe_events"), /permission denied/);
+  });
+  await as(o, async (q) => {
+    await assert.rejects(q("insert into stripe_events (id, type) values ('evt_fake', 'invoice.paid')"), /permission denied/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from stripe_events"), /permission denied/);
+  });
+  // Even with table rights back, RLS with no policies still shows nothing.
+  await db.query("grant select on stripe_events to authenticated");
+  await as(o, async (q) => {
+    assert.equal((await q("select * from stripe_events")).rowCount, 0);
+  });
+  await db.query("revoke select on stripe_events from authenticated");
+  // The server's secret key (service_role) sees every event, and a repeated id is refused.
+  await db.query("begin");
+  try {
+    await db.query("set local role service_role");
+    assert.equal((await db.query("select * from stripe_events where id = 'evt_rls_1'")).rowCount, 1);
+    await assert.rejects(db.query("insert into stripe_events (id, type) values ('evt_rls_1', 'invoice.paid')"), /duplicate key/);
+  } finally {
+    await db.query("rollback");
+  }
+});
+
+// The billing states the issue names, for effective_plan() and effectivePlan().
+const CASES: { name: string; plan: string; status: string; days: number; want: string }[] = [
+  { name: "trial", plan: "trial", status: "trialing", days: 10, want: "trial" },
+  { name: "trial ended", plan: "trial", status: "trialing", days: -1, want: "expired" },
+  { name: "active Starter", plan: "starter", status: "active", days: -30, want: "starter" },
+  { name: "active Pro during the trial", plan: "pro", status: "active", days: 5, want: "pro" },
+  { name: "past due keeps the plan", plan: "pro", status: "past_due", days: -30, want: "pro" },
+  { name: "canceled after the trial", plan: "pro", status: "canceled", days: -30, want: "expired" },
+  { name: "canceled during the trial", plan: "starter", status: "canceled", days: 3, want: "trial" },
+  { name: "unpaid", plan: "starter", status: "unpaid", days: -30, want: "expired" },
+  { name: "first payment still going through", plan: "pro", status: "incomplete", days: -1, want: "expired" },
+];
+
+test("effective_plan() for trial, active, past due, canceled and trial ended, and it matches effectivePlan()", async (t) => {
+  if (!db) return t.skip("no test database");
+  for (const c of CASES) {
+    const ws = (
+      await db.query("insert into workspaces (name, plan, status, trial_ends_at) values ($1, $2, $3, now() + make_interval(days => $4)) returning id, trial_ends_at", [c.name, c.plan, c.status, c.days])
+    ).rows[0];
+    const sql = (await db.query("select effective_plan($1::uuid) p", [ws.id])).rows[0].p;
+    assert.equal(sql, c.want, `SQL: ${c.name}`);
+    const ts = effectivePlan({ plan: c.plan, status: c.status, trial_ends_at: (ws.trial_ends_at as Date).toISOString() }).plan;
+    assert.equal(ts, c.want, `TypeScript: ${c.name}`);
+  }
+});
+
+test("a new workspace starts on the trial", async (t) => {
+  if (!db) return t.skip("no test database");
+  const n = await signUp("new1@example.com", { business: "New Co" });
+  const ws = await wsOf(n);
+  await as(n, async (q) => {
+    assert.equal((await q("select effective_plan($1::uuid) p", [ws])).rows[0].p, "trial");
+  });
+});
+
+test("members only get effective_plan() for their own workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const a = await signUp("ep1@example.com", { business: "EP A" });
+  const b = await signUp("ep2@example.com", { business: "EP B" });
+  const aws = await wsOf(a);
+  const bws = await wsOf(b);
+  await as(a, async (q) => {
+    assert.equal((await q("select effective_plan($1::uuid) p", [aws])).rows[0].p, "trial");
+    assert.equal((await q("select effective_plan($1::uuid) p", [bws])).rows[0].p, null);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select effective_plan($1::uuid) p", [aws]), /permission denied/);
+  });
+});
+
+test("plan and status only take known values", async (t) => {
+  if (!db) return t.skip("no test database");
+  await assert.rejects(db.query("insert into workspaces (name, plan) values ('Bad plan', 'enterprise')"), /workspaces_plan_check/);
+  await assert.rejects(db.query("insert into workspaces (name, status) values ('Bad status', 'whatever')"), /workspaces_status_check/);
 });
