@@ -263,6 +263,39 @@ img{display:block;max-width:100%}
 .formprev{display:grid;gap:6px;margin-top:8px}
 .formprev div{background:var(--ivory);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;color:var(--ink-3)}
 
+/* mentions */
+.mention{color:var(--clay-hover);background:var(--clay-bg);border-radius:6px;padding:0 4px;font-weight:600;white-space:nowrap}
+.msg.me .bub .mention{background:rgba(255,255,255,.16);color:#fff}
+.mpop{position:absolute;left:12px;bottom:calc(100% + 8px);width:300px;max-width:calc(100% - 24px);max-height:330px;overflow:auto;background:var(--white);border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 44px rgba(20,20,19,.14);padding:6px;z-index:30;display:none}
+.mpop.on{display:block;animation:fade .18s var(--ease)}
+.mpop h5{font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);font-weight:500;padding:8px 10px 4px}
+.mpop button{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border-radius:10px;text-align:left;font-size:14px}
+.mpop button.on,.mpop button:hover{background:var(--ivory-2)}
+.mpop img,.mpop .hu{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:none}
+.mpop .hu{display:grid;place-items:center;font-size:12px;font-weight:600;background:var(--ivory-3)}
+.mpop small{display:block;color:var(--ink-4);font-size:12px;line-height:1.2}
+.handoff{font-size:12.5px;color:var(--ink-3);display:flex;align-items:center;gap:7px;margin:-2px 0 0 42px}
+.handoff img{width:18px;height:18px;border-radius:50%;object-fit:cover}
+.taglist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+/* knowledge */
+.kgrid{display:grid;grid-template-columns:1.05fr 1fr;gap:16px}
+.teach{display:flex;gap:8px;align-items:center;padding:10px 10px 10px 16px;margin-bottom:14px}
+.teach input{flex:1;border:0;outline:0;background:transparent;font-size:15px;min-width:0}
+.kd{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line);cursor:pointer;transition:background .2s}
+.kd:first-child{border-top:0}
+.kd:hover,.kd.on{background:var(--ivory)}
+.kd .ki{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;font-family:var(--mono);font-size:10px;font-weight:500;color:#fff;background:var(--ink)}
+.kd .ki.l{background:var(--clay)}.kd .ki.s{background:#5b8def}.kd .ki.a{background:var(--green)}
+.kd b{font-size:14px;display:block}
+.kd small{font-size:12.5px;color:var(--ink-4)}
+.kd .by{margin-left:auto;display:flex}
+.kd .by img{width:22px;height:22px;border-radius:50%;object-fit:cover;border:2px solid var(--white);margin-left:-6px}
+.kd .by span{font-size:11.5px;color:var(--ink-4);white-space:nowrap}
+.kprev{padding:20px 22px;align-self:start;position:sticky;top:50px}
+.kprev h3{font-family:var(--serif);font-weight:400;font-size:26px;letter-spacing:-.01em;margin:6px 0 4px}
+.kprev .meta{font-size:12.5px;color:var(--ink-4);margin-bottom:12px}
+.kprev .body{font-size:14.5px;color:var(--ink-2);white-space:pre-line;background:var(--ivory);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kprev .used{margin-top:14px;font-size:13px;color:var(--ink-3)}
 /* tables etc */
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .filters button{border:1px solid var(--line-2);background:var(--white);border-radius:99px;padding:6px 12px;font-size:13px;display:inline-flex;align-items:center;gap:6px}
@@ -338,6 +371,8 @@ img{display:block;max-width:100%}
   .apps{grid-template-columns:repeat(2,1fr)}
 }
 @media (max-width:860px){
+  .kgrid{grid-template-columns:1fr}
+  .kprev{position:static}
   .app{grid-template-columns:1fr}
   .side{position:fixed;left:0;top:34px;bottom:0;width:280px;z-index:50;transform:translateX(-105%);transition:transform .35s var(--ease)}
   .side.on{transform:none}
@@ -391,7 +426,7 @@ img{display:block;max-width:100%}
         <a href="#routines" data-v="routines"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Routines</a>
         <a href="#reports" data-v="reports"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</a>
         <a href="#apps" data-v="apps"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Apps</a>
-        <a href="#brain" data-v="brain"><svg class="ico" viewBox="0 0 24 24"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a2 2 0 0 0-3-1ZM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></svg>Brain</a>
+        <a href="#knowledge" data-v="knowledge"><svg class="ico" viewBox="0 0 24 24"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a2 2 0 0 0-3-1ZM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></svg>Knowledge</a>
       </nav>
       <h6>Recents</h6>
       <div class="recent" id="recent">
@@ -422,14 +457,14 @@ img{display:block;max-width:100%}
         <h1>What should your <em>team</em> do today?</h1>
       </div>
       <form class="composer" id="homeForm">
-        <textarea id="homeInput" rows="2" placeholder="Ask your team anything..."></textarea>
+        <textarea id="homeInput" rows="2" placeholder="Ask your team anything. Type @ to tag someone"></textarea>
         <div class="c-row">
           <button type="button" class="c-btn round" aria-label="Attach" data-toast="Attach files, photos or voice memos"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-          <button type="button" class="c-btn" id="pickBtn"><span id="pickLbl">Auto</span><svg class="ico" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg></button>
+          <button type="button" class="c-btn" data-at><b style="color:var(--clay);font-size:15px">@</b>Tag a teammate</button>
           <button type="button" class="c-btn round" aria-label="Voice" data-toast="Hold to talk to your team"><svg class="ico" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
           <button class="send" aria-label="Send"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
         </div>
-        <div class="picker" id="picker"></div>
+        
       </form>
       <div class="reach">
         <span>Other ways to reach your team</span>
@@ -475,8 +510,8 @@ img{display:block;max-width:100%}
       <div class="chat" id="chat"></div>
       <div class="dock">
         <form class="composer" id="chatForm">
-          <textarea id="chatInput" rows="1" placeholder="Reply or ask for changes..."></textarea>
-          <div class="c-row"><span style="font-size:12.5px;color:var(--ink-4);padding-left:8px">Your team uses your Brain: voice, prices and rules</span><button class="send" aria-label="Send"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+          <textarea id="chatInput" rows="1" placeholder="Reply, or type @ to pull in a teammate"></textarea>
+          <div class="c-row"><span style="font-size:12.5px;color:var(--ink-4);padding-left:8px">Your team reads your Knowledge: voice, prices and rules</span><button class="send" aria-label="Send"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
         </form>
       </div>
     </section>
@@ -523,7 +558,7 @@ img{display:block;max-width:100%}
       </div>
       <div class="tabp" id="t-chat">
         <div class="chat" id="agChat"></div>
-        <div class="dock"><form class="composer" id="agForm"><textarea id="agInput" rows="1" placeholder="Ask this agent..."></textarea><div class="c-row"><span style="font-size:12.5px;color:var(--ink-4);padding-left:8px" id="agHint"></span><button class="send" aria-label="Send"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div></form></div>
+        <div class="dock"><form class="composer" id="agForm"><textarea id="agInput" rows="1" placeholder="Ask this agent, or @ another one for help"></textarea><div class="c-row"><span style="font-size:12.5px;color:var(--ink-4);padding-left:8px" id="agHint"></span><button class="send" aria-label="Send"><svg class="ico" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div></form></div>
       </div>
       <div class="tabp" id="t-rules"><div class="card box"><h3>Rules this agent follows</h3><p style="font-size:13.5px;color:var(--ink-3);margin-bottom:8px">Set by you during onboarding. Edit them in plain English.</p><ul class="list rules" id="agRules"></ul><button class="btn btn-line" style="margin-top:12px" data-toast="Type a new rule, like 'Never text after 7pm'">+ Add a rule</button></div></div>
       <div class="tabp" id="t-job"><div class="card box jobd" id="agJobd"></div></div>
@@ -581,23 +616,14 @@ img{display:block;max-width:100%}
       <div class="apps" id="others"></div>
     </section>
 
-    <!-- BRAIN -->
-    <section class="view" id="v-brain">
-      <div class="page-h"><h1>Brain</h1><p>What every agent knows about your business. It gets sharper each time you edit a draft.</p></div>
-      <div class="brain">
-        <div class="card box"><h3>Business</h3><dl class="kv" style="margin-top:8px">
-          <dt>Name</dt><dd>Brightside Heating & Air</dd><dt>Area</dt><dd>Austin, Round Rock, Cedar Park</dd><dt>Hours</dt><dd>Mon–Sat 7am–7pm, emergency line 24/7</dd><dt>Services</dt><dd>AC repair, installs, furnace tune-ups, duct cleaning</dd><dt>Offer</dt><dd>$89 furnace tune-up through Dec 31</dd></dl></div>
-        <div class="card box"><h3>Voice</h3><p style="margin-top:6px">Friendly, plain and local. Short sentences. Use first names. Sign off as "the Brightside crew." Never pushy.</p><p style="margin-top:10px;color:var(--ink-4);font-size:13px">Learned from 18 past emails and 12 posts, plus 23 edits you made.</p></div>
-        <div class="card box"><h3>Rules for everyone</h3><ul class="list rules" style="margin-top:4px">
-          <li><span class="ck">!</span>Never quote a price for installs without a site visit.</li>
-          <li><span class="ck">!</span>Discounts over 10% need Alex.</li>
-          <li><span class="ck">!</span>No texts before 8am or after 7pm.</li>
-          <li><span class="ck">!</span>Gas smell or no heat with kids or elderly: call the on-call tech right away.</li></ul></div>
-        <div class="card box"><h3>Files and links</h3><div class="files" style="margin-top:8px">
-          <div class="file"><i>PDF</i>Price sheet 2026<small>Updated Nov 2</small></div>
-          <div class="file"><i>DOC</i>Warranty and service policy<small>Oct 6</small></div>
-          <div class="file"><i>URL</i>brightsidehvac.com<small>Synced daily</small></div>
-          <div class="file"><i>CSV</i>Past customers (1,240)<small>Oct 6</small></div></div></div>
+    <!-- KNOWLEDGE -->
+    <section class="view" id="v-knowledge">
+      <div class="page-h"><h1>Knowledge</h1><p>What your team knows. Every agent reads it before it acts, and it grows each time you edit a draft or answer a question.</p></div>
+      <form class="card teach" id="teach"><input id="teachIn" placeholder="Teach your team something new, like 'We now service Georgetown'"><button class="btn btn-dark">Add</button></form>
+      <div class="filters" id="kFilters"></div>
+      <div class="kgrid">
+        <div class="card" id="kList"></div>
+        <div class="card kprev" id="kPrev"></div>
       </div>
     </section>
   </main>
@@ -606,42 +632,42 @@ img{display:block;max-width:100%}
 
 <script>
 const A = {
-  chief:{god:"Athena",name:"Chief of Staff",img:"chief",job:"Runs your day. Briefs you each morning, answers your questions and hands work to the team.",tools:["Omniscient","Claritia","MagpieReply","Capybaroar","Arrowsterr","Gmail","Slack"],out:["7am briefing with your numbers","Hands tasks to the right agent","Weekly report written for you"],st:"Working",trust:1,
+  chief:{tags:"sales,support,forms,email,social,seo,web".split(","),god:"Athena",name:"Chief of Staff",img:"chief",job:"Runs your day. Briefs you each morning, answers your questions and hands work to the team.",tools:["Omniscient","Claritia","MagpieReply","Capybaroar","Arrowsterr","Gmail","Slack"],out:["7am briefing with your numbers","Hands tasks to the right agent","Weekly report written for you"],st:"Working",trust:1,
     kpis:[["Briefings sent","7"],["Tasks handed off","23"],["Alerts raised","2"],["Questions answered","11"]],
     done:["Sent 7 morning briefings to Slack","Asked SEO for a 'furnace smells like burning' article after 3 support chats","Flagged Google Ads spend up 40% with no new leads","Wrote Monday's weekly report"],
     rules:["Brief Alex at 7am, Slack and email","Escalate anything over $5,000 right away","Never change another agent's rules without Alex"],
     jobd:"<p>Your Chief of Staff watches every tool and every agent, so you don't have to.</p><ul><li>Morning briefing with leads, bookings, quotes and reviews</li><li>Routes your requests to the right agent</li><li>Spots problems early, like a drop in leads or a bad review</li><li>Writes the weekly report and explains why numbers moved</li></ul>"},
-  sales:{god:"Hermes",name:"Sales Rep",img:"sales",job:"Replies to every lead in under a minute, books the visit and follows up every quote until it's a yes or no.",tools:["Omniscient","Claritia","Gmail","Twilio"],out:["Replies to leads in seconds","Every quote followed up","CRM always up to date"],st:"Working",trust:1,
+  sales:{tags:"forms,support,chief".split(","),god:"Hermes",name:"Sales Rep",img:"sales",job:"Replies to every lead in under a minute, books the visit and follows up every quote until it's a yes or no.",tools:["Omniscient","Claritia","Gmail","Twilio"],out:["Replies to leads in seconds","Every quote followed up","CRM always up to date"],st:"Working",trust:1,
     kpis:[["Leads answered","14"],["Avg reply","38s"],["Visits booked","9"],["Quotes followed up","17"]],
     done:["Replied to 14 new leads, average 38 seconds","Booked 9 site visits in Claritia","Sent 17 quote follow-ups, 3 said yes ($9,350)","Wrote meeting briefs before 6 calls"],
     rules:["Reply to new leads within 1 minute, 7am–7pm","Max 4 follow-ups per quote","Price, discount and contract questions go to Alex","Stop all follow-ups when a person replies"],
     jobd:"<p>Your Sales Rep works every lead from first contact to signed contract.</p><ul><li>Instant reply by text and email to new leads</li><li>Asks qualifying questions and books the visit</li><li>Brief before each call, recap and tasks after</li><li>Follows up quotes on day 1, 3, 7 and 14</li><li>Drafts proposals and contracts in Omniscient for you to approve</li></ul>"},
-  support:{god:"Hestia",name:"Customer Support",img:"support",job:"Answers customers on chat, text, email and social, day or night, and hands the hard ones to your crew.",tools:["MagpieReply","Claritia","Omniscient"],out:["Answers on every channel 24/7","Reschedules visits on its own","Escalates the hard ones"],st:"Working",trust:2,
+  support:{tags:"sales,forms,seo".split(","),god:"Hestia",name:"Customer Support",img:"support",job:"Answers customers on chat, text, email and social, day or night, and hands the hard ones to your crew.",tools:["MagpieReply","Claritia","Omniscient"],out:["Answers on every channel 24/7","Reschedules visits on its own","Escalates the hard ones"],st:"Working",trust:2,
     kpis:[["Conversations","58"],["Resolved by AI","72%"],["CSAT","4.8"],["Escalated","6"]],
     done:["Answered 58 conversations across chat, text and Instagram","Rescheduled 4 visits in Claritia","Escalated 6 tickets (2 refunds, 1 gas smell)","Turned 3 repeat questions into help articles"],
     rules:["Gas smell or no heat with kids or elderly: call on-call tech now","Refunds always go to a person","Answer only from your docs and price sheet"],
     jobd:"<p>Customer Support runs your inbox in MagpieReply across every channel.</p><ul><li>Live answers from your docs and policies</li><li>Looks up bookings and reschedules visits</li><li>Escalates refunds, angry customers and emergencies</li><li>Asks happy customers for a Google review</li></ul>"},
-  forms:{god:"Hora",name:"Forms + Scheduling",img:"forms",job:"Builds your forms and booking pages, routes every lead and keeps your calendar full with reminders.",tools:["Claritia","Google Calendar"],out:["Forms built from one sentence","Reminders by text and email","No-shows followed up"],st:"Working",trust:2,
+  forms:{tags:"sales,support".split(","),god:"Hora",name:"Forms + Scheduling",img:"forms",job:"Builds your forms and booking pages, routes every lead and keeps your calendar full with reminders.",tools:["Claritia","Google Calendar"],out:["Forms built from one sentence","Reminders by text and email","No-shows followed up"],st:"Working",trust:2,
     kpis:[["Form submissions","22"],["Bookings","9"],["No-show rate","4%"],["Forms live","5"]],
     done:["Built 'Furnace tune-up' form and booking page","Sent 26 reminders by text and email","Followed up 1 no-show, rebooked for Friday","Sent 22 submissions to Sales Rep"],
     rules:["Reminder 1 day before and 2 hours before","Offer 3 time slots, never more","Copy every submission to Morning Telos and Omniscient"],
     jobd:"<p>Forms + Scheduling runs your lead capture in Claritia.</p><ul><li>Builds forms and booking pages from a plain request</li><li>Routes each lead to the right person</li><li>Sends reminders and handles reschedules</li><li>Follows up with no-shows and people who didn't book</li></ul>"},
-  email:{god:"Iris",name:"Email Marketing",img:"email",job:"Plans and writes your campaigns, welcome emails and win-backs, and sends them through Claritia.",tools:["Claritia","Arrowsterr","Omniscient"],out:["Monthly newsletter written for you","Win-back emails to old customers","Results explained"],st:"Waiting",trust:0,
+  email:{tags:"seo,social,sales".split(","),god:"Iris",name:"Email Marketing",img:"email",job:"Plans and writes your campaigns, welcome emails and win-backs, and sends them through Claritia.",tools:["Claritia","Arrowsterr","Omniscient"],out:["Monthly newsletter written for you","Win-back emails to old customers","Results explained"],st:"Waiting",trust:0,
     kpis:[["Emails sent","1,240"],["Open rate","46%"],["Clicks","31"],["Bookings","7"]],
     done:["Sent '$89 furnace tune-up' to 1,240 past customers","Welcomed 9 new subscribers","Built 'No visit in 12 months' segment (312 people)","Drafted the December newsletter"],
     rules:["Max 1 marketing email per person per week","Skip anyone in an open deal or open ticket","Every campaign needs Alex's approval"],
     jobd:"<p>Email Marketing runs your campaigns in Claritia.</p><ul><li>Plans the email calendar</li><li>Writes newsletters, promos and win-backs</li><li>Builds segments from your customer list</li><li>Reports opens, clicks and bookings</li></ul>"},
-  social:{god:"Aphrodite",name:"Social Media",img:"social",job:"Keeps Facebook, Instagram and Google posts full and on brand, and answers comments.",tools:["Capybaroar","Arrowsterr"],out:["A full calendar every week","Posts in your voice","Comments answered"],st:"Waiting",trust:0,
+  social:{tags:"seo,sales,email".split(","),god:"Aphrodite",name:"Social Media",img:"social",job:"Keeps Facebook, Instagram and Google posts full and on brand, and answers comments.",tools:["Capybaroar","Arrowsterr"],out:["A full calendar every week","Posts in your voice","Comments answered"],st:"Waiting",trust:0,
     kpis:[["Posts published","9"],["Reach","6,420"],["Comments answered","14"],["DMs to Sales","2"]],
     done:["Published 9 posts on Facebook, Instagram and Google","Answered 14 comments","Sent 2 DMs asking for quotes to Sales Rep","Drafted next week's 5 posts"],
     rules:["Post Mon, Wed, Fri at 9am","Never post customer homes without permission","Batch approval every Monday"],
     jobd:"<p>Social Media runs your channels in Capybaroar.</p><ul><li>Plans and writes a week of posts</li><li>Makes images in your style</li><li>Answers simple comments, drafts the rest</li><li>Sends buyers in your DMs to the Sales Rep</li></ul>"},
-  seo:{god:"Artemis",name:"SEO Specialist",img:"seo",job:"Gets you found on Google and in ChatGPT answers with articles and pages people search for.",tools:["Arrowsterr","WordPress"],out:["Weekly rankings brief","New articles every month","Shows up in AI answers"],st:"Working",trust:1,
+  seo:{tags:"email,social,web".split(","),god:"Artemis",name:"SEO Specialist",img:"seo",job:"Gets you found on Google and in ChatGPT answers with articles and pages people search for.",tools:["Arrowsterr","WordPress"],out:["Weekly rankings brief","New articles every month","Shows up in AI answers"],st:"Working",trust:1,
     kpis:[["Keywords top 10","18"],["New articles","3"],["AI mentions","+4"],["Site visits","1,930"]],
     done:["Published 'How much does a new AC cost in Austin?'","Moved 'furnace repair Austin' from #9 to #4","Refreshed 2 old service pages","Planned 4 December articles"],
     rules:["Publish Tuesdays","Only use prices from the price sheet","Article plan needs Alex's approval each month"],
     jobd:"<p>The SEO Specialist runs your search presence with Arrowsterr.</p><ul><li>Finds what customers search for</li><li>Writes and publishes articles and pages</li><li>Tracks Google rankings and AI mentions</li><li>Hands new articles to Social and Email</li></ul>"},
-  web:{god:"Hephaestus",name:"Website Builder",img:"web",job:"Builds and updates your website, with forms, booking and SEO built in.",tools:["WordPress","Arrowsterr","Claritia"],out:["New pages from a text","Forms on every page","Fast, mobile-friendly"],st:"Idle",trust:0,
+  web:{tags:"seo,forms".split(","),god:"Hephaestus",name:"Website Builder",img:"web",job:"Builds and updates your website, with forms, booking and SEO built in.",tools:["WordPress","Arrowsterr","Claritia"],out:["New pages from a text","Forms on every page","Fast, mobile-friendly"],st:"Idle",trust:0,
     kpis:[["Pages live","14"],["Pages this month","2"],["Speed score","96"],["Form views","880"]],
     done:["Built the Round Rock service page","Added the tune-up booking form to 6 pages","Drafted the Austin AC install page"],
     rules:["Every page has a booking form","Use real job photos when we have them","Preview link before anything goes live"],
@@ -658,6 +684,7 @@ let APPR=[
   {id:4,a:"seo",title:"December article plan (4 articles)",meta:"Arrowsterr content plan",tag:["Monthly plan","green"],draft:"1. Furnace smells like burning: when to worry (3 support chats asked this)\n2. Heat pump vs furnace in Austin\n3. How long does an AC last in Texas?\n4. Carbon monoxide detector placement guide",why:"Monthly plan needs you",ok:"Plan approved. SEO starts writing Tuesday"}
 ];
 const FEED=[
+  ["social","<b>Aphrodite</b> tagged <span class=\"mention\">@Hermes</span>: 2 Instagram DMs asking for quotes","Just now"],
   ["sales","<b>Sales Rep</b> replied to <b>Marcus Hill</b> in 22 seconds and booked a visit for Thu 10am","Just now"],
   ["support","<b>Customer Support</b> rescheduled <b>Priya Shah's</b> tune-up to Friday","2 min ago"],
   ["forms","<b>Forms + Scheduling</b> sent 6 visit reminders by text","14 min ago"],
@@ -665,6 +692,8 @@ const FEED=[
   ["social","<b>Social Media</b> answered 3 comments on Instagram","2 hr ago"]
 ];
 const LIVE=[
+  ["seo","<b>Artemis</b> tagged <span class=\"mention\">@Iris</span>: the AC cost article is live, add it to the newsletter"],
+  ["support","<b>Hestia</b> tagged <span class=\"mention\">@Hermes</span>: a chat visitor wants a quote for a new heat pump"],
   ["support","<b>Customer Support</b> answered a question about duct cleaning prices on chat"],
   ["sales","<b>Sales Rep</b> moved <b>Jen Ortiz</b> to Won ($6,200) in Omniscient"],
   ["forms","<b>Forms + Scheduling</b> got a new tune-up booking from the website"],
@@ -677,7 +706,7 @@ const SUGG=[
   ["support","Ask for Google reviews","Text happy customers a review link after each job."],
   ["chief","Morning weather alert","On freezing nights, push furnace offers on social and email."]
 ];
-const CHIPS=["Post about our $89 tune-up","Make a form for duct cleaning quotes","How many leads this week?","Write a December newsletter","Add a Cedar Park service page"];
+const CHIPS=["@Artemis @Iris turn the AC cost article into a newsletter","@Hermes follow up with Dana","Post about our $89 tune-up","Make a form for duct cleaning quotes","How many leads this week?","Write a December newsletter","Add a Cedar Park service page"];
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 function toast(t,undo){const el=$("#toast");el.innerHTML=t+(undo?' <button onclick="this.parentNode.classList.remove(\'on\')">Undo</button>':'');el.classList.add("on");clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove("on"),3200)}
@@ -704,7 +733,7 @@ document.addEventListener("click",e=>{
   const card=b.closest(".ap"),id=+card.dataset.id,p=APPR.find(x=>x.id===id);if(!p)return;
   const act=b.dataset.ap;
   if(act==="edit"){const d=card.querySelector(".draft");if(d&&!d.querySelector("textarea")){const t=d.textContent;d.innerHTML=`<textarea>${t}</textarea>`;d.querySelector("textarea").focus();b.textContent="Save";b.dataset.ap="save"}else if(!d){toast("Opening the post editor")}return}
-  if(act==="save"){const t=card.querySelector("textarea").value;p.draft=t;toast("Saved. Your edit was added to the Brain so future drafts sound like you.")}
+  if(act==="save"){const t=card.querySelector("textarea").value;p.draft=t;toast("Saved. Your edit was added to Knowledge so future drafts sound like you.")}
   card.classList.add("gone");
   setTimeout(()=>{APPR=APPR.filter(x=>x.id!==id);renderAppr()},420);
   if(act==="ok"||act==="save")toast("✓ "+p.ok,true);else toast("Skipped. "+A[p.a].name+" won't send it.",true);
@@ -720,13 +749,37 @@ function renderHome(){
 let liveI=0;
 setInterval(()=>{if(!$("#v-home").classList.contains("on"))return;const f=LIVE[liveI++%LIVE.length];const feed=$("#feed");feed.insertAdjacentHTML("afterbegin",feedItem([f[0],f[1],"Just now"]));[...feed.children].slice(1).forEach((c,i)=>{const s=c.querySelector("small");if(i===0&&s.textContent==="Just now")s.textContent="1 min ago"});while(feed.children.length>6)feed.lastChild.remove()},6500);
 
-/* picker */
-let pick="auto";
-function renderPicker(){
-  $("#picker").innerHTML=`<button data-p="auto"><span class="auto">✦</span><span><b>Auto</b><small>Chief of Staff picks the right agent</small></span></button>`+ORDER.filter(k=>k!=="chief").map(k=>`<button data-p="${k}"><img src="${IMG(k)}" alt=""><span><b>${A[k].name}</b><small>${A[k].out[0]}</small></span></button>`).join("");
+/* mentions */
+const HANDLE={};ORDER.forEach(k=>HANDLE[A[k].god.toLowerCase()]=k);
+const HUMANS={luis:["Luis","Lead tech","LU"],maria:["Maria","Office manager","MA"]};
+const pop=document.createElement("div");pop.className="mpop";let popTA=null,popSel=0,popItems=[];
+function esc(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+function hl(t){return esc(t).replace(/@(\w+)/g,(m,n)=>HANDLE[n.toLowerCase()]||HUMANS[n.toLowerCase()]?`<span class="mention">@${HANDLE[n.toLowerCase()]?A[HANDLE[n.toLowerCase()]].god:HUMANS[n.toLowerCase()][0]}</span>`:m)}
+function parseTags(t){const ag=[],hu=[];(t.match(/@(\w+)/g)||[]).forEach(m=>{const n=m.slice(1).toLowerCase();if(HANDLE[n]&&!ag.includes(HANDLE[n]))ag.push(HANDLE[n]);else if(HUMANS[n]&&!hu.includes(n))hu.push(n)});return{ag,hu}}
+function mq(ta){const v=ta.value.slice(0,ta.selectionStart);const m=v.match(/(^|\s)@(\w*)$/);return m?m[2].toLowerCase():null}
+function openPop(ta,q){
+  popTA=ta;ta.closest(".composer").appendChild(pop);
+  const ag=q?[...ORDER.filter(k=>A[k].god.toLowerCase().startsWith(q)),...ORDER.filter(k=>!A[k].god.toLowerCase().startsWith(q)&&A[k].name.toLowerCase().split(/[^a-z]+/).some(w=>w.startsWith(q)))]:ORDER;
+  const hu=Object.keys(HUMANS).filter(h=>!q||h.startsWith(q));
+  popItems=[...ag.map(k=>({h:A[k].god,html:`<img src="${IMG(k)}" alt=""><span><b>${A[k].god}</b><small>${A[k].name}</small></span>`})),...hu.map(h=>({h:HUMANS[h][0],html:`<span class="hu">${HUMANS[h][2]}</span><span><b>${HUMANS[h][0]}</b><small>${HUMANS[h][1]} · gets it on Slack</small></span>`}))];
+  if(!popItems.length){closePop();return}
+  popSel=Math.min(popSel,popItems.length-1);
+  pop.innerHTML=(ag.length?"<h5>AI team</h5>":"")+popItems.slice(0,ag.length).map((it,i)=>`<button type="button" data-mi="${i}" class="${i===popSel?"on":""}">${it.html}</button>`).join("")+(hu.length?"<h5>Your crew</h5>":"")+popItems.slice(ag.length).map((it,i)=>`<button type="button" data-mi="${i+ag.length}" class="${i+ag.length===popSel?"on":""}">${it.html}</button>`).join("");
+  pop.classList.add("on");
 }
-$("#pickBtn").onclick=e=>{e.stopPropagation();$("#picker").classList.toggle("on")};
-document.addEventListener("click",e=>{const b=e.target.closest("[data-p]");if(b){pick=b.dataset.p;$("#pickLbl").innerHTML=pick==="auto"?"Auto":`<img src="${IMG(pick)}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;margin-right:6px">${A[pick].name}`;$("#picker").classList.remove("on")}else if(!e.target.closest("#picker"))$("#picker").classList.remove("on")});
+function closePop(){pop.classList.remove("on");popTA=null;popSel=0}
+function pickMention(i){const ta=popTA,it=popItems[i];if(!ta||!it)return;const pos=ta.selectionStart,before=ta.value.slice(0,pos).replace(/@(\w*)$/,"@"+it.h+" ");ta.value=before+ta.value.slice(pos);ta.focus();ta.selectionStart=ta.selectionEnd=before.length;closePop()}
+pop.addEventListener("mousedown",e=>{const b=e.target.closest("[data-mi]");if(b){e.preventDefault();pickMention(+b.dataset.mi)}});
+$$(".composer textarea").forEach(ta=>{
+  ta.addEventListener("input",()=>{const q=mq(ta);q===null?closePop():openPop(ta,q)});
+  ta.addEventListener("keydown",e=>{if(!pop.classList.contains("on")||popTA!==ta)return;
+    if(e.key==="ArrowDown"){e.preventDefault();popSel=(popSel+1)%popItems.length;openPop(ta,mq(ta))}
+    else if(e.key==="ArrowUp"){e.preventDefault();popSel=(popSel-1+popItems.length)%popItems.length;openPop(ta,mq(ta))}
+    else if(e.key==="Enter"||e.key==="Tab"){e.preventDefault();e.stopImmediatePropagation();pickMention(popSel)}
+    else if(e.key==="Escape"){closePop()}},true);
+  ta.addEventListener("blur",()=>setTimeout(()=>{if(popTA===ta)closePop()},150));
+});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-at]");if(!b)return;const ta=b.closest(".composer").querySelector("textarea");const v=ta.value;ta.value=v+(v&&!v.endsWith(" ")?" ":"")+"@";ta.focus();ta.selectionStart=ta.selectionEnd=ta.value.length;openPop(ta,"")});
 
 /* chat brain */
 function route(t){t=t.toLowerCase();
@@ -739,6 +792,7 @@ function route(t){t=t.toLowerCase();
   if(/support|ticket|refund|complain|customer.*(ask|said)/.test(t))return"support";
   return"chief";}
 function answer(k,t){
+  if(k==="seo"&&/newsletter|email/i.test(t))return{steps:["Opening the article in Arrowsterr","Pulling the key points"],html:`The <b>"How much does a new AC cost in Austin?"</b> article is live and already ranks #7. I pulled the 3 key points and the booking link so Iris can build the email.`,btn:["Open the article","Article opened in a new tab"]};
   const R={
     social:{steps:["Reading your brand voice","Checking the Capybaroar calendar","Making images in your style"],html:`Here are 3 posts for the $89 tune-up. I put them in Mon, Wed and Fri slots at 9am.<div class="posts" style="margin-top:10px"><div class="post"><i></i><p>Cold night tonight? Book a $89 furnace tune-up before Dec 31.<small>Mon · FB + IG</small></p></div><div class="post"><i class="b"></i><p>45 minutes, free carbon monoxide check, done.<small>Wed · IG</small></p></div><div class="post"><i class="c"></i><p>Last call: $89 tune-ups end Dec 31.<small>Fri · Google</small></p></div></div>`,btn:["Schedule all 3","Scheduled in Capybaroar: Mon, Wed, Fri at 9am"]},
     forms:{steps:["Reading your services and prices","Building the form in Claritia","Adding a booking step"],html:`Done. I built <b>"Duct cleaning quote"</b> in Claritia with a booking step at the end. New submissions go straight to the Sales Rep.<div class="formprev"><div>Name · Phone · Email</div><div>Home size: under 1,500 / 1,500–2,500 / 2,500+ sq ft</div><div>Last cleaned: never / 1–3 years / 3+ years</div><div>Pick a visit time →</div></div>`,btn:["Publish on the website","Form published on 6 pages"]},
@@ -750,19 +804,25 @@ function answer(k,t){
     chief:{steps:["Checking Omniscient, Claritia and MagpieReply","Adding up this week"],html:`This week so far: <b>14 new leads</b> (up 27%), <b>9 visits booked</b>, average reply time <b>38 seconds</b>. Biggest open quote is Dana Lee at $4,800. Google reviews: 6 new, average 4.9.`,btn:["Send this to Slack","Posted in #brightside-team"]}
   };return R[k];}
 function addMsg(box,html,me){box.insertAdjacentHTML("beforeend",html);box.lastElementChild.scrollIntoView({behavior:"smooth",block:"end"})}
-function runChat(box,text,forced){
-  addMsg(box,`<div class="msg me"><div class="me-av">A</div><div class="bub">${text.replace(/</g,"&lt;")}</div></div>`);
-  const k=forced||route(text),a=A[k],r=answer(k,text);
-  if(!forced&&k!=="chief")addMsg(box,`<div class="route"><img src="${IMG("chief")}" alt="" style="width:18px;height:18px;border-radius:50%;object-fit:cover"> Chief of Staff sent this to ${a.name}</div>`);
-  const id="m"+Date.now();
-  addMsg(box,`<div class="msg" id="${id}"><img class="av" src="${IMG(k)}" alt=""><div><div class="who">${a.name}</div><div class="bub"><div class="steps">${r.steps.map(s=>`<div>${s}</div>`).join("")}</div></div></div></div>`);
+function reply(box,k,text,done){
+  const a=A[k],r=answer(k,text),id="m"+Date.now()+Math.random().toString(36).slice(2,6);
+  addMsg(box,`<div class="msg" id="${id}"><img class="av" src="${IMG(k)}" alt=""><div><div class="who">${a.god} · ${a.name}</div><div class="bub"><div class="steps">${r.steps.map(s=>`<div>${s}</div>`).join("")}</div></div></div></div>`);
   const steps=$$("#"+id+" .steps div");
   steps.forEach((s,i)=>setTimeout(()=>s.classList.add("ok"),600+i*650));
-  setTimeout(()=>{$("#"+id+" .bub").innerHTML=r.html+`<div class="ap-act"><button class="btn btn-dark" data-done="${r.btn[1]}">${r.btn[0]}</button><button class="btn btn-line" data-toast="Tell me what to change">Change something</button></div>`;$("#"+id).scrollIntoView({behavior:"smooth",block:"end"})},700+steps.length*650);
+  setTimeout(()=>{$("#"+id+" .bub").innerHTML=r.html+`<div class="ap-act"><button class="btn btn-dark" data-done="${r.btn[1]}">${r.btn[0]}</button><button class="btn btn-line" data-toast="Tell ${a.god} what to change">Change something</button></div>`;$("#"+id).scrollIntoView({behavior:"smooth",block:"end"});done&&done()},700+steps.length*650);
+}
+function runChat(box,text,forced){
+  addMsg(box,`<div class="msg me"><div class="me-av">A</div><div class="bub">${hl(text)}</div></div>`);
+  const t=parseTags(text);
+  t.hu.forEach(h=>addMsg(box,`<div class="handoff"><span class="mention">@${HUMANS[h][0]}</span> got this on Slack. Their reply will show up here.</div>`));
+  let ks=forced?[forced,...t.ag.filter(k=>k!==forced)]:t.ag.length?t.ag:(t.hu.length?[]:[route(text)]);
+  if(!forced&&!t.ag.length&&ks[0]&&ks[0]!=="chief")addMsg(box,`<div class="handoff"><img src="${IMG("chief")}" alt="">Athena sent this to ${A[ks[0]].god}, your ${A[ks[0]].name}</div>`);
+  const next=i=>{if(i>=ks.length)return;if(i>0)addMsg(box,`<div class="handoff"><img src="${IMG(ks[i-1])}" alt="">${A[ks[i-1]].god} tagged <span class="mention">@${A[ks[i]].god}</span> to take it from here</div>`);setTimeout(()=>reply(box,ks[i],text,()=>setTimeout(()=>next(i+1),500)),i?350:0)};
+  next(0);
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-done]");if(b){b.textContent="✓ Done";b.disabled=true;b.style.background="var(--green)";toast("✓ "+b.dataset.done,true)}});
-function startThread(text){location.hash="chat";$("#threadTitle").textContent=text.length>48?text.slice(0,46)+"…":text;$("#chat").innerHTML="";setTimeout(()=>runChat($("#chat"),text,pick==="auto"?null:pick),150);
-  const r=$("#recent");r.insertAdjacentHTML("afterbegin",`<a href="#chat"><span>${text.replace(/</g,"&lt;")}</span></a>`);}
+function startThread(text){location.hash="chat";$("#threadTitle").textContent=text.length>48?text.slice(0,46)+"…":text;$("#chat").innerHTML="";setTimeout(()=>runChat($("#chat"),text),150);
+  const r=$("#recent");r.insertAdjacentHTML("afterbegin",`<a href="#chat"><span>${esc(text)}</span></a>`);}
 $("#homeForm").onsubmit=e=>{e.preventDefault();const t=$("#homeInput").value.trim();if(!t){$("#homeInput").focus();return}$("#homeInput").value="";startThread(t)};
 $("#homeInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#homeForm").requestSubmit()}});
 document.addEventListener("click",e=>{const c=e.target.closest("[data-chip]");if(c)startThread(c.dataset.chip)});
@@ -780,10 +840,10 @@ function openAgent(k){
   $("#agKpis").innerHTML=a.kpis.map(x=>`<div class="stat"><small>${x[0]}</small><b>${x[1]}</b><em>This week</em></div>`).join("");
   $("#agDone").innerHTML=a.done.map((d,i)=>`<li><span class="ck">✓</span>${d}<small>${["Today","Yesterday","Tue","Mon"][i]||"Mon"}</small></li>`).join("");
   $("#agRules").innerHTML=a.rules.map(r=>`<li><span class="ck">!</span>${r}</li>`).join("");
-  $("#agJobd").innerHTML=a.jobd+`<p class="never"><b>Never does:</b> spend money, sign contracts or change prices without you.</p>`;
+  $("#agJobd").innerHTML=a.jobd+`<p class="never"><b>Tags for help:</b></p><div class="taglist">${a.tags.map(t=>`<span class="mention">@${A[t].god}</span>`).join("")}<span class="mention">@Luis</span></div><p class="never"><b>Never does:</b> spend money, sign contracts or change prices without you.</p>`;
   $$("#seg button").forEach(b=>b.classList.toggle("on",+b.dataset.l===a.trust));
   const tog=$("#agTog");tog.classList.toggle("off",a.st==="Idle");$("#agOnLbl").textContent=a.st==="Idle"?"Paused":"Working";
-  $("#agChat").innerHTML=`<div class="msg"><img class="av" src="${IMG(k)}" alt=""><div><div class="who">${a.name}</div><div class="bub">Hi Alex. ${a.out.join(". ")}. What do you need?</div></div></div>`;
+  $("#agChat").innerHTML=`<div class="msg"><img class="av" src="${IMG(k)}" alt=""><div><div class="who">${a.name}</div><div class="bub">Hi Alex, I\'m ${a.god}. ${a.out.join(". ")}. Need someone else too? Just @ them.</div></div></div>`;
   $("#agHint").textContent="Talking to "+a.name;
   $$("#agTabs button").forEach((b,i)=>b.classList.toggle("on",i===0));$$(".tabp").forEach((p,i)=>p.classList.toggle("on",i===0));
   renderAppr();
@@ -835,6 +895,35 @@ function renderApps(){
   $("#others").innerHTML=OTHERS.map(s=>`<div class="card appc"><span class="lg" style="background:${s[1]};font-size:${s[2].length>1?13:16}px">${s[2]}</span><div><b>${s[0]}</b><p>${s[3]}</p>${s[4]?'<span class="conn">Connected</span>':`<button class="btn btn-line" style="height:30px;font-size:12.5px" data-toast="${s[0]} connected in one click">Connect</button>`}</div></div>`).join("");
 }
 
+/* knowledge */
+const KD=[
+  {t:"Brand voice",s:"Company",i:"DOC",c:"",by:"all",m:"Learned from 18 emails, 12 posts and 23 of your edits",b:"Friendly, plain and local. Short sentences. Use first names.\nSign off as \"the Brightside crew.\"\nSay \"crew\" instead of \"team.\" Never pushy, never salesy."},
+  {t:"Services and prices 2026",s:"Company",i:"PDF",c:"",by:"all",m:"Price sheet 2026.pdf · updated Nov 2",b:"AC repair diagnostic: $89\nFurnace tune-up: $89 through Dec 31, then $129\nDuct cleaning: from $349\nInstalls: quote after a free site visit"},
+  {t:"Area, hours and emergencies",s:"Company",i:"DOC",c:"",by:"all",m:"Set during onboarding",b:"Austin, Round Rock, Cedar Park.\nMon–Sat 7am–7pm. Emergency line 24/7: (512) 555-0199.\nGas smell or no heat with kids or elderly: call the on-call tech right away."},
+  {t:"Quote follow-up playbook",s:"Agent",i:"DOC",c:"",by:["sales"],m:"Used by Hermes",b:"Day 1: any questions?\nDay 3: answer the most likely worry (price, timing, financing).\nDay 7: still interested?\nDay 14: friendly close-out.\nFinancing: 12 months at 0% through Synchrony."},
+  {t:"Support escalation rules",s:"Agent",i:"DOC",c:"",by:["support"],m:"Used by Hestia",b:"Refunds, damage claims and angry customers go to Maria.\nEmergencies go to the on-call tech by phone.\nEverything else: answer from Knowledge, then offer to book."},
+  {t:"Posting style guide",s:"Agent",i:"DOC",c:"",by:["social"],m:"Used by Aphrodite",b:"Real job photos beat stock.\nOne idea per post, under 40 words.\nNever show a customer's home or address without permission."},
+  {t:"Customers ask about financing a lot",s:"Learned",i:"AI",c:"l",by:["sales","support"],m:"Learned from 9 chats this month · Hestia",b:"9 of 58 conversations asked about payment plans.\nAdded the Synchrony 0% offer to replies and quote follow-ups."},
+  {t:"Alex shortens long emails",s:"Learned",i:"AI",c:"l",by:["email","sales"],m:"Learned from 6 edits · 2 days ago",b:"You cut most drafts by about a third.\nNew drafts aim for 60–90 words."},
+  {t:"brightsidehvac.com",s:"Sources",i:"URL",c:"s",by:"all",m:"Website · synced daily",b:"14 pages, including services, areas, reviews and FAQs."},
+  {t:"Claritia forms and bookings",s:"Sources",i:"API",c:"a",by:["forms","sales"],m:"Live sync",b:"5 forms, 3 meeting types, 1,240 contacts."},
+  {t:"Omniscient deals and call notes",s:"Sources",i:"API",c:"a",by:["sales","chief"],m:"Live sync",b:"6 open deals, 41 call notes and meeting briefs."},
+  {t:"MagpieReply conversations",s:"Sources",i:"API",c:"a",by:["support","seo"],m:"Live sync",b:"Every chat, text, email and DM, so repeat questions become help articles."}
+];
+let kf="All",ksel=0;
+function byHTML(by){if(by==="all")return`<span>Everyone</span>`;return by.map(k=>`<img src="${IMG(k)}" alt="${A[k].god}" title="${A[k].god}">`).join("")}
+function renderKnowledge(){
+  $("#kFilters").innerHTML=["All","Company","Agent","Learned","Sources"].map(f=>`<button data-kf="${f}" class="${kf===f?"on":""}">${f==="Agent"?"Per agent":f}</button>`).join("");
+  const list=KD.map((d,i)=>[d,i]).filter(([d])=>kf==="All"||d.s===kf);
+  if(!list.some(([,i])=>i===ksel))ksel=list[0][1];
+  $("#kList").innerHTML=list.map(([d,i])=>`<div class="kd ${i===ksel?"on":""}" data-kd="${i}"><span class="ki ${d.c}">${d.i}</span><div><b>${esc(d.t)}</b><small>${d.m}</small></div><div class="by">${byHTML(d.by)}</div></div>`).join("");
+  const d=KD[ksel];
+  $("#kPrev").innerHTML=`<span class="tag ${d.s==="Learned"?"clay":d.s==="Sources"?"green":""}">${d.s==="Agent"?"Per agent":d.s}</span><h3>${esc(d.t)}</h3><div class="meta">${d.m}</div><div class="body">${esc(d.b)}</div><div class="used">Used by: ${d.by==="all"?"every agent":d.by.map(k=>`<span class="mention">@${A[k].god}</span>`).join(" ")}</div><div class="ap-act"><button class="btn btn-line" data-toast="Editing ${esc(d.t)}">Edit</button><button class="btn btn-ghost" data-toast="Your team will stop using this">Archive</button></div>`;
+}
+$("#kFilters").onclick=e=>{const b=e.target.closest("[data-kf]");if(b){kf=b.dataset.kf;renderKnowledge()}};
+$("#kList").onclick=e=>{const r=e.target.closest("[data-kd]");if(r){ksel=+r.dataset.kd;renderKnowledge();if(innerWidth<860)$("#kPrev").scrollIntoView({behavior:"smooth"})}};
+$("#teach").onsubmit=e=>{e.preventDefault();const v=$("#teachIn").value.trim();if(!v)return;KD.unshift({t:v,s:"Company",i:"NEW",c:"l",by:"all",m:"Added by Alex · just now",b:v});ksel=0;kf="All";$("#teachIn").value="";renderKnowledge();toast("Added to Knowledge. Every agent will use it from now on.")};
+
 /* router */
 function show(){
   let h=location.hash.slice(1)||"home";let [v,arg]=h.split("/");
@@ -852,7 +941,7 @@ $("#menu").onclick=()=>{$("#side").classList.add("on");$("#scrim").classList.add
 $("#scrim").onclick=()=>{$("#side").classList.remove("on");$("#scrim").classList.remove("on")};
 $$("[data-go]").forEach(b=>b.onclick=()=>{location.hash="home";setTimeout(()=>$("#homeInput").focus(),100)});
 window.addEventListener("hashchange",show);
-renderHome();renderPicker();renderAppr();renderContacts();renderRoutines();renderApps();show();
+renderHome();renderKnowledge();renderAppr();renderContacts();renderRoutines();renderApps();show();
 </script>
 </body>
 </html>
