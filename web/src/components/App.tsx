@@ -11,6 +11,7 @@ import { inviteTokenFromPath, roleLabel } from "@/lib/workspace";
 import { AuthScreen, NewPassword } from "./AuthScreen";
 import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
 import { SettingsPage, type Workspace } from "./Settings";
+import { ConnectSocialCard } from "./Social";
 import { btnPrimary, btnSecondary, ErrorText, Frame, input, label, Logo, Notice } from "./ui";
 
 // An invite token waits here from the moment the link is opened until the person is signed in.
@@ -186,6 +187,7 @@ function Home({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {
         <p className="text-[15px] text-ink-3">Your AI team is getting set up. Chat and approvals are coming next.</p>
       </div>
       <SetupStatus key={ws.id} sb={sb} workspaceId={ws.id} />
+      <ConnectSocialCard key={`social-${ws.id}`} sb={sb} ws={ws} />
     </section>
   );
 }

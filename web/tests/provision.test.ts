@@ -42,6 +42,9 @@ function fakeProduct(product: Product) {
       for (const k of keys) if (k.brand === brand) k.revoked = true;
       return { ok: true, status: 204, data: null };
     },
+    async connectLink() {
+      return { ok: false, status: 404, code: "not_found", message: "Not used here.", retryable: false };
+    },
   };
   return { partner, brands, keys, calls, setDown: (f: PartnerFailure | null) => void (down = f) };
 }
