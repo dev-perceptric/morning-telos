@@ -48,6 +48,14 @@ if curl -sS "$API/docker/morningtelos" "${auth[@]}" | grep -q '"content":"servic
   id=$(curl -sS -X DELETE "$API/docker/morningtelos/down" "${auth[@]}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
   wait_for "$id"
 fi
-r=$(curl -sS -X POST "$API/docker" "${auth[@]}" -H "Content-Type: application/json" -d "$body")
-id=$(echo "$r" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])') || { echo "$r"; exit 1; }
-wait_for "$id" && echo "deployed"
+# Retry the create step, since the old project is already down at this point.
+for try in 1 2 3 4 5 6; do
+  r=$(curl -sS -X POST "$API/docker" "${auth[@]}" -H "Content-Type: application/json" -d "$body")
+  if id=$(echo "$r" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])' 2>/dev/null); then
+    wait_for "$id" && { echo "deployed"; exit 0; }
+  else
+    echo "create failed (try $try): $(echo "$r" | head -c 200)"
+  fi
+  sleep $((try * 15))
+done
+exit 1

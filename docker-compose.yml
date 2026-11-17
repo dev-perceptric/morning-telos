@@ -64,6 +64,13 @@ services:
     # Stored on the server outside the project folder, so redeploys keep the data.
     volumes:
       - /srv/morningtelos/pgdata:/var/lib/postgresql/data
+    # Keeps the stored password in sync with DB_PASSWORD on every start.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        if [ -s /var/lib/postgresql/data/PG_VERSION ]; then
+        echo "ALTER USER mt PASSWORD '$$POSTGRES_PASSWORD';" | su-exec postgres postgres --single -D /var/lib/postgresql/data postgres >/dev/null; fi;
+        exec docker-entrypoint.sh postgres
   # Emails the team if the app or the website stops answering, and again when it's back.
   watchdog:
     image: alpine:3.20
