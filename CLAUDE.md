@@ -2,38 +2,52 @@
 
 Morning Telos sells an AI team to small businesses. Each customer gets a workspace with AI employees (named after Greek gods) they chat with, tag with @, and approve work from.
 
+**The plan is the source of truth:** the "Morning Telos SaaS Plan" doc (https://claude.ai/artifact/5BnjVisY2z2vwxrCEYfyNm). Read it before planning or building. Work only on the current phase. If an issue conflicts with the plan, the plan wins: comment on the issue and label it `agent-blocked`.
+
 ## Layout
 
-- `app/`: the product at chat.morningtelos.com. Plain Node 22 (ES modules), `pg`, `@anthropic-ai/sdk`. No framework, no build step.
-  - `server.js`: HTTP server, every API route (`route(...)`), the routines scheduler.
-  - `lib/agents.js`: the team (`AGENTS`, `ORDER`), the tool gateway (`SCOPE`) that locks each customer to their own brand, and the agent loop (`runAgent`, `runTurn`).
-  - `lib/db.js`: the whole schema and migrations. Migrations must be idempotent (`create table if not exists`, `add column if not exists`). They run on every start.
-  - `public/`: the single-page web app (`index.html`, `app.js`, `app.css`). Vanilla JS.
-- `site/`: the marketing site (static HTML). Built by the Python scripts in `scripts/` from `content/`.
-- `docker-compose.yml`, `scripts/deploy.sh`: production. Containers pull `main` from GitHub when they start.
+- `web/`: **the new app** (being built). Next 16, React 19, Tailwind 4, TypeScript, Supabase (`db.morningtelos.com`), Stripe, Resend, Sentry, PostHog. One client app at `src/app/[[...slug]]`. At launch (phase 5) it replaces `app/`.
+  - `web/supabase/`: `schema.sql` plus numbered migrations (`001_*.sql`, `002_*.sql`, ...). Every customer table has `workspace_id` and RLS through `has_role(workspace_id, '<role>')`. Server-only tables have RLS on and no policies.
+  - `web/tests/*.test.ts`: `node --test`.
+- `app/`: **the old app**, still live at chat.morningtelos.com for our own team until launch. Plain Node. Only fix real bugs there. Don't add features.
+- `site/`: the marketing site (static HTML), built by `scripts/` from `content/`.
+- `docker-compose.yml`, `scripts/deploy.sh`: production for the old app and the site. Containers pull `main` from GitHub when they start, so anything merged to `main` under `app/` or `site/` goes live on the next restart.
+
+## Copy before you write
+
+The plan's "What we copy from Arrowsterr and Omniscient" table says where each piece comes from. Read the source first and lift it, then trim what Morning Telos doesn't need.
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://github.com/perceptric/arrowsterr /home/user/perceptric/arrowsterr
+```
+
+Omniscient (`perceptric/omniscient`) is private: attach it with the `add_repo` tool (read access) before cloning. Match their file layout, lint config, CI and naming so the three products stay alike.
 
 ## Checks (run before every commit)
 
 ```bash
-cd app && npm ci && npm run verify
+cd web && npm ci && npm run lint && npm run typecheck && npm test && npm run build
+cd app && npm ci && npm run verify   # only if you touched app/
 ```
 
-`npm run check` syntax-checks every file and scans for leaked keys. `npm test` runs the unit tests and a smoke test that boots the server against Postgres and signs up. The smoke test reads `TEST_DATABASE_URL` (default `postgres://mt:mt@localhost:5432/mt`) and skips if no database answers. If Postgres is installed but stopped, start it and create the `mt` user and database so the smoke test really runs.
-
-Add a test for every new route or pure function. CI runs the same checks on every pull request.
+Add tests for every pure function, route handler and SQL policy you write. CI runs the same checks on every pull request.
 
 ## Rules
 
-- Never read, print or use `DATABASE_URL` or any other real credential from the environment. Tests use `TEST_DATABASE_URL` only.
-- Never commit keys. Platform keys live only in the server's environment (`lib/platform.js`).
-- Every query on customer data must filter by `workspace_id`. One customer must never see another's data.
-- Tools that change something outside the app go through the approvals flow in `runAgent`. Never let an agent send, publish or delete without owner approval unless the agent's trust level is autopilot.
-- New tool access for agents must go through `SCOPE` in `lib/agents.js` so calls stay locked to the customer's brand.
+- Never read, print or use `DATABASE_URL` or any other real credential from the environment. Tests use `TEST_DATABASE_URL` or mocks only. Never call real Stripe, Supabase, Resend or Anthropic from tests.
+- Never commit keys. Keys live in the server's environment. Add each new one to `web/.env.example` with an empty value and a comment saying where it comes from.
+- One customer must never see another's data: RLS on every table, and server code checks the workspace too.
+- Agent tools that change something outside the app go through approvals. No send, publish or delete without the owner's OK, unless the agent's trust level is autopilot.
 - User-facing text: plain English, 9th grade level, short sentences, no em dashes.
-- Keep the code style: small, dense, no new dependencies unless clearly needed. No TypeScript, no bundler.
-- Do not write new markdown files (notes, plans, summaries) unless the task asks for one.
-- Do not edit `docker-compose.yml` or `scripts/deploy.sh` unless the task is about deploys.
+- If you'd write a comment telling the next agent "don't do X", write a lint rule or a test that fails on X instead.
+- Do not write new markdown files (notes, plans, summaries) unless the issue asks for one.
+- Do not edit `docker-compose.yml`, `scripts/deploy.sh` or anything under `.github/` unless the issue is about deploys or CI.
 
-## Overnight agent work
+## How agents work here
 
-Tasks live in GitHub issues labeled `agent-ready`. Work one issue per branch (`agent/<issue-number>-<short-name>`), open a pull request that says `Closes #<n>`, and stop. Never merge, never push to `main`. When done, swap the issue's label to `agent-done`. If an issue is unclear or blocked (needs a key, a design choice, or a big refactor), comment on the issue explaining why, swap its label to `agent-blocked`, and move on.
+Issues labeled `agent-ready` are the queue. Each issue has a phase label (`phase-1`, ...) and a "Done when" list.
+
+- **Builder:** one issue per branch `agent/<n>-<short-name>`. Open a PR into `main` that says `Closes #<n>`, what changed and how you tested it. Swap the label to `agent-done`. Never merge, never push to `main`.
+- **Blocked:** if an issue needs a key, a human decision or another unmerged issue, comment saying exactly what's needed, swap the label to `agent-blocked`, and move on.
+- **Review fixes:** a PR with review comments from the reviewer agent or a human gets fixed on its own branch before you start new issues.
+- Repeated mistakes become a lint rule, a test, or a line in this file.
