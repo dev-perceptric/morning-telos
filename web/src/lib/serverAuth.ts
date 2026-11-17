@@ -32,7 +32,13 @@ export async function requireRole(request: Request, workspaceId: unknown, min: M
   return { sb, user: user.user };
 }
 
-/** A Supabase client with full access, for billing and jobs. Needs SUPABASE_SECRET_KEY. Never send it to the browser. */
+/** True when the signed-in person can make changes (and spend) in the workspace. */
+export async function isEditor(sb: SupabaseClient, workspaceId: string): Promise<boolean> {
+  const { data } = await sb.rpc("has_role", { ws: workspaceId, min: "editor" });
+  return Boolean(data);
+}
+
+/** A Supabase client with full access, for billing, jobs and the login routes. Needs SUPABASE_SECRET_KEY. Never send it to the browser. */
 export function adminClient(): SupabaseClient | null {
   const url = supabaseUrl();
   const key = process.env.SUPABASE_SECRET_KEY?.trim();

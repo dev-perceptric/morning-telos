@@ -1,9 +1,18 @@
 -- Test-only stand-in for the parts of Supabase that schema.sql relies on: the API roles,
 -- auth.users, auth.uid() and auth.jwt(). Never run this on a real Supabase project.
-do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
-  if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
-  if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
+-- Roles are shared by the whole Postgres server, and test files run at the same time, so two may try to
+-- create the same role at once. Each create ignores "already exists".
+do $$
+declare r text;
+begin
+  foreach r in array array['anon', 'authenticated', 'service_role', 'supabase_auth_admin'] loop
+    begin
+      if not exists (select 1 from pg_roles where rolname = r) then
+        execute format('create role %I nologin%s', r, case when r = 'service_role' then ' bypassrls' else '' end);
+      end if;
+    exception when duplicate_object or unique_violation then null;
+    end;
+  end loop;
 end $$;
 
 create schema auth;
