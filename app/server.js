@@ -8,6 +8,10 @@ import { hashPassword, checkPassword, encrypt, token } from "./lib/util.js";
 import { AGENTS, ORDER, APPS, SERVICES, runTurn, executeApproval, getConn, spendSince, canRun } from "./lib/agents.js";
 import * as mcp from "./lib/mcp.js";
 import * as billing from "./lib/billing.js";
+import crypto from "node:crypto";
+import { sendEmail, layout } from "./lib/email.js";
+import { noteFailure } from "./lib/alerts.js";
+import { runBackup, backupStatus, r2Put } from "./lib/backup.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(here, "public");
@@ -49,7 +53,7 @@ async function startSession(userId) {
 async function auth(req) {
   const t = cookies(req).mt_session;
   if (!t) return {};
-  const user = await one("select u.id, u.email, u.name, u.role, u.is_admin, u.workspace_id from sessions s join users u on u.id=s.user_id where s.token=$1 and s.expires_at>now()", [t]);
+  const user = await one("select u.id, u.email, u.name, u.role, u.is_admin, u.workspace_id, (u.email_verified_at is not null) as email_verified from sessions s join users u on u.id=s.user_id where s.token=$1 and s.expires_at>now()", [t]);
   if (!user) return {};
   return { user, ws: await one("select * from workspaces where id=$1", [user.workspace_id]) };
 }
@@ -64,6 +68,24 @@ const cleanEmail = (e) => String(e || "").trim().toLowerCase();
 const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length < 200;
 const cleanUrl = (u) => String(u || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "").slice(0, 200);
 const validTz = (z) => { try { new Intl.DateTimeFormat("en-US", { timeZone: z }); return !!z; } catch { return false; } };
+
+// ---------- email tokens ----------
+const hashToken = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
+async function makeToken(userId, kind, minutes) {
+  const t = token(32);
+  await q("delete from email_tokens where user_id=$1 and kind=$2 and used_at is null", [userId, kind]);
+  await q("insert into email_tokens(token_hash,user_id,kind,expires_at) values($1,$2,$3,now()+make_interval(mins => $4))", [hashToken(t), userId, kind, minutes]);
+  return t;
+}
+async function useToken(t, kind) {
+  return one("update email_tokens set used_at=now() where token_hash=$1 and kind=$2 and used_at is null and expires_at>now() returning user_id", [hashToken(t), kind]);
+}
+async function sendVerify(userId, email, name) {
+  const url = `${ORIGIN}/#verify=${await makeToken(userId, "verify", 60 * 48)}`;
+  return sendEmail({ to: email, subject: "Verify your email for Morning Telos",
+    text: `Hi ${name || "there"}, confirm your email for Morning Telos: ${url}`,
+    html: layout({ title: `Welcome${name ? ", " + name.split(" ")[0] : ""}`, intro: "Confirm your email so we can reach you about your AI team and your account.", button: "Verify my email", url, outro: "This link works for 48 hours." }) });
+}
 
 // ---------- static ----------
 function serveFile(res, file, cache = "no-cache") {
@@ -99,6 +121,7 @@ route("POST", "/api/signup", async (req, res) => {
   const u = await one("insert into users(email,name,pass_hash,role,workspace_id) values($1,$2,$3,'owner',$4) returning id", [email, name, hashPassword(b.password), ws.id]);
   await q("insert into knowledge(workspace_id,title,body,created_by) values($1,$2,$3,$4)", [ws.id, `About ${business}`, `${business}${site ? ` (${site})` : ""}.\n\nWhat we sell:\nWho our customers are:\nWhere we work:\nHow we sound:`, u.id]);
   await log(ws.id, "chief", "set up your workspace. Your 14-day free trial has started");
+  sendVerify(u.id, email, name).catch(() => {});
   send(res, 200, { ok: true }, { "Set-Cookie": await startSession(u.id) });
 }, { open: true });
 
@@ -113,6 +136,57 @@ route("POST", "/api/login", async (req, res) => {
 route("POST", "/api/logout", async (req, res) => {
   const t = cookies(req).mt_session;
   if (t) await q("delete from sessions where token=$1", [t]);
+  send(res, 200, { ok: true }, { "Set-Cookie": sessionCookie("", 0) });
+});
+
+route("POST", "/api/verify", async (req, res) => {
+  const b = await readJson(req);
+  const r = b.token ? await useToken(b.token, "verify") : null;
+  if (!r) return fail(res, 400, "That link has expired or was already used. Send a new one from the app.");
+  await q("update users set email_verified_at=coalesce(email_verified_at, now()) where id=$1", [r.user_id]);
+  send(res, 200, { ok: true });
+}, { open: true });
+route("POST", "/api/verify/resend", async (req, res, { user }) => {
+  if (user.email_verified) return send(res, 200, { ok: true, already: true });
+  if (limited("verify:" + user.id, 3, 60 * 60 * 1000)) return fail(res, 429, "We already sent a few. Check your inbox and spam folder.");
+  await sendVerify(user.id, user.email, user.name);
+  send(res, 200, { ok: true });
+});
+route("POST", "/api/password/forgot", async (req, res) => {
+  const b = await readJson(req), email = cleanEmail(b.email);
+  if (limited("forgot:" + ipOf(req), 5, 60 * 60 * 1000) || limited("forgot:" + email, 3, 60 * 60 * 1000)) return fail(res, 429, "Too many requests. Try again in an hour.");
+  const u = validEmail(email) ? await one("select id, name from users where email=$1", [email]) : null;
+  if (u) {
+    const url = `${ORIGIN}/#reset=${await makeToken(u.id, "reset", 60)}`;
+    await sendEmail({ to: email, subject: "Reset your Morning Telos password", text: `Reset your password: ${url} (works for 1 hour). If you didn't ask for this, ignore this email.`,
+      html: layout({ title: "Reset your password", intro: "Someone asked to reset the password for your Morning Telos account. If it was you, use the button below.", button: "Choose a new password", url, outro: "This link works for 1 hour. If you didn't ask for this, you can ignore this email." }) });
+  }
+  send(res, 200, { ok: true });
+}, { open: true });
+route("POST", "/api/password/reset", async (req, res) => {
+  if (limited("reset:" + ipOf(req), 10, 60 * 60 * 1000)) return fail(res, 429, "Too many tries. Try again later.");
+  const b = await readJson(req);
+  if (String(b.password || "").length < 10) return fail(res, 400, "Use a password with at least 10 characters.");
+  const r = b.token ? await useToken(b.token, "reset") : null;
+  if (!r) return fail(res, 400, "That link has expired or was already used. Ask for a new one.");
+  await q("update users set pass_hash=$2, email_verified_at=coalesce(email_verified_at, now()) where id=$1", [r.user_id, hashPassword(b.password)]);
+  await q("delete from sessions where user_id=$1", [r.user_id]);
+  send(res, 200, { ok: true }, { "Set-Cookie": await startSession(r.user_id) });
+}, { open: true });
+route("DELETE", "/api/workspace", async (req, res, { user, ws }) => {
+  if (user.role !== "owner") return fail(res, 403, "Only the owner can delete the workspace.");
+  const b = await readJson(req);
+  if (String(b.name || "").trim() !== ws.name) return fail(res, 400, "Type the workspace name exactly to confirm.");
+  const u = await one("select pass_hash from users where id=$1", [user.id]);
+  if (!checkPassword(String(b.password || ""), u.pass_hash)) return fail(res, 400, "Your password is wrong.");
+  if (await one("select 1 from users where workspace_id=$1 and is_admin", [ws.id])) return fail(res, 400, "The Morning Telos admin workspace can't be deleted here.");
+  if (ws.stripe_subscription_id && !["canceled", "incomplete_expired"].includes(ws.status)) {
+    try { await billing.stripe(`subscriptions/${ws.stripe_subscription_id}`, null, null, "DELETE"); }
+    catch (e) { return fail(res, 400, "We couldn't cancel your subscription automatically. Cancel it in Billing first, then try again."); }
+  }
+  await q("delete from workspaces where id=$1", [ws.id]);
+  sendEmail({ to: user.email, subject: "Your Morning Telos workspace was deleted", text: `Your workspace "${ws.name}" and its data were deleted. Backups clear within 30 days.`,
+    html: layout({ title: "Your workspace was deleted", intro: `"${ws.name}" and its chats, knowledge, approvals and routines were deleted. Copies in our encrypted backups are cleared within 30 days. Thanks for trying Morning Telos.` }) }).catch(() => {});
   send(res, 200, { ok: true }, { "Set-Cookie": sessionCookie("", 0) });
 });
 
@@ -303,6 +377,7 @@ route("GET", "/api/billing", async (req, res, { ws }) => {
 });
 route("POST", "/api/billing/checkout", async (req, res, { user, ws }) => {
   if (user.role !== "owner") return fail(res, 403, "Only the owner can change the plan.");
+  if (!user.email_verified) return fail(res, 400, "Verify your email first. Check your inbox, or resend it from Home.");
   const b = await readJson(req);
   const plan = await one("select * from plans where key=$1 and active and coalesce(stripe_price_id,'')<>''", [b.plan]);
   if (!plan) return fail(res, 400, "That plan isn't available.");
@@ -341,6 +416,8 @@ route("POST", "/api/admin/workspaces/:id", async (req, res, { params }) => {
     [w.id, pick("arrowsterr_brand"), pick("capybaroar_brand_id"), pick("plan") || w.plan, pick("status") || w.status, trial, b.setup_note !== undefined ? String(b.setup_note).slice(0, 300) : w.setup_note]);
   send(res, 200, { ok: true });
 }, ADMIN);
+route("GET", "/api/admin/backup", async (req, res) => send(res, 200, { status: await backupStatus() }), ADMIN);
+route("POST", "/api/admin/backup", async (req, res) => send(res, 200, { status: await runBackup() }), ADMIN);
 route("POST", "/api/admin/plans", async (req, res) => {
   const b = await readJson(req);
   for (const p of Array.isArray(b.plans) ? b.plans : []) {
@@ -353,7 +430,7 @@ route("POST", "/api/admin/apps/:tool", async (req, res, { params }) => {
   const app = APPS[params.tool];
   if (!app) return fail(res, 404, "Unknown app");
   const b = await readJson(req), prev = await getConn(params.tool);
-  const key = b.key ? String(b.key).trim() : prev?.key;
+  let key = b.key ? String(b.key).trim() : prev?.key;
   const url = app.kind === "mcp" ? String(b.url ?? prev?.url ?? app.url ?? "").trim() : null;
   if (app.kind === "mcp" && url && !(PROD ? /^https:\/\/\S+$/ : /^https?:\/\/\S+$/).test(url)) return fail(res, 400, "The address must start with https://");
   if (!key) return fail(res, 400, "Paste the key.");
@@ -365,12 +442,20 @@ route("POST", "/api/admin/apps/:tool", async (req, res, { params }) => {
     } else if (app.kind === "stripe") {
       await billing.stripe("balance", null, key);
       if (b.webhook_secret) await setSetting("stripe_webhook_secret", encrypt(String(b.webhook_secret).trim()));
+    } else if (app.kind === "r2") {
+      const prevR2 = (() => { try { return JSON.parse(prev?.key || "{}"); } catch { return {}; } })();
+      const creds = { id: b.key ? String(b.key).trim() : prevR2.id, secret: b.secret2 ? String(b.secret2).trim() : prevR2.secret };
+      if (!creds.id || !creds.secret) throw new Error("Paste both the Access Key ID and the Secret Access Key.");
+      if (!process.env.R2_ENDPOINT) throw new Error("The server has no R2 address yet.");
+      await r2Put({ ...creds, endpoint: process.env.R2_ENDPOINT, bucket: process.env.R2_BUCKET || "morningtelos-backups" }, "healthcheck/ping.txt", Buffer.from(new Date().toISOString()));
+      b.key = JSON.stringify(creds);
     } else {
       if (!url) throw new Error("Paste the MCP address.");
       mcp.forget(url); await mcp.initialize(url, key);
       count = (await mcp.listTools(url, key, { fresh: true })).length;
     }
   } catch (e) { status = "error"; error = e.message.slice(0, 300); }
+  if (app.kind === "r2" && b.key && b.key.startsWith("{")) key = b.key;
   await q(`insert into connections(tool,url,secret_enc,status,tool_count,error,updated_at) values($1,$2,$3,$4,$5,$6,now())
     on conflict(tool) do update set url=excluded.url, secret_enc=excluded.secret_enc, status=excluded.status, tool_count=excluded.tool_count, error=excluded.error, updated_at=now()`,
     [params.tool, url, encrypt(key), status, count, error]);
@@ -392,7 +477,14 @@ async function runRoutine(ws, r) {
   runTurn({ ws, threadId, text: r.instruction, forced: r.agent, model: "auto", emit: () => {} }).catch((e) => console.error("routine", e));
   return threadId;
 }
+let lastBackupDay = null;
 async function tick() {
+  const now = new Date(), day = now.toISOString().slice(0, 10);
+  if (now.getUTCHours() === 3 && now.getUTCMinutes() >= 15 && lastBackupDay !== day) {
+    lastBackupDay = day;
+    const st = await backupStatus().catch(() => null);
+    if (!st || Date.now() - new Date(st.at).getTime() > 20 * 3600 * 1000) runBackup().catch((e) => console.error("backup", e));
+  }
   try {
     const due = await all("select r.*, w.timezone from routines r join workspaces w on w.id=r.workspace_id where r.enabled and (r.last_run_at is null or r.last_run_at < now() - interval '5 minutes')");
     for (const r of due) {
@@ -417,13 +509,14 @@ const server = http.createServer(async (req, res) => {
       if (r.admin && !user.is_admin) return fail(res, 404, "Not found");
       return await r.handler(req, res, { user, ws, params: r.re.exec(p).groups || {} });
     }
-    if (p === "/healthz") return send(res, 200, "ok");
+    if (p === "/healthz") { try { await q("select 1"); return send(res, 200, "ok"); } catch { return send(res, 503, "database down"); } }
     if (p.startsWith("/img/")) { const f = safeJoin(IMGDIR, p.slice(5)); return f ? serveFile(res, f, "public, max-age=86400") : send(res, 404, "Not found"); }
     const f = p === "/" ? null : safeJoin(PUBLIC, p.slice(1));
     if (f && fs.existsSync(f) && fs.statSync(f).isFile()) return serveFile(res, f);
     return serveFile(res, path.join(PUBLIC, "index.html"));
   } catch (e) {
     console.error(e);
+    if (!e.status) noteFailure("server", "The app is returning server errors", `${req.method} ${p}: ${String(e.message).slice(0, 300)}`, 5, 10 * 60 * 1000);
     if (!res.headersSent) fail(res, e.status || 500, e.status ? e.message : "Server error"); else res.end();
   }
 });

@@ -47,26 +47,36 @@ document.addEventListener("click", (e) => { const t = e.target.closest("[data-to
 
 // ---------- auth ----------
 let authMode = "login";
+let resetToken = null;
 function showAuth(mode) {
-  authMode = mode === "signup" ? "signup" : "login";
-  const su = authMode === "signup";
+  authMode = ["signup", "forgot", "reset"].includes(mode) ? mode : "login";
+  const su = authMode === "signup", fg = authMode === "forgot", rs = authMode === "reset";
   $("#boot").hidden = true; $("#shell").hidden = true; $("#tabbar").hidden = true; $("#auth").hidden = false;
-  $("#authT").textContent = su ? "Start your free trial" : "Log in";
-  $("#authS").textContent = su ? "Your AI team, ready in a minute. 14 days free, no card needed." : "Welcome back to your AI team.";
+  $("#authT").textContent = su ? "Start your free trial" : fg ? "Reset your password" : rs ? "Choose a new password" : "Log in";
+  $("#authS").textContent = su ? "Your AI team, ready in a minute. 14 days free, no card needed." : fg ? "Enter your email and we'll send you a reset link." : rs ? "At least 10 characters." : "Welcome back to your AI team.";
   $$("[data-su]").forEach((e) => (e.hidden = !su));
-  $("#authBtn").textContent = su ? "Create my workspace" : "Log in";
-  $('#authForm [name="password"]').autocomplete = su ? "new-password" : "current-password";
-  $("#authSwitch").innerHTML = su ? 'Already have an account? <a class="link" href="#login" data-auth="login">Log in</a>' : 'New here? <a class="link" href="#signup" data-auth="signup">Start a free trial</a>';
-  $("#authErr").textContent = "";
-  setTimeout(() => $(su ? '#authForm [name="name"]' : '#authForm [name="email"]').focus(), 50);
+  $("#fEmail").hidden = rs; $("#fPass").hidden = fg;
+  $('#authForm [name="email"]').required = !rs; $('#authForm [name="password"]').required = !fg;
+  $("#pwLabel").textContent = rs ? "New password" : "Password";
+  $("#authBtn").textContent = su ? "Create my workspace" : fg ? "Email me a reset link" : rs ? "Save new password" : "Log in";
+  $('#authForm [name="password"]').autocomplete = su || rs ? "new-password" : "current-password";
+  $("#authForgot").hidden = authMode !== "login"; $("#authTerms").hidden = !su;
+  $("#authSwitch").innerHTML = su || fg || rs ? 'Already have an account? <a class="link" href="#login" data-auth="login">Log in</a>' : 'New here? <a class="link" href="#signup" data-auth="signup">Start a free trial</a>';
+  $("#authErr").textContent = ""; $("#authErr").style.color = "";
+  setTimeout(() => $(su ? '#authForm [name="name"]' : rs ? '#authForm [name="password"]' : '#authForm [name="email"]').focus(), 50);
 }
 document.addEventListener("click", (e) => { const a = e.target.closest("[data-auth]"); if (a) { e.preventDefault(); history.replaceState(null, "", "#" + a.dataset.auth); showAuth(a.dataset.auth); } });
 $("#authForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = Object.fromEntries(new FormData(e.target).entries());
   if (authMode === "signup") body.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  $("#authErr").textContent = ""; $("#authBtn").disabled = true;
-  try { await api(authMode === "signup" ? "/api/signup" : "/api/login", { method: "POST", body }); location.hash = "home"; await boot(); }
+  $("#authErr").textContent = ""; $("#authErr").style.color = ""; $("#authBtn").disabled = true;
+  try {
+    if (authMode === "forgot") { await api("/api/password/forgot", { method: "POST", body: { email: body.email } }); $("#authErr").style.color = "var(--green)"; $("#authErr").textContent = "If that email has an account, a reset link is on its way. Check your inbox."; return; }
+    if (authMode === "reset") { await api("/api/password/reset", { method: "POST", body: { token: resetToken, password: body.password } }); location.hash = "home"; await boot(); toast("Password updated. You're logged in."); return; }
+    await api(authMode === "signup" ? "/api/signup" : "/api/login", { method: "POST", body }); location.hash = "home"; await boot();
+    if (authMode === "signup") toast("Welcome! Check your inbox to verify your email.");
+  }
   catch (err) { $("#authErr").textContent = err.message; }
   finally { $("#authBtn").disabled = false; }
 });
@@ -74,9 +84,17 @@ document.addEventListener("click", async (e) => { if (!e.target.closest("[data-l
 
 // ---------- boot ----------
 async function init() {
+  const h = location.hash;
+  if (h.startsWith("#reset=")) { resetToken = decodeURIComponent(h.slice(7)); history.replaceState(null, "", "#reset"); return showAuth("reset"); }
+  let verified = null;
+  if (h.startsWith("#verify=")) {
+    history.replaceState(null, "", "#home");
+    try { await api("/api/verify", { method: "POST", body: { token: decodeURIComponent(h.slice(8)) } }); verified = "Email verified. Thanks!"; } catch (e) { verified = e.message; }
+  }
+  if (verified) setTimeout(() => toast(verified), 600);
   try {
     const st = await (await fetch("/api/state")).json();
-    if (!st.me) return showAuth(location.hash === "#signup" ? "signup" : "login");
+    if (!st.me) return showAuth({ "#signup": "signup", "#forgot": "forgot" }[location.hash] || "login");
     await boot();
   } catch { $("#boot").textContent = "Can't reach the server. Refresh to try again."; }
 }
@@ -90,7 +108,7 @@ async function refresh() {
 async function boot() {
   await refresh();
   $("#boot").hidden = true; $("#auth").hidden = true; $("#shell").hidden = false; $("#tabbar").hidden = false;
-  if (["#login", "#signup", ""].includes(location.hash)) history.replaceState(null, "", "#home");
+  if (["#login", "#signup", "#forgot", "#reset", ""].includes(location.hash)) history.replaceState(null, "", "#home");
   show();
 }
 function paintChrome() {
@@ -330,6 +348,7 @@ async function renderHome() {
   if (S.blocked) { tb.hidden = false; tb.className = "trialbar warn"; tb.innerHTML = `${esc(S.blocked)} <b>Open Billing →</b>`; }
   else if (w.plan === "trial") { const d = Math.max(0, Math.ceil((new Date(w.trial_ends_at) - Date.now()) / 864e5)); tb.hidden = false; tb.className = "trialbar"; tb.innerHTML = `Free trial: <b>${d} day${d === 1 ? "" : "s"} left</b> · Choose a plan →`; }
   else tb.hidden = true;
+  $("#verifyBar").hidden = !!S.me?.email_verified;
   const [home, know] = await Promise.all([api("/api/home"), api("/api/knowledge")]);
   const filled = know.some((d) => !/What we sell:\s*\nWho our customers are:/.test(d.body));
   const steps = [
@@ -344,6 +363,8 @@ async function renderHome() {
   $("#homeKpis").innerHTML = [["Replies", home.replies], ["Changes done", home.changesDone], ["Waiting on you", S.pending.length], ["AI cost", "$" + home.spend.toFixed(2)]].map(([k, v]) => `<div class="kpi"><small>${k}</small><b>${v}</b><em class="flat">Last 7 days</em></div>`).join("");
   $("#feed").innerHTML = home.activity.length ? home.activity.map((a) => `<${a.thread_id ? `a href="#chat/${a.thread_id}"` : "div"} class="row"><img class="av sm" src="${IMG(a.agent || "chief")}" alt=""><p><b>${AG[a.agent]?.god || "Team"}</b> ${esc(a.text)}</p><span class="meta">${ago(a.created_at)}</span></${a.thread_id ? "a" : "div"}>`).join("") : emptyHTML("Quiet so far", "Ask your team something to get started.");
 }
+
+$("#resendVerify").addEventListener("click", async () => { try { const r = await api("/api/verify/resend", { method: "POST" }); toast(r.already ? "Your email is already verified." : "Sent. Check your inbox and spam folder."); } catch (e) { toast(e.message); } });
 
 // ---------- team + agent ----------
 function renderTeam() {
@@ -446,11 +467,14 @@ async function renderAdmin() {
   const st = (a) => a.status === "ok" ? `<span class="pillst ok">Connected${a.toolCount ? ` · ${a.toolCount} tools` : ""}</span>` : a.status === "error" ? `<span class="pillst error">Not working</span>` : `<span class="pillst off">Not connected</span>`;
   $("#admApps").innerHTML = d.apps.map((a) => `<div class="card appx"><div class="hd"><span class="lg" style="background:${APPC[a.key]?.[1] || "#999"}">${APPC[a.key]?.[0] || "?"}</span><span class="tx"><b>${esc(a.name)}</b><small>${esc(a.help)}</small></span>${st(a)}</div>
     <form data-app="${a.key}" autocomplete="off">${a.kind === "mcp" ? `<input class="inp" name="mcp_address" autocomplete="off" data-1p-ignore data-lpignore="true" placeholder="https://…/mcp" value="${esc(a.url)}" aria-label="${esc(a.name)} MCP address">` : ""}
-    <input ${SECRET_ATTRS} name="k_secret" placeholder="${a.hasKey ? "Saved. Paste a new key to replace it" : "Paste key"}" aria-label="${esc(a.name)} key">
-    ${a.kind === "stripe" ? `<input ${SECRET_ATTRS} name="k_whsec" placeholder="Webhook signing secret (whsec_…)" aria-label="Stripe webhook secret">` : ""}
+    <input ${SECRET_ATTRS} name="k_secret" placeholder="${a.hasKey ? "Saved. Paste a new key to replace it" : a.kind === "r2" ? "Access Key ID" : "Paste key"}" aria-label="${esc(a.name)} key">
+    ${a.kind === "stripe" ? `<input ${SECRET_ATTRS} name="k_whsec" placeholder="Webhook signing secret (optional, whsec_…)" aria-label="Stripe webhook secret">` : ""}
+    ${a.kind === "r2" ? `<input ${SECRET_ATTRS} name="k_secret2" placeholder="Secret Access Key" aria-label="R2 secret access key">` : ""}
     ${a.error ? `<div class="err">${esc(a.error)}</div>` : ""}
     <div class="row2"><button class="btn primary sm">${a.status === "ok" ? "Update" : "Save and test"}</button>${a.hasKey ? `<button type="button" class="btn ghost sm" data-appdel="${a.key}">Disconnect</button>` : ""}</div></form></div>`).join("");
   $("#admHook").textContent = "Stripe webhook: " + d.hookUrl;
+  const bk = (await api("/api/admin/backup")).status;
+  $("#admBackup").innerHTML = bk ? `<div class="svc"><span class="status ${bk.ok && bk.offsite ? "" : "wait"}">${bk.ok ? "Last backup worked" : "Last backup failed"}</span><span class="meta" style="color:var(--ink-4)">${ago(bk.at)} ago · ${(bk.size / 1024).toFixed(0)} KB · ${bk.local ? "on server" : ""}${bk.local && bk.offsite ? " + " : ""}${bk.offsite ? "Cloudflare R2" : ""}</span></div>${bk.error ? `<p class="err" style="margin-top:8px">${esc(bk.error)}</p>` : ""}` : `<p style="font-size:13.5px;color:var(--ink-3)">No backups yet. They run every night at 3:15 UTC.</p>`;
   $("#admPlans").innerHTML = `<div class="plan-edit h"><span>Plan</span><span>Name</span><span>Price label</span><span>Stripe price id</span><span>AI $ / period</span></div>` +
     d.plans.map((p) => `<div class="plan-edit" data-plan="${p.key}"><b style="font-size:13px">${p.key}</b><input class="inp" name="name" value="${esc(p.name)}"><input class="inp" name="price_label" value="${esc(p.price_label)}" placeholder="$99/month"><input class="inp" name="stripe_price_id" value="${esc(p.stripe_price_id || "")}" placeholder="price_…" ${p.key === "trial" ? "disabled" : ""}><input class="inp" name="ai_budget_usd" type="number" min="0" step="1" value="${Number(p.ai_budget_usd)}"></div>`).join("") +
     `<button class="btn primary sm" style="margin-top:6px">Save plans</button>`;
@@ -465,7 +489,7 @@ document.addEventListener("submit", async (e) => {
   if (f) {
     e.preventDefault(); const b = f.querySelector("button"); b.disabled = true; b.textContent = "Testing…";
     const d = Object.fromEntries(new FormData(f).entries());
-    try { const r = await api("/api/admin/apps/" + f.dataset.app, { method: "POST", body: { url: d.mcp_address, key: d.k_secret, webhook_secret: d.k_whsec } }); toast(r.status === "ok" ? "Connected" : "Saved, but the test failed: " + r.error); }
+    try { const r = await api("/api/admin/apps/" + f.dataset.app, { method: "POST", body: { url: d.mcp_address, key: d.k_secret, secret2: d.k_secret2, webhook_secret: d.k_whsec } }); toast(r.status === "ok" ? "Connected" : "Saved, but the test failed: " + r.error); }
     catch (x) { toast(x.message); }
     await refresh(); return renderAdmin();
   }
@@ -484,6 +508,8 @@ document.addEventListener("click", async (e) => {
   if (b && confirm("Disconnect this platform app? Every workspace loses it.")) { await api("/api/admin/apps/" + b.dataset.appdel, { method: "DELETE" }); renderAdmin(); }
 });
 
+$("#bkNow").addEventListener("click", async (e) => { e.target.disabled = true; e.target.textContent = "Backing up…"; try { const r = await api("/api/admin/backup", { method: "POST" }); toast(r.status.ok ? "Backup done" : "Backup failed: " + r.status.error); } catch (x) { toast(x.message); } e.target.disabled = false; e.target.textContent = "Back up now"; renderAdmin(); });
+
 // ---------- settings ----------
 const TZS = ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu", "Europe/London", "Europe/Berlin", "Asia/Ho_Chi_Minh", "Asia/Singapore", "Australia/Sydney", "UTC"];
 async function renderSettings() {
@@ -493,7 +519,14 @@ async function renderSettings() {
   $$("#bizForm input, #bizForm select, #bizForm button").forEach((x) => (x.disabled = !owner));
   $("#userList").innerHTML = s.users.map((u) => `<div class="row"><span class="avatar-me" style="width:32px;height:32px">${esc((u.name || u.email)[0].toUpperCase())}</span><span class="main"><b>${esc(u.name || u.email)}</b><small>${esc(u.email)} · ${u.role === "owner" ? "Owner" : "Teammate"}</small></span>${owner && u.role !== "owner" ? `<button class="btn ghost sm" data-udel="${u.id}">Remove</button>` : ""}</div>`).join("");
   $("#userForm").hidden = !owner;
+  $("#dangerSec").hidden = !owner || !!S.me?.is_admin;
 }
+$("#delForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("#delErr").textContent = "";
+  const d = Object.fromEntries(new FormData(e.target).entries());
+  if (!confirm("Delete this workspace and everything in it? This can't be undone.")) return;
+  try { await api("/api/workspace", { method: "DELETE", body: d }); location.hash = ""; location.reload(); } catch (x) { $("#delErr").textContent = x.message; }
+});
 $("#bizForm").addEventListener("submit", async (e) => { e.preventDefault(); try { await api("/api/settings", { method: "POST", body: Object.fromEntries(new FormData(e.target).entries()) }); $("#bizOk").textContent = "Saved"; setTimeout(() => ($("#bizOk").textContent = ""), 2000); await refresh(); } catch (x) { toast(x.message); } });
 $("#pwForm").addEventListener("submit", async (e) => { e.preventDefault(); $("#pwErr").textContent = ""; try { await api("/api/me/password", { method: "POST", body: Object.fromEntries(new FormData(e.target).entries()) }); e.target.reset(); toast("Password updated"); } catch (x) { $("#pwErr").textContent = x.message; } });
 $("#userForm").addEventListener("submit", async (e) => { e.preventDefault(); $("#userErr").textContent = ""; try { await api("/api/users", { method: "POST", body: Object.fromEntries(new FormData(e.target).entries()) }); e.target.reset(); toast("Teammate added"); renderSettings(); } catch (x) { $("#userErr").textContent = x.message; } });

@@ -38,6 +38,14 @@ create table if not exists users (
 );
 alter table users add column if not exists workspace_id int references workspaces(id) on delete cascade;
 alter table users add column if not exists is_admin boolean not null default false;
+alter table users add column if not exists email_verified_at timestamptz;
+create table if not exists email_tokens (
+  token_hash text primary key,
+  user_id int not null references users(id) on delete cascade,
+  kind text not null,
+  expires_at timestamptz not null,
+  used_at timestamptz
+);
 create table if not exists sessions (
   token text primary key,
   user_id int not null references users(id) on delete cascade,
@@ -177,10 +185,22 @@ export async function migrate() {
     console.log("migrated existing users into workspace", ws.id);
   }
   await q(`insert into plans(key,name,price_label,ai_budget_usd,sort) values
-    ('trial','Free trial','14 days free',10,0),
-    ('starter','Starter','',50,1),
-    ('pro','Pro','',200,2)
+    ('trial','Free trial','14 days free',5,0),
+    ('starter','Starter','$49/month',12,1),
+    ('pro','Pro','$149/month',50,2)
     on conflict(key) do nothing`);
+  // One-time move to the launch prices ($49 / $149).
+  if (!(await one("select 1 from settings where key='plans_v2'"))) {
+    await q("update plans set price_label='14 days free', ai_budget_usd=5 where key='trial'");
+    await q("update plans set price_label='$49/month', ai_budget_usd=12 where key='starter'");
+    await q("update plans set price_label='$149/month', ai_budget_usd=50 where key='pro'");
+    await q("insert into settings(key,value) values('plans_v2','1')");
+  }
+  // Stripe price ids can come from the server environment.
+  for (const [k, env] of [["starter", "PLAN_PRICE_STARTER"], ["pro", "PLAN_PRICE_PRO"]]) {
+    if (process.env[env]) await q("update plans set stripe_price_id=$2 where key=$1", [k, process.env[env]]);
+  }
+  await q("update users set email_verified_at=now() where is_admin and email_verified_at is null");
 }
 
 export async function getSetting(key, fallback = null) {

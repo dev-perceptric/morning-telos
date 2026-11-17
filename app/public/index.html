@@ -24,10 +24,12 @@
     <label class="fld" data-su hidden><span>Your name</span><input class="inp" name="name" autocomplete="name"></label>
     <label class="fld" data-su hidden><span>Business name</span><input class="inp" name="business" autocomplete="organization"></label>
     <label class="fld" data-su hidden><span>Website <em style="font-style:normal;color:var(--ink-4);font-weight:400">(optional)</em></span><input class="inp" name="website" autocomplete="url" placeholder="yourbusiness.com"></label>
-    <label class="fld"><span>Email</span><input class="inp" name="email" type="email" autocomplete="email" required></label>
-    <label class="fld"><span>Password</span><input class="inp" name="password" type="password" autocomplete="current-password" required><small data-su hidden>At least 10 characters.</small></label>
+    <label class="fld" id="fEmail"><span>Email</span><input class="inp" name="email" type="email" autocomplete="email" required></label>
+    <label class="fld" id="fPass"><span id="pwLabel">Password</span><input class="inp" name="password" type="password" autocomplete="current-password" required><small data-su hidden>At least 10 characters.</small></label>
     <div class="err" id="authErr" role="alert"></div>
     <button class="btn primary full" id="authBtn">Log in</button>
+    <p class="sub" style="margin:10px 0 0;text-align:center;font-size:13px" id="authForgot"><a class="link" href="#forgot" data-auth="forgot">Forgot password?</a></p>
+    <p class="sub" style="margin:10px 0 0;text-align:center;font-size:12px" id="authTerms" hidden>By creating an account you agree to the <a class="link" href="https://morningtelos.com/terms/" target="_blank" rel="noopener">Terms</a> and <a class="link" href="https://morningtelos.com/privacy/" target="_blank" rel="noopener">Privacy Policy</a>.</p>
     <p class="sub" style="margin:14px 0 0;text-align:center;font-size:13.5px" id="authSwitch"></p>
   </form>
 </div>
@@ -72,6 +74,7 @@
       <!-- HOME -->
       <section class="view narrow" id="v-home">
         <a class="trialbar" id="trialBar" href="#billing" hidden></a>
+        <div class="trialbar warn" id="verifyBar" hidden>Check your inbox to verify your email. <button class="link" id="resendVerify" style="font-weight:600">Resend</button></div>
         <div class="hero"><p id="greet">Hello</p><h1>What should your team do today?</h1></div>
         <form class="composer down" id="homeForm">
           <label class="sr" for="homeInput">Ask your team</label>
@@ -182,6 +185,7 @@
         <div class="ph"><div><h1>Admin</h1><p>Morning Telos only. Platform keys, plans and every customer workspace.</p></div></div>
         <div class="sh"><h2>Platform apps</h2><span class="meta" style="font-size:12px;color:var(--ink-4)">Morning Telos's own accounts. Customers never see these.</span></div>
         <div class="apps2" id="admApps"></div>
+        <div class="sec"><div class="sh"><h2>Backups</h2><button class="btn sm" id="bkNow">Back up now</button></div><div class="card pad" id="admBackup"></div></div>
         <div class="sec"><div class="sh"><h2>Plans</h2><span class="meta" style="font-size:12px;color:var(--ink-4)" id="admHook"></span></div><form class="card pad" id="admPlans"></form></div>
         <div class="sec"><div class="sh"><h2>Workspaces</h2></div><div class="card list" id="admWs"></div></div>
       </section>
@@ -200,6 +204,11 @@
             <label class="fld"><span>New password</span><input class="inp" type="password" name="password" autocomplete="new-password"><small>At least 10 characters.</small></label>
             <div class="err" id="pwErr"></div><button class="btn primary">Update password</button></form>
         </div>
+        <div class="sec" id="dangerSec"><div class="sh"><h2>Delete workspace</h2></div>
+          <form class="card pad" id="delForm" autocomplete="off"><p style="font-size:13.5px;color:var(--ink-3);margin-bottom:12px">This deletes your workspace, people, chats, knowledge, approvals and routines, and cancels your plan. It can't be undone. Backups clear within 30 days.</p>
+            <div class="form-grid"><label class="fld"><span>Type the workspace name</span><input class="inp" name="name" autocomplete="off" data-1p-ignore></label><label class="fld"><span>Your password</span><input class="inp" type="password" name="password" autocomplete="current-password"></label></div>
+            <div class="err" id="delErr"></div><button class="btn" style="border-color:var(--red);color:var(--red)">Delete workspace forever</button></form>
+          <p style="font-size:12.5px;color:var(--ink-4);margin-top:10px"><a class="link" href="https://morningtelos.com/terms/" target="_blank" rel="noopener">Terms</a> · <a class="link" href="https://morningtelos.com/privacy/" target="_blank" rel="noopener">Privacy</a></p></div>
         <div class="sec"><div class="sh"><h2>People</h2></div><div class="card list" id="userList"></div>
           <form class="card pad" id="userForm" style="margin-top:12px"><div class="sh"><h2>Add a teammate</h2></div>
             <div class="form-grid"><label class="fld"><span>Name</span><input class="inp" name="name"></label><label class="fld"><span>Email</span><input class="inp" name="email" type="email"></label></div>

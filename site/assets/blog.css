@@ -171,3 +171,5 @@
 .promo .pm-mark { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; flex: none; margin-top: 2px; }
 .promo .pm-mark .mark { grid-template-columns: repeat(7, 2px); grid-auto-rows: 2px; }
 .prose .promo p { margin: 0; font-size: 16.5px; color: var(--ink-2); }
+
+.side-cta .side-alt { display:block; margin-top:10px; font-size:13px; color:#c2c0b6; text-align:center; text-decoration:underline; text-underline-offset:3px; }

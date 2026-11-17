@@ -27,14 +27,18 @@ sha=$(git rev-parse HEAD)
 current_env=$(curl -sS "$API/docker/morningtelos" "${auth[@]}" | python3 -c 'import sys,json
 try: print(json.load(sys.stdin).get("environment") or "")
 except Exception: print("")')
-body=$(SHA="$sha" ENVIN="$current_env" python3 -c '
+body=$(SHA="$sha" ENVIN="$current_env" SET_ENV="${SET_ENV:-}" python3 -c '
 import json, os, secrets
 env = {}
 for line in os.environ["ENVIN"].splitlines():
     if "=" in line and not line.startswith("#"):
         k, v = line.split("=", 1); env[k.strip()] = v.strip()
-for k in ("APP_SECRET", "DB_PASSWORD", "SETUP_CODE"):
-    env.setdefault(k, secrets.token_urlsafe(18 if k == "SETUP_CODE" else 32))
+for k in ("APP_SECRET", "DB_PASSWORD"):
+    env.setdefault(k, secrets.token_urlsafe(32))
+# Extra settings for this deploy: SET_ENV="KEY=value;KEY2=value" (kept on the server, never in git).
+for pair in os.environ.get("SET_ENV", "").split(";"):
+    if "=" in pair:
+        k, v = pair.split("=", 1); env[k.strip()] = v.strip()
 c = open("docker-compose.yml").read().replace("refs/heads/main", os.environ["SHA"])
 print(json.dumps({"project_name": "morningtelos", "content": c, "environment": "\n".join(f"{k}={v}" for k, v in env.items())}))')
 

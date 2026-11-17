@@ -28,6 +28,15 @@ services:
       PORT: "3000"
       DATABASE_URL: postgres://mt:${DB_PASSWORD}@db:5432/mt
       APP_SECRET: ${APP_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      ALERT_EMAIL: ${ALERT_EMAIL:-meet@morningtelos.com}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_BUCKET: ${R2_BUCKET:-morningtelos-backups}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PLAN_PRICE_STARTER: ${PLAN_PRICE_STARTER:-}
+      PLAN_PRICE_PRO: ${PLAN_PRICE_PRO:-}
+    volumes:
+      - /srv/morningtelos/backups:/backups
     # On every start, download the app from GitHub, install packages and run it.
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -35,6 +44,7 @@ services:
         set -e;
         wget -qO /tmp/src.tgz https://codeload.github.com/dev-perceptric/morning-telos/tar.gz/refs/heads/main;
         mkdir -p /srv && tar -xzf /tmp/src.tgz -C /srv;
+        apk add --no-cache postgresql16-client >/dev/null 2>&1 || apk add --no-cache postgresql-client >/dev/null;
         cd /srv/*/app && npm ci --omit=dev --no-audit --no-fund;
         exec node server.js
     labels:
@@ -54,3 +64,21 @@ services:
     # Stored on the server outside the project folder, so redeploys keep the data.
     volumes:
       - /srv/morningtelos/pgdata:/var/lib/postgresql/data
+  # Emails the team if the app or the website stops answering, and again when it's back.
+  watchdog:
+    image: alpine:3.20
+    restart: unless-stopped
+    depends_on: [app, web]
+    environment:
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      ALERT_EMAIL: ${ALERT_EMAIL:-meet@morningtelos.com}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        apk add --no-cache curl >/dev/null;
+        send() { [ -z "$$RESEND_API_KEY" ] && return; printf '{"from":"Morning Telos <meet@morningtelos.com>","to":["%s"],"subject":"[Morning Telos alert] %s","text":"%s. Checked from the server every minute."}' "$$ALERT_EMAIL" "$$1" "$$1" | curl -s -m 15 https://api.resend.com/emails -H "Authorization: Bearer $$RESEND_API_KEY" -H "Content-Type: application/json" --data-binary @- >/dev/null; };
+        sleep 240; af=0; ad=0; wf=0; wd=0;
+        while true; do
+        if curl -fs -m 10 http://app:3000/healthz >/dev/null; then [ $$ad = 1 ] && send "The app is back up"; af=0; ad=0; else af=$$((af+1)); [ $$af -ge 3 ] && [ $$ad = 0 ] && { send "chat.morningtelos.com is down"; ad=1; }; fi;
+        if curl -fs -m 10 -o /dev/null http://web/; then [ $$wd = 1 ] && send "The website is back up"; wf=0; wd=0; else wf=$$((wf+1)); [ $$wf -ge 3 ] && [ $$wd = 0 ] && { send "morningtelos.com is down"; wd=1; }; fi;
+        sleep 60; done

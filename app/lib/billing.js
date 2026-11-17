@@ -17,11 +17,11 @@ function form(obj, prefix = "", out = new URLSearchParams()) {
   }
   return out;
 }
-export async function stripe(path, body, key) {
+export async function stripe(path, body, key, method) {
   key = key || (await stripeKey());
   if (!key) throw new Error("Billing isn't set up yet.");
   const r = await fetch(`https://api.stripe.com/v1/${path}`, {
-    method: body ? "POST" : "GET",
+    method: method || (body ? "POST" : "GET"),
     headers: { Authorization: `Bearer ${key}`, ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
     body: body ? form(body) : undefined,
     signal: AbortSignal.timeout(20000),
@@ -53,7 +53,7 @@ export async function portalUrl(ws, origin) {
 
 // Checks the Stripe-Signature header (HMAC-SHA256 of "t.body", 5 minute window).
 export async function verifyWebhook(raw, header) {
-  const secret = decrypt(await getSetting("stripe_webhook_secret"));
+  const secret = process.env.STRIPE_WEBHOOK_SECRET || decrypt(await getSetting("stripe_webhook_secret"));
   if (!secret || !header) return false;
   const parts = Object.fromEntries(header.split(",").map((p) => p.split("=")).filter((p) => p.length === 2).map(([k, v]) => [k, v]));
   const sigs = header.split(",").filter((p) => p.startsWith("v1=")).map((p) => p.slice(3));

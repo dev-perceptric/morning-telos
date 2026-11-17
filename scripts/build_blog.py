@@ -194,8 +194,8 @@ def share_bar(url, title):
 def side_cta(p):
     o = p.get("offer")
     if o:
-        return f'<div class="side-cta"><b>{esc(o.get("side_title", o["title"]))}</b><p>{esc(o.get("side_text", "We set it up for you, usually in about a week. Start with a free 30-minute Telos Session."))}</p><a class="btn" href="/book/">Book a Telos Session →</a></div>'
-    return '<div class="side-cta"><b>Want systems that run while you sleep?</b><p>Book a free 30-minute Telos Session. We\'ll find your highest-leverage first move.</p><a class="btn" href="/book/">Book a Telos Session →</a></div>'
+        return f'<div class="side-cta"><b>{esc(o.get("side_title", o["title"]))}</b><p>{esc(o.get("side_text", "We set it up for you, usually in about a week. Start with a free 30-minute Telos Session."))}</p><a class="btn" href="https://chat.morningtelos.com/#signup">Start free trial →</a><a class="side-alt" href="/book/">or book a free Telos Session</a></div>'
+    return '<div class="side-cta"><b>Want systems that run while you sleep?</b><p>Book a free 30-minute Telos Session. We\'ll find your highest-leverage first move.</p><a class="btn" href="https://chat.morningtelos.com/#signup">Start free trial →</a><a class="side-alt" href="/book/">or book a free Telos Session</a></div>'
 
 
 def build_post(p, posts):
@@ -285,7 +285,7 @@ def build_post(p, posts):
       {side_cta(p)}
     </aside>
   </div>
-  <section class="post-cta wrap"><div><h2>Want systems that run <span class="clay">while you sleep?</span></h2><p>Morning Telos builds software and AI automation for founders, operators and decision makers.</p></div><a class="btn btn-dark btn-lg" href="/book/">Book a Telos Session <span class="arr">→</span></a></section>
+  <section class="post-cta wrap"><div><h2>Want systems that run <span class="clay">while you sleep?</span></h2><p>Morning Telos builds software and AI automation for founders, operators and decision makers.</p></div><span style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn btn-dark btn-lg" href="https://chat.morningtelos.com/#signup">Start free trial <span class="arr">→</span></a><a class="btn btn-ghost btn-lg" href="/book/">Book a Telos Session</a></span></section>
   {f'<section class="istrip wrap"><h2 class="big">Related <span class="clay">services.</span></h2><div class="igrid">{related_svc}</div></section>' if related_svc else ''}
   {f'<section class="more wrap"><h2 class="big">More from <span class="clay">the blog.</span></h2><div class="pgrid">{related_posts}</div></section>' if related_posts else ''}
 </main>

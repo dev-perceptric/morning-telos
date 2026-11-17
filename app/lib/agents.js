@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { q, one, all, log } from "./db.js";
 import { decrypt, clip } from "./util.js";
 import * as mcp from "./mcp.js";
+import { noteFailure } from "./alerts.js";
 
 // ---------- platform apps (Morning Telos's own accounts) ----------
 export const APPS = {
@@ -10,7 +11,8 @@ export const APPS = {
   arrowsterr: { name: "Arrowsterr", kind: "mcp", url: "https://app.arrowsterr.com/api/mcp", help: "Morning Telos's Arrowsterr workspace key (Settings → Workspace → Slack, API and MCP)." },
   capybaroar: { name: "Capybaroar", kind: "mcp", url: "", help: "Morning Telos's Capybaroar MCP address and key." },
   claritia: { name: "Claritia", kind: "mcp", url: "", help: "Morning Telos's Claritia MCP address and key (not wired to agents yet)." },
-  stripe: { name: "Stripe", kind: "stripe", help: "Secret key (sk_live_ or sk_test_) and the webhook signing secret (whsec_)." },
+  stripe: { name: "Stripe", kind: "stripe", help: "Morning Telos's Stripe secret key (sk_live_…, or a restricted key with Checkout, Customers, Subscriptions and Billing portal access)." },
+  r2: { name: "Backups (Cloudflare R2)", kind: "r2", help: "R2 API token for the morningtelos-backups bucket: Access Key ID and Secret Access Key." },
 };
 
 // What each customer gets from each app, and where their brand id is stored on the workspace.
@@ -317,6 +319,7 @@ export async function runTurn({ ws, threadId, text, forced, model, emit }) {
     } catch (e) {
       const msg = e instanceof Anthropic.RateLimitError ? "The AI is busy right now. Try again in a minute." : "Something went wrong. Try again in a moment.";
       console.error("agent error", ws.id, k, e?.status || "", e?.message || e);
+      noteFailure("agent", "AI team requests are failing", `Last error (${AGENTS[k].god}, workspace ${ws.id}): ${String(e?.message || e).slice(0, 300)}`);
       await q("insert into messages(thread_id,role,agent,content,meta) values($1,'agent',$2,$3,'{\"error\":true}')", [threadId, k, msg]);
       emit({ type: "message", agent: k, text: msg, error: true });
     }
