@@ -1,22 +1,33 @@
 "use client";
 
-// The whole client app: the sign-in screens, then the app shell. Workspace screens (P1.5) and billing (P1.6) plug in here.
+// The whole client app: the sign-in screens, then the app shell with its pages. Billing (P1.6) plugs in here.
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabase, type SupaConfig } from "@/lib/supa";
 import { cleanWebsite } from "@/lib/signup";
+import { inviteTokenFromPath, roleLabel } from "@/lib/workspace";
 import { AuthScreen, NewPassword } from "./AuthScreen";
-import { btnPrimary, ErrorText, Frame, input, label, Logo } from "./ui";
+import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
+import { SettingsPage, type Workspace } from "./Settings";
+import { btnPrimary, btnSecondary, ErrorText, Frame, input, label, Logo, Notice } from "./ui";
 
-type Workspace = { id: string; name: string; website: string | null; plan: string; trial_ends_at: string };
-
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+// An invite token waits here from the moment the link is opened until the person is signed in.
+const INVITE_KEY = "mt.invite";
+// The workspace on screen, for people in more than one.
+const WS_KEY = "mt.workspace";
+const NOTICE_KEY = "mt.notice";
 
 export function App({ supabase, turnstileSiteKey }: { supabase: SupaConfig; turnstileSiteKey: string | null }) {
   const sb = getSupabase(supabase);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [recovering, setRecovering] = useState(false);
+  // Read once on load: an /invite/<token> link, or one saved before a sign-in redirect.
+  const [invite, setInvite] = useState<string | null>(() => {
+    const fromPath = inviteTokenFromPath(window.location.pathname);
+    if (fromPath) writeLocal(INVITE_KEY, fromPath);
+    return fromPath ?? readLocal(INVITE_KEY);
+  });
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => setSession(data.session));
@@ -27,9 +38,15 @@ export function App({ supabase, turnstileSiteKey }: { supabase: SupaConfig; turn
     return () => data.subscription.unsubscribe();
   }, [sb]);
 
+  const clearInvite = useCallback(() => {
+    writeLocal(INVITE_KEY, null);
+    setInvite(null);
+  }, []);
+
   if (session === undefined) return <Loading />;
   if (recovering && session) return <NewPassword sb={sb} onDone={() => setRecovering(false)} />;
-  if (!session) return <AuthScreen sb={sb} invited={/^\/invite\//.test(window.location.pathname)} turnstileSiteKey={turnstileSiteKey} />;
+  if (!session) return <AuthScreen sb={sb} invited={Boolean(invite)} turnstileSiteKey={turnstileSiteKey} />;
+  if (invite) return <JoinInvite sb={sb} session={session} token={invite} onDone={clearInvite} />;
   return <Shell sb={sb} session={session} />;
 }
 
@@ -41,54 +58,207 @@ function Loading() {
   );
 }
 
+/** Signed in with an invite link: join that workspace, then open it. */
+function JoinInvite({ sb, session, token, onDone }: { sb: SupabaseClient; session: Session; token: string; onDone: () => void }) {
+  const [error, setError] = useState("");
+  const started = useRef(false);
+  useEffect(() => {
+    // Accept once, even when React runs effects twice in development.
+    if (started.current) return;
+    started.current = true;
+    sb.rpc("accept_invite", { p_token: token }).then(({ data, error }) => {
+      if (error) return setError(message(error));
+      writeLocal(WS_KEY, String(data));
+      writeLocal(NOTICE_KEY, "You joined the team. Welcome!");
+      navigate("/", true);
+      onDone();
+    });
+  }, [sb, token, onDone]);
+
+  if (!error) return <Loading />;
+  const wrongEmail = /Sign in with that email/.test(error);
+  return (
+    <Frame>
+      <div>
+        <h1 className="font-serif text-[26px] leading-tight">This invite didn&apos;t work</h1>
+        <p className="mt-1 text-[15px] text-ink-3">You are logged in as {session.user.email}.</p>
+      </div>
+      <ErrorText>{error}</ErrorText>
+      <div className="flex flex-col gap-3">
+        {wrongEmail ? (
+          <button type="button" className={btnPrimary} onClick={() => sb.auth.signOut()}>
+            Log out and use the invited email
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className={wrongEmail ? btnSecondary : btnPrimary}
+          onClick={() => {
+            navigate("/", true);
+            onDone();
+          }}
+        >
+          Go to my workspace
+        </button>
+      </div>
+    </Frame>
+  );
+}
+
 /** Signed in: load the person's workspaces. No workspace yet (Google sign-up) means set one up first. */
 function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
+  const route = useRoute();
   const [list, setList] = useState<Workspace[] | null>(null);
   const [error, setError] = useState("");
-  // Bump to load the list again (after making a workspace).
+  const [current, setCurrent] = useState<string | null>(() => readLocal(WS_KEY));
+  // A message left by the screen before (like "You joined the team"). Shown once.
+  const [notice, setNotice] = useState(() => readLocal(NOTICE_KEY) ?? "");
+  useEffect(() => writeLocal(NOTICE_KEY, null), []);
+  // Bump to load the list again (after a change).
   const [version, setVersion] = useState(0);
   const load = useCallback(() => setVersion((v) => v + 1), []);
   useEffect(() => {
     let live = true;
-    sb.from("workspaces")
-      .select("id, name, website, plan, trial_ends_at")
+    sb.from("workspace_members")
+      .select("role, created_at, workspace:workspaces(id, name, website, timezone, plan, trial_ends_at)")
+      .eq("user_id", session.user.id)
       .order("created_at")
       .then(({ data, error }) => {
         if (!live) return;
-        if (error) setError(error.message);
-        else setList(data as Workspace[]);
+        if (error) return setError(error.message);
+        const rows = (data ?? []) as unknown as { role: Workspace["role"]; workspace: Omit<Workspace, "role"> | null }[];
+        setList(rows.filter((r) => r.workspace).map((r) => ({ ...r.workspace!, role: r.role })));
       });
     return () => {
       live = false;
     };
-  }, [sb, version]);
+  }, [sb, session.user.id, version]);
+
+  const pick = useCallback((id: string) => {
+    writeLocal(WS_KEY, id);
+    setCurrent(id);
+  }, []);
 
   if (error) return <Frame><ErrorText>{error}</ErrorText></Frame>;
   if (!list) return <Loading />;
-  if (!list.length) return <SetUpBusiness sb={sb} name={String(session.user.user_metadata?.name ?? "")} onDone={load} />;
-  const ws = list[0];
+  if (!list.length) return <SetUpBusiness sb={sb} name={String(session.user.user_metadata?.name ?? "")} notice={notice} onDone={load} />;
+  const ws = list.find((w) => w.id === current) ?? list[0];
+
+  const gone = (text: string) => {
+    writeLocal(WS_KEY, null);
+    setCurrent(null);
+    setNotice(text);
+    navigate("/");
+    load();
+  };
+
   return (
-    <main className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-line bg-side px-5 py-3">
-        <Logo />
-        <div className="flex items-center gap-4 text-[14px]">
-          <span className="text-ink-3">{session.user.email}</span>
-          <button type="button" className="rounded-[9px] border border-line bg-surface px-3 py-1.5 hover:bg-sunk" onClick={() => sb.auth.signOut()}>
-            Log out
-          </button>
+    <div className="flex min-h-screen flex-col md:flex-row">
+      <Sidebar sb={sb} session={session} list={list} ws={ws} page={route.page} onPick={pick} />
+      <main className="min-w-0 flex-1 px-4 py-8 sm:px-8 md:py-12">
+        <div className="mx-auto flex max-w-3xl flex-col gap-6">
+          {notice ? (
+            <div className="flex items-start justify-between gap-3 rounded-[10px] bg-clay-bg px-3 py-2 text-[14px] text-ink-2" role="status">
+              <span>{notice}</span>
+              <button type="button" className="text-ink-4 hover:text-ink" aria-label="Close" onClick={() => setNotice("")}>
+                ×
+              </button>
+            </div>
+          ) : null}
+          {route.page === "settings" ? (
+            <SettingsPage sb={sb} ws={ws} userId={session.user.id} tab={route.tab} onChanged={load} onGone={gone} />
+          ) : (
+            <Home ws={ws} />
+          )}
         </div>
-      </header>
-      <section className="mx-auto max-w-3xl px-5 py-12">
-        <p className="mb-1 text-[14px] text-ink-3">{ws.name}</p>
-        <h1 className="mb-3 font-serif text-[34px] leading-tight">What should your team do today?</h1>
-        <p className="text-[15px] text-ink-3">Your AI team is getting set up. Chat, approvals and settings are coming next.</p>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
 
-/** For people who signed up with Google or an email code: tell us about the business, then make the workspace. */
-function SetUpBusiness({ sb, name, onDone }: { sb: SupabaseClient; name: string; onDone: () => void }) {
+function Home({ ws }: { ws: Workspace }) {
+  return (
+    <section className="py-4">
+      <p className="mb-1 text-[14px] text-ink-3">{ws.name}</p>
+      <h1 className="mb-3 font-serif text-[34px] leading-tight">What should your team do today?</h1>
+      <p className="text-[15px] text-ink-3">Your AI team is getting set up. Chat and approvals are coming next.</p>
+    </section>
+  );
+}
+
+const NAV = [
+  { page: "home", label: "Home", path: "/" },
+  { page: "settings", label: "Settings", path: "/settings" },
+] as const;
+
+/** The left side on a computer, the top bar on a phone: workspace, pages, and the signed-in person. */
+function Sidebar({
+  sb,
+  session,
+  list,
+  ws,
+  page,
+  onPick,
+}: {
+  sb: SupabaseClient;
+  session: Session;
+  list: Workspace[];
+  ws: Workspace;
+  page: string;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <aside className="flex shrink-0 flex-col gap-4 border-b border-line bg-side px-4 py-3 md:sticky md:top-0 md:h-screen md:w-60 md:border-r md:border-b-0 md:py-5">
+      <div className="flex items-center justify-between gap-3">
+        <Logo />
+      </div>
+      {list.length > 1 ? (
+        <div>
+          <label className="mb-1 block text-[12px] font-semibold text-ink-4" htmlFor="ws-pick">
+            Workspace
+          </label>
+          <select id="ws-pick" className="h-10 w-full rounded-[9px] border border-line bg-surface px-2 text-[14px]" value={ws.id} onChange={(e) => onPick(e.target.value)}>
+            {list.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="min-w-0">
+          <p className="truncate text-[15px] font-semibold">{ws.name}</p>
+          <p className="text-[13px] text-ink-4">{roleLabel(ws.role)}</p>
+        </div>
+      )}
+      <nav className="flex gap-1 md:flex-col" aria-label="Main">
+        {NAV.map((n) => (
+          <a
+            key={n.page}
+            href={n.path}
+            aria-current={page === n.page ? "page" : undefined}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(n.path);
+            }}
+            className={`rounded-[9px] px-3 py-2 text-[15px] ${page === n.page ? "bg-surface font-semibold text-ink shadow-sm" : "text-ink-3 hover:bg-sunk hover:text-ink"}`}
+          >
+            {n.label}
+          </a>
+        ))}
+      </nav>
+      <div className="flex items-center justify-between gap-2 border-t border-line pt-3 text-[13px] md:mt-auto md:flex-col md:items-start">
+        <span className="min-w-0 truncate text-ink-3">{session.user.email}</span>
+        <button type="button" className="rounded-[9px] border border-line bg-surface px-3 py-1.5 text-[14px] hover:bg-sunk" onClick={() => sb.auth.signOut()}>
+          Log out
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+/** For people who signed up with Google or an email code, or who left or deleted their only workspace: tell us about the business, then make the workspace. */
+function SetUpBusiness({ sb, name, notice, onDone }: { sb: SupabaseClient; name: string; notice?: string; onDone: () => void }) {
   const [business, setBusiness] = useState("");
   const [website, setWebsite] = useState("");
   const [busy, setBusy] = useState(false);
@@ -109,6 +279,7 @@ function SetUpBusiness({ sb, name, onDone }: { sb: SupabaseClient; name: string;
   }
   return (
     <Frame>
+      {notice ? <Notice>{notice}</Notice> : null}
       <div>
         <h1 className="font-serif text-[26px] leading-tight">{name ? `Welcome, ${name.split(" ")[0]}` : "Welcome"}</h1>
         <p className="mt-1 text-[15px] text-ink-3">Tell us about your business so your team can get to work.</p>
