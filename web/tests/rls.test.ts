@@ -488,3 +488,48 @@ test("plan and status only take known values", async (t) => {
   await assert.rejects(db.query("insert into workspaces (name, plan) values ('Bad plan', 'enterprise')"), /workspaces_plan_check/);
   await assert.rejects(db.query("insert into workspaces (name, status) values ('Bad status', 'whatever')"), /workspaces_status_check/);
 });
+
+// ─────────────── P2.1: services and sealed brand keys ───────────────
+
+test("services: members see each product's status, never the brand id or key; other workspaces see nothing", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("svc1@example.com", { business: "Svc Co" });
+  const x = await signUp("svc2@example.com", { business: "Other Co" });
+  const ws = await wsOf(o);
+  await db.query(
+    "insert into services (workspace_id, product, brand_id, sealed_key, key_prefix, status) values ($1, 'arrowsterr', 'b1', 'v2.a.iv.tag.body', 'aw_brand_ab', 'ready'), ($1, 'capybaroar', null, null, null, 'pending')",
+    [ws],
+  );
+  await as(o, async (q) => {
+    await assert.rejects(q("select * from services"), /permission denied/);
+  });
+  await as(o, async (q) => {
+    await assert.rejects(q("select sealed_key from services where workspace_id = $1", [ws]), /permission denied/);
+  });
+  await as(o, async (q) => {
+    await assert.rejects(q("update services set status = 'ready' where workspace_id = $1", [ws]), /permission denied/);
+  });
+  await as(o, async (q) => {
+    const rows = (await q("select * from service_status($1)", [ws])).rows;
+    assert.deepEqual(rows.map((r) => [r.product, r.status]), [["arrowsterr", "ready"], ["capybaroar", "pending"]]);
+    assert.deepEqual(Object.keys(rows[0]).sort(), ["product", "status", "updated_at"]);
+  });
+  await as(x, async (q) => {
+    assert.equal((await q("select * from service_status($1)", [ws])).rowCount, 0);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from service_status($1)", [ws]), /permission denied/);
+  });
+});
+
+test("services: one row per product, known products and statuses only, gone with the workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("svc3@example.com", { business: "Svc3 Co" });
+  const ws = await wsOf(o);
+  await db.query("insert into services (workspace_id, product) values ($1, 'arrowsterr')", [ws]);
+  await assert.rejects(db.query("insert into services (workspace_id, product) values ($1, 'arrowsterr')", [ws]), /duplicate key/);
+  await assert.rejects(db.query("insert into services (workspace_id, product) values ($1, 'zapier')", [ws]), /services_product_check/);
+  await assert.rejects(db.query("insert into services (workspace_id, product, status) values ($1, 'capybaroar', 'great')", [ws]), /services_status_check/);
+  await db.query("delete from workspaces where id = $1", [ws]);
+  assert.equal((await db.query("select count(*)::int n from services where workspace_id = $1", [ws])).rows[0].n, 0);
+});
