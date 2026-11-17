@@ -35,6 +35,17 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       PLAN_PRICE_STARTER: ${PLAN_PRICE_STARTER:-}
       PLAN_PRICE_PRO: ${PLAN_PRICE_PRO:-}
+      # Platform keys. Set them in the server's environment only, never in git.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ARROWSTERR_MCP_URL: ${ARROWSTERR_MCP_URL:-}
+      ARROWSTERR_MCP_KEY: ${ARROWSTERR_MCP_KEY:-}
+      CAPYBAROAR_MCP_URL: ${CAPYBAROAR_MCP_URL:-}
+      CAPYBAROAR_MCP_KEY: ${CAPYBAROAR_MCP_KEY:-}
+      CLARITIA_MCP_URL: ${CLARITIA_MCP_URL:-}
+      CLARITIA_MCP_KEY: ${CLARITIA_MCP_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
     volumes:
       - /srv/morningtelos/backups:/backups
     # On every start, download the app from GitHub, install packages and run it.

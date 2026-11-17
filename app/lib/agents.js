@@ -1,4 +1,5 @@
 // The AI team: roster, the tool gateway (keeps each customer inside their own brand), and the agent loop.
+import { platformConn } from "./platform.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { q, one, all, log } from "./db.js";
 import { decrypt, clip } from "./util.js";
@@ -7,12 +8,12 @@ import { noteFailure } from "./alerts.js";
 
 // ---------- platform apps (Morning Telos's own accounts) ----------
 export const APPS = {
-  anthropic: { name: "Claude", kind: "key", help: "Morning Telos's Claude API key (console.anthropic.com). Pays for every workspace's AI." },
-  arrowsterr: { name: "Arrowsterr", kind: "mcp", url: "https://app.arrowsterr.com/api/mcp", help: "Morning Telos's Arrowsterr workspace key (Settings → Workspace → Slack, API and MCP)." },
-  capybaroar: { name: "Capybaroar", kind: "mcp", url: "", help: "Morning Telos's Capybaroar MCP address and key." },
-  claritia: { name: "Claritia", kind: "mcp", url: "", help: "Morning Telos's Claritia MCP address and key (not wired to agents yet)." },
-  stripe: { name: "Stripe", kind: "stripe", help: "Morning Telos's Stripe secret key (sk_live_…, or a restricted key with Checkout, Customers, Subscriptions and Billing portal access)." },
-  r2: { name: "Backups (Cloudflare R2)", kind: "r2", help: "R2 API token for the morningtelos-backups bucket: Access Key ID and Secret Access Key." },
+  anthropic: { name: "Claude", kind: "key", help: "Claude API key from console.anthropic.com. Pays for every workspace's AI." },
+  arrowsterr: { name: "Arrowsterr", kind: "mcp", help: "Arrowsterr workspace key (Settings → Workspace → Slack, API and MCP)." },
+  capybaroar: { name: "Capybaroar", kind: "mcp", help: "Capybaroar MCP address and key." },
+  claritia: { name: "Claritia", kind: "mcp", help: "Claritia MCP address and key (not wired to agents yet)." },
+  stripe: { name: "Stripe", kind: "stripe", help: "Stripe secret or restricted key, plus the webhook signing secret." },
+  r2: { name: "Backups (Cloudflare R2)", kind: "r2", help: "R2 API token for the morningtelos-backups bucket." },
 };
 
 // What each customer gets from each app, and where their brand id is stored on the workspace.
@@ -63,8 +64,7 @@ export async function spendSince(wsId, since) {
 }
 
 export async function getConn(tool) {
-  const c = await one("select * from connections where tool=$1", [tool]);
-  return c ? { ...c, key: decrypt(c.secret_enc) } : null;
+  return platformConn(tool);
 }
 
 // ---------- the gateway ----------

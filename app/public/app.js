@@ -440,7 +440,6 @@ document.addEventListener("submit", async (e) => {
 document.addEventListener("click", async (e) => { const b = e.target.closest("[data-kdel]"); if (!b || !confirm("Delete this doc?")) return; await api("/api/knowledge/" + b.dataset.kdel, { method: "DELETE" }); kSel = null; if ($("#dw").classList.contains("on")) closeDrawer(); renderKnowledge(); });
 
 // ---------- billing ----------
-const SECRET_ATTRS = 'type="text" class="inp secret" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other"';
 async function renderBilling() {
   const b = await api("/api/billing"), w = b.ws, owner = S.me?.role === "owner";
   if (new URLSearchParams(location.hash.split("?")[1] || "").get("paid")) toast("Thanks! Your plan is active.");
@@ -464,17 +463,14 @@ $("#portalBtn").addEventListener("click", async () => { try { const r = await ap
 async function renderAdmin() {
   if (!S.me?.is_admin) { location.hash = "home"; return; }
   const d = await api("/api/admin/overview");
-  const st = (a) => a.status === "ok" ? `<span class="pillst ok">Connected${a.toolCount ? ` · ${a.toolCount} tools` : ""}</span>` : a.status === "error" ? `<span class="pillst error">Not working</span>` : `<span class="pillst off">Not connected</span>`;
+  const st = (a) => !a.ready ? `<span class="pillst off">Not set</span>` : a.test && !a.test.ok ? `<span class="pillst error">Not working</span>` : `<span class="pillst ok">${a.test ? "Working" : "Set"}${a.test?.toolCount ? ` · ${a.test.toolCount} tools` : ""}</span>`;
   $("#admApps").innerHTML = d.apps.map((a) => `<div class="card appx"><div class="hd"><span class="lg" style="background:${APPC[a.key]?.[1] || "#999"}">${APPC[a.key]?.[0] || "?"}</span><span class="tx"><b>${esc(a.name)}</b><small>${esc(a.help)}</small></span>${st(a)}</div>
-    <form data-app="${a.key}" autocomplete="off">${a.kind === "mcp" ? `<input class="inp" name="mcp_address" autocomplete="off" data-1p-ignore data-lpignore="true" placeholder="https://…/mcp" value="${esc(a.url)}" aria-label="${esc(a.name)} MCP address">` : ""}
-    <input ${SECRET_ATTRS} name="k_secret" placeholder="${a.hasKey ? "Saved. Paste a new key to replace it" : a.kind === "r2" ? "Access Key ID" : "Paste key"}" aria-label="${esc(a.name)} key">
-    ${a.kind === "stripe" ? `<input ${SECRET_ATTRS} name="k_whsec" placeholder="Webhook signing secret (optional, whsec_…)" aria-label="Stripe webhook secret">` : ""}
-    ${a.kind === "r2" ? `<input ${SECRET_ATTRS} name="k_secret2" placeholder="Secret Access Key" aria-label="R2 secret access key">` : ""}
-    ${a.error ? `<div class="err">${esc(a.error)}</div>` : ""}
-    <div class="row2"><button class="btn primary sm">${a.status === "ok" ? "Update" : "Save and test"}</button>${a.hasKey ? `<button type="button" class="btn ghost sm" data-appdel="${a.key}">Disconnect</button>` : ""}</div></form></div>`).join("");
+    <ul class="envlist">${a.vars.map((v) => `<li><code>${esc(v.name)}</code><span class="${v.set ? "ok" : "no"}">${v.set ? "Set" : "Missing"}</span></li>`).join("")}</ul>
+    ${a.test && !a.test.ok ? `<div class="err">${esc(a.test.error || "")}</div>` : ""}
+    <div class="row2"><button type="button" class="btn sm" data-apptest="${a.key}" ${a.ready ? "" : "disabled"}>Test</button>${a.test ? `<span class="meta" style="font-size:12px;color:var(--ink-4)">Tested ${ago(a.test.at) === "now" ? "just now" : ago(a.test.at) + " ago"}</span>` : ""}</div></div>`).join("");
   $("#admHook").textContent = "Stripe webhook: " + d.hookUrl;
   const bk = (await api("/api/admin/backup")).status;
-  $("#admBackup").innerHTML = bk ? `<div class="svc"><span class="status ${bk.ok && bk.offsite ? "" : "wait"}">${bk.ok ? "Last backup worked" : "Last backup failed"}</span><span class="meta" style="color:var(--ink-4)">${ago(bk.at)} ago · ${(bk.size / 1024).toFixed(0)} KB · ${bk.local ? "on server" : ""}${bk.local && bk.offsite ? " + " : ""}${bk.offsite ? "Cloudflare R2" : ""}</span></div>${bk.error ? `<p class="err" style="margin-top:8px">${esc(bk.error)}</p>` : ""}` : `<p style="font-size:13.5px;color:var(--ink-3)">No backups yet. They run every night at 3:15 UTC.</p>`;
+  $("#admBackup").innerHTML = bk ? `<div class="svc"><span class="status ${bk.ok && bk.offsite ? "" : "wait"}">${bk.ok ? "Last backup worked" : "Last backup failed"}</span><span class="meta" style="color:var(--ink-4)">${ago(bk.at) === "now" ? "just now" : ago(bk.at) + " ago"} · ${(bk.size / 1024).toFixed(0)} KB · ${bk.local ? "on server" : ""}${bk.local && bk.offsite ? " + " : ""}${bk.offsite ? "Cloudflare R2" : ""}</span></div>${bk.error ? `<p class="err" style="margin-top:8px">${esc(bk.error)}</p>` : ""}` : `<p style="font-size:13.5px;color:var(--ink-3)">No backups yet. They run every night at 3:15 UTC.</p>`;
   $("#admPlans").innerHTML = `<div class="plan-edit h"><span>Plan</span><span>Name</span><span>Price label</span><span>Stripe price id</span><span>AI $ / period</span></div>` +
     d.plans.map((p) => `<div class="plan-edit" data-plan="${p.key}"><b style="font-size:13px">${p.key}</b><input class="inp" name="name" value="${esc(p.name)}"><input class="inp" name="price_label" value="${esc(p.price_label)}" placeholder="$99/month"><input class="inp" name="stripe_price_id" value="${esc(p.stripe_price_id || "")}" placeholder="price_…" ${p.key === "trial" ? "disabled" : ""}><input class="inp" name="ai_budget_usd" type="number" min="0" step="1" value="${Number(p.ai_budget_usd)}"></div>`).join("") +
     `<button class="btn primary sm" style="margin-top:6px">Save plans</button>`;
@@ -485,14 +481,6 @@ async function renderAdmin() {
     <span style="display:flex;gap:6px"><button class="btn sm">Save</button><button type="button" class="btn ghost sm" data-extend="${w.id}" title="Add 7 trial days">+7d</button></span></form>`).join("") || emptyHTML("No workspaces", "");
 }
 document.addEventListener("submit", async (e) => {
-  const f = e.target.closest("[data-app]");
-  if (f) {
-    e.preventDefault(); const b = f.querySelector("button"); b.disabled = true; b.textContent = "Testing…";
-    const d = Object.fromEntries(new FormData(f).entries());
-    try { const r = await api("/api/admin/apps/" + f.dataset.app, { method: "POST", body: { url: d.mcp_address, key: d.k_secret, secret2: d.k_secret2, webhook_secret: d.k_whsec } }); toast(r.status === "ok" ? "Connected" : "Saved, but the test failed: " + r.error); }
-    catch (x) { toast(x.message); }
-    await refresh(); return renderAdmin();
-  }
   const w = e.target.closest("[data-ws]");
   if (w) { e.preventDefault(); try { await api("/api/admin/workspaces/" + w.dataset.ws, { method: "POST", body: Object.fromEntries(new FormData(w).entries()) }); toast("Workspace saved"); } catch (x) { toast(x.message); } return renderAdmin(); }
   if (e.target.id === "admPlans") {
@@ -504,8 +492,8 @@ document.addEventListener("submit", async (e) => {
 document.addEventListener("click", async (e) => {
   const x = e.target.closest("[data-extend]");
   if (x) { await api("/api/admin/workspaces/" + x.dataset.extend, { method: "POST", body: { extend_trial_days: 7 } }); toast("Trial extended 7 days"); return renderAdmin(); }
-  const b = e.target.closest("[data-appdel]");
-  if (b && confirm("Disconnect this platform app? Every workspace loses it.")) { await api("/api/admin/apps/" + b.dataset.appdel, { method: "DELETE" }); renderAdmin(); }
+  const t = e.target.closest("[data-apptest]");
+  if (t) { t.disabled = true; t.textContent = "Testing…"; try { const r = await api("/api/admin/apps/" + t.dataset.apptest + "/test", { method: "POST" }); toast(r.status === "ok" ? "Working" : "Test failed: " + r.error); } catch (x) { toast(x.message); } await refresh(); return renderAdmin(); }
 });
 
 $("#bkNow").addEventListener("click", async (e) => { e.target.disabled = true; e.target.textContent = "Backing up…"; try { const r = await api("/api/admin/backup", { method: "POST" }); toast(r.status.ok ? "Backup done" : "Backup failed: " + r.status.error); } catch (x) { toast(x.message); } e.target.disabled = false; e.target.textContent = "Back up now"; renderAdmin(); });

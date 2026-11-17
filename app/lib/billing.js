@@ -1,11 +1,10 @@
 // Stripe billing over its HTTPS API (no SDK needed).
 import crypto from "node:crypto";
 import { q, one, getSetting } from "./db.js";
-import { decrypt } from "./util.js";
+import { platformConn } from "./platform.js";
 
 async function stripeKey() {
-  const c = await one("select secret_enc, status from connections where tool='stripe'");
-  return c?.status === "ok" ? decrypt(c.secret_enc) : null;
+  return platformConn("stripe").key;
 }
 export async function stripeReady() { return !!(await stripeKey()); }
 
@@ -53,7 +52,7 @@ export async function portalUrl(ws, origin) {
 
 // Checks the Stripe-Signature header (HMAC-SHA256 of "t.body", 5 minute window).
 export async function verifyWebhook(raw, header) {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET || decrypt(await getSetting("stripe_webhook_secret"));
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret || !header) return false;
   const parts = Object.fromEntries(header.split(",").map((p) => p.split("=")).filter((p) => p.length === 2).map(([k, v]) => [k, v]));
   const sigs = header.split(",").filter((p) => p.startsWith("v1=")).map((p) => p.slice(3));

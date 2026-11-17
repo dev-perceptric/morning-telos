@@ -196,6 +196,9 @@ export async function migrate() {
     await q("update plans set price_label='$149/month', ai_budget_usd=50 where key='pro'");
     await q("insert into settings(key,value) values('plans_v2','1')");
   }
+  // Platform keys now live only in the server environment. Wipe any copies left in the database.
+  await q("update connections set secret_enc=null, url=null where secret_enc is not null or url is not null");
+  await q("delete from settings where key='stripe_webhook_secret'");
   // Stripe price ids can come from the server environment.
   for (const [k, env] of [["starter", "PLAN_PRICE_STARTER"], ["pro", "PLAN_PRICE_PRO"]]) {
     if (process.env[env]) await q("update plans set stripe_price_id=$2 where key=$1", [k, process.env[env]]);

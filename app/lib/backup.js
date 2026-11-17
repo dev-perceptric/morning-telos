@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { one, getSetting, setSetting } from "./db.js";
-import { decrypt } from "./util.js";
+import { platformConn } from "./platform.js";
 import { alert } from "./alerts.js";
 
 const DIR = process.env.BACKUP_DIR || "/backups";
@@ -37,10 +37,9 @@ export function decryptBackup(buf) {
 const sha = (d) => crypto.createHash("sha256").update(d).digest("hex");
 const hmac = (k, d) => crypto.createHmac("sha256", k).update(d).digest();
 export async function r2Creds() {
-  const c = await one("select secret_enc, status from connections where tool='r2'");
-  const endpoint = process.env.R2_ENDPOINT, bucket = process.env.R2_BUCKET || "morningtelos-backups";
-  if (!c || !endpoint) return null;
-  try { const { id, secret } = JSON.parse(decrypt(c.secret_enc)); return id && secret ? { id, secret, endpoint, bucket } : null; } catch { return null; }
+  const c = platformConn("r2");
+  if (c.status !== "ok") return null;
+  return { id: c.key, secret: c.key2, endpoint: process.env.R2_ENDPOINT, bucket: process.env.R2_BUCKET || "morningtelos-backups" };
 }
 export async function r2Put(creds, key, body) {
   const url = new URL(`${creds.endpoint.replace(/\/$/, "")}/${creds.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`);

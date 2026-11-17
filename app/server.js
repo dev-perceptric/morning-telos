@@ -4,7 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, q, one, all, migrate, setSetting, log } from "./lib/db.js";
-import { hashPassword, checkPassword, encrypt, decrypt, token } from "./lib/util.js";
+import { hashPassword, checkPassword, encrypt, token } from "./lib/util.js";
+import { platformConn, platformInfo } from "./lib/platform.js";
 import { AGENTS, ORDER, APPS, SERVICES, runTurn, executeApproval, getConn, spendSince, canRun } from "./lib/agents.js";
 import * as mcp from "./lib/mcp.js";
 import * as billing from "./lib/billing.js";
@@ -191,8 +192,7 @@ route("DELETE", "/api/workspace", async (req, res, { user, ws }) => {
 });
 
 async function servicesFor(ws) {
-  const conns = Object.fromEntries((await all("select tool, status from connections")).map((r) => [r.tool, r.status]));
-  return Object.fromEntries(Object.entries(SERVICES).map(([k, s]) => [k, { label: s.label, setup: !!ws[s.field], ready: !!ws[s.field] && conns[k] === "ok" }]));
+  return Object.fromEntries(Object.entries(SERVICES).map(([k, s]) => [k, { label: s.label, setup: !!ws[s.field], ready: !!ws[s.field] && platformConn(k).status === "ok" }]));
 }
 async function agentsFor(ws) {
   const prefs = Object.fromEntries((await all("select * from agent_prefs where workspace_id=$1", [ws.id])).map((r) => [r.agent, r]));
@@ -397,12 +397,12 @@ route("POST", "/hooks/stripe", async (req, res) => {
 // ---------- admin (Morning Telos team only) ----------
 const ADMIN = { admin: true };
 async function appsState() {
-  const by = Object.fromEntries((await all("select * from connections")).map((r) => [r.tool, r]));
+  // Shows which server settings are set and the last test result. Key values never leave the server.
+  const by = Object.fromEntries((await all("select tool, status, tool_count, error, updated_at from connections")).map((r) => [r.tool, r]));
   return Object.entries(APPS).map(([k, a]) => {
-    const r = by[k];
-    // A key saved under an older APP_SECRET can't be unlocked anymore. Ask for it again.
-    const lost = r?.secret_enc && decrypt(r.secret_enc) == null;
-    return { key: k, name: a.name, kind: a.kind, help: a.help, url: r?.url || a.url || "", hasKey: !!r?.secret_enc && !lost, status: lost ? "error" : r?.status || "off", toolCount: r?.tool_count || 0, error: lost ? "The saved key can't be read anymore. Paste it again." : r?.error || null };
+    const info = platformInfo(k), t = by[k];
+    return { key: k, name: a.name, help: a.help, vars: info.vars, ready: info.ready,
+      test: t && t.status !== "off" ? { ok: t.status === "ok", error: t.error, toolCount: t.tool_count, at: t.updated_at } : null };
   });
 }
 route("GET", "/api/admin/overview", async (req, res) => {
@@ -431,47 +431,32 @@ route("POST", "/api/admin/plans", async (req, res) => {
   }
   send(res, 200, { ok: true });
 }, ADMIN);
-route("POST", "/api/admin/apps/:tool", async (req, res, { params }) => {
-  const app = APPS[params.tool];
-  if (!app) return fail(res, 404, "Unknown app");
-  const b = await readJson(req), prev = await getConn(params.tool);
-  let key = b.key ? String(b.key).trim() : prev?.key;
-  const url = app.kind === "mcp" ? String(b.url ?? prev?.url ?? app.url ?? "").trim() : null;
-  if (app.kind === "mcp" && url && !(PROD ? /^https:\/\/\S+$/ : /^https?:\/\/\S+$/).test(url)) return fail(res, 400, "The address must start with https://");
-  if (!key) return fail(res, 400, "Paste the key.");
+// Tests a platform app with the keys from the server settings. Nothing is saved except the result.
+route("POST", "/api/admin/apps/:tool/test", async (req, res, { params }) => {
+  if (!APPS[params.tool]) return fail(res, 404, "Unknown app");
+  send(res, 200, await testApp(params.tool));
+}, ADMIN);
+async function testApp(tool) {
+  const app = APPS[tool], c = platformConn(tool);
   let status = "ok", error = null, count = 0;
   try {
+    if (c.status !== "ok") throw new Error("Not set on the server yet.");
     if (app.kind === "key") {
-      const r = await fetch(`${process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"}/v1/models?limit=1`, { headers: { "x-api-key": key, "anthropic-version": "2023-06-01" }, signal: AbortSignal.timeout(20000) });
+      const r = await fetch(`${process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"}/v1/models?limit=1`, { headers: { "x-api-key": c.key, "anthropic-version": "2023-06-01" }, signal: AbortSignal.timeout(20000) });
       if (!r.ok) throw new Error(r.status === 401 ? "Claude rejected this key." : `Claude answered ${r.status}.`);
     } else if (app.kind === "stripe") {
-      await billing.stripe("balance", null, key);
-      if (b.webhook_secret) await setSetting("stripe_webhook_secret", encrypt(String(b.webhook_secret).trim()));
+      await billing.stripe("balance", null, c.key);
     } else if (app.kind === "r2") {
-      const prevR2 = (() => { try { return JSON.parse(prev?.key || "{}"); } catch { return {}; } })();
-      const creds = { id: b.key ? String(b.key).trim() : prevR2.id, secret: b.secret2 ? String(b.secret2).trim() : prevR2.secret };
-      if (!creds.id || !creds.secret) throw new Error("Paste both the Access Key ID and the Secret Access Key.");
-      if (!process.env.R2_ENDPOINT) throw new Error("The server has no R2 address yet.");
-      await r2Put({ ...creds, endpoint: process.env.R2_ENDPOINT, bucket: process.env.R2_BUCKET || "morningtelos-backups" }, "healthcheck/ping.txt", Buffer.from(new Date().toISOString()));
-      b.key = JSON.stringify(creds);
+      await r2Put({ id: c.key, secret: c.key2, endpoint: process.env.R2_ENDPOINT, bucket: process.env.R2_BUCKET || "morningtelos-backups" }, "healthcheck/ping.txt", Buffer.from(new Date().toISOString()));
     } else {
-      if (!url) throw new Error("Paste the MCP address.");
-      mcp.forget(url); await mcp.initialize(url, key);
-      count = (await mcp.listTools(url, key, { fresh: true })).length;
+      mcp.forget(c.url); await mcp.initialize(c.url, c.key);
+      count = (await mcp.listTools(c.url, c.key, { fresh: true })).length;
     }
-  } catch (e) { status = "error"; error = e.message.slice(0, 300); }
-  if (app.kind === "r2" && b.key && b.key.startsWith("{")) key = b.key;
-  await q(`insert into connections(tool,url,secret_enc,status,tool_count,error,updated_at) values($1,$2,$3,$4,$5,$6,now())
-    on conflict(tool) do update set url=excluded.url, secret_enc=excluded.secret_enc, status=excluded.status, tool_count=excluded.tool_count, error=excluded.error, updated_at=now()`,
-    [params.tool, url, encrypt(key), status, count, error]);
-  send(res, 200, { status, error, toolCount: count });
-}, ADMIN);
-route("DELETE", "/api/admin/apps/:tool", async (req, res, { params }) => {
-  const c = await getConn(params.tool);
-  if (c?.url) mcp.forget(c.url);
-  await q("delete from connections where tool=$1", [params.tool]);
-  send(res, 200, { ok: true });
-}, ADMIN);
+  } catch (e) { status = "error"; error = String(e.message || e).slice(0, 300); }
+  await q(`insert into connections(tool,status,tool_count,error,updated_at) values($1,$2,$3,$4,now())
+    on conflict(tool) do update set status=excluded.status, tool_count=excluded.tool_count, error=excluded.error, updated_at=now()`, [tool, status, count, error]);
+  return { status, error, toolCount: count };
+}
 
 // ---------- routines scheduler ----------
 async function runRoutine(ws, r) {
@@ -532,5 +517,7 @@ await q("update approvals set status='failed', result='Stopped by a server resta
 await q("update workspaces set hook_token=md5(random()::text || id::text) where hook_token is null");
 server.requestTimeout = 0;
 server.listen(PORT, () => console.log(`Morning Telos app on :${PORT}`));
+// Check every platform app that has keys set, so Admin shows fresh results after each deploy.
+setTimeout(() => { for (const k of Object.keys(APPS)) if (platformConn(k).status === "ok") testApp(k).catch(() => {}); }, 3000);
 setInterval(tick, 60 * 1000);
 process.on("SIGTERM", () => { server.close(); pool.end().finally(() => process.exit(0)); });
