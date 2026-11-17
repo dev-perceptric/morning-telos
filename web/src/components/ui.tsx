@@ -1,13 +1,20 @@
 // Small shared pieces for the Morning Telos screens, in the current app's style.
 
 export const input =
-  "w-full h-11 rounded-[10px] border border-line bg-surface px-3 text-[15px] text-ink outline-none transition focus:border-ink-3 focus:ring-2 focus:ring-clay/20";
+  "w-full h-11 rounded-[10px] border border-line bg-surface px-3 text-[15px] text-ink outline-none transition focus:border-ink-3 focus:ring-2 focus:ring-clay/20 disabled:bg-sunk disabled:text-ink-3";
 export const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 export const btnPrimary =
   "inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-ink px-4 text-[15px] font-semibold text-white transition hover:bg-clay disabled:opacity-60";
 export const btnSecondary =
   "inline-flex h-11 w-full items-center justify-center gap-3 rounded-[10px] border border-line bg-surface px-4 text-[15px] font-medium text-ink transition hover:border-line-2 hover:bg-sunk disabled:opacity-60";
 export const textLink = "font-medium text-clay-2 underline-offset-2 hover:underline";
+/** A small button for rows and toolbars. */
+export const btnSmall =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-[9px] border border-line bg-surface px-3 text-[14px] font-medium text-ink transition hover:border-line-2 hover:bg-sunk disabled:opacity-60";
+export const btnDanger =
+  "inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-red px-4 text-[15px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50";
+/** A white card for one section of a page. */
+export const card = "flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5 sm:p-6";
 
 export function Logo() {
   return (
