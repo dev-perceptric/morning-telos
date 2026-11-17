@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* Morning Telos colors and fonts, the same as the current app (app/public/app.css). */
+@theme {
+  --color-bg: #faf9f5;
+  --color-side: #f4f2eb;
+  --color-surface: #ffffff;
+  --color-sunk: #f5f4ed;
+  --color-line: #e8e6dc;
+  --color-line-2: #dcd9cd;
+  --color-ink: #141413;
+  --color-ink-2: #3a3a37;
+  --color-ink-3: #65645f;
+  --color-ink-4: #8c8b84;
+  --color-clay: #d97757;
+  --color-clay-2: #c6613f;
+  --color-clay-bg: #fbefe8;
+  --color-green: #2f7d4f;
+  --color-amber: #9a6412;
+  --color-red: #b4410f;
+  --font-sans: var(--font-inter-tight), system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-clay);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
