@@ -39,7 +39,7 @@ for k in ("APP_SECRET", "DB_PASSWORD"):
 for pair in os.environ.get("SET_ENV", "").split(";"):
     if "=" in pair:
         k, v = pair.split("=", 1); env[k.strip()] = v.strip()
-c = open("docker-compose.yml").read().replace("refs/heads/main", os.environ["SHA"])
+c = open(os.environ.get("COMPOSE", "docker-compose.yml")).read().replace("refs/heads/main", os.environ["SHA"])
 print(json.dumps({"project_name": "morningtelos", "content": c, "environment": "\n".join(f"{k}={v}" for k, v in env.items())}))')
 
 # Take down the old project if it exists, then create it fresh.
