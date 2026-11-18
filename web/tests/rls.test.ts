@@ -1377,3 +1377,155 @@ test("rescan_website: editors and up start a scan, once at a time; website_scan_
     await assert.rejects(q("select rescan_website($1)", [ws]), /Add your website in Settings first/);
   });
 });
+
+// ─────────────── P3.3: approvals and activity (013_approvals.sql) ───────────────
+
+/** A pending approval in a workspace, saved the way the server saves it. */
+async function approvalIn(ws: string, thread: string | null, o: { status?: string; decidedAgo?: string } = {}) {
+  return (
+    await db!.query(
+      `insert into approvals (workspace_id, thread_id, agent, product, tool, input, title, why, status, decided_at, finished_at)
+       values ($1, $2, 'social', 'capybaroar', 'create_posts', '{"posts":[{"text":"Hi"}]}', 'Create posts (Social media)', 'This changes your social media.', $3,
+               case when $3 = 'pending' then null else now() - $4::interval end, case when $3 in ('done', 'failed') then now() end) returning id`,
+      [ws, thread, o.status ?? "pending", o.decidedAgo ?? "0 seconds"],
+    )
+  ).rows[0].id as string;
+}
+
+test("approvals and activity: every member reads their own workspace's, never another's; visitors see nothing; nobody writes them from the browser", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("ap-read");
+  const other = await team("ap-other");
+  const thread = await chatIn(ws, owner);
+  const mine = await approvalIn(ws, thread);
+  const theirs = await approvalIn(other.ws, null);
+  await db.query("insert into activity (workspace_id, agent, thread_id, approval_id, text) values ($1, 'social', $2, $3, 'prepared it'), ($4, 'social', null, $5, 'theirs')", [ws, thread, mine, other.ws, theirs]);
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => {
+      assert.deepEqual((await q("select id, status from approvals")).rows, [{ id: mine, status: "pending" }]);
+      assert.deepEqual((await q("select text from activity")).rows, [{ text: "prepared it" }]);
+    });
+    for (const sql of [
+      ["update approvals set status = 'done' where id = $1", [mine]],
+      ["update approvals set input = '{}' where id = $1", [mine]],
+      ["delete from approvals where id = $1", [mine]],
+      ["insert into approvals (workspace_id, agent, product, tool, title) values ($1, 'social', 'capybaroar', 'create_posts', 'x')", [ws]],
+      ["insert into activity (workspace_id, text) values ($1, 'x')", [ws]],
+      ["update activity set text = 'x' where workspace_id = $1", [ws]],
+      ["delete from activity where workspace_id = $1", [ws]],
+    ] as const) {
+      await as(u, async (q) => {
+        await assert.rejects(q(sql[0], [...sql[1]]), /permission denied/, sql[0]);
+      });
+    }
+  }
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from approvals"), /permission denied/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from activity"), /permission denied/);
+  });
+  assert.equal((await db.query("select status from approvals where id = $1", [mine])).rows[0].status, "pending");
+});
+
+test("decide_approval, finish_approval and fail_stale_approvals: server only", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor, viewer } = await team("ap-fn");
+  const id = await approvalIn(ws, null);
+  for (const u of [owner, editor, viewer, null]) {
+    for (const sql of [
+      ["select * from decide_approval($1, $2, $3, 'approve')", [id, ws, owner.id]],
+      ["select finish_approval($1, $2, 'done', 'ok')", [id, ws]],
+      ["select fail_stale_approvals('1 minute')", []],
+    ] as const) {
+      await as(u, async (q) => {
+        await assert.rejects(q(sql[0], [...sql[1]]), /permission denied for function/, sql[0]);
+      });
+    }
+  }
+  assert.equal((await db.query("select status from approvals where id = $1", [id])).rows[0].status, "pending");
+});
+
+test("decide_approval: editors and up decide once; viewers, strangers and other workspaces get nothing; edited details replace the saved ones", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("ap-decide");
+  const other = await team("ap-decide-other");
+  const decideAs = (id: string, wsId: string, by: User, action: string, input: unknown = null) =>
+    asService(async (q) => (await q("select id, status, input, decided_by from decide_approval($1, $2, $3, $4, $5)", [id, wsId, by.id, action, input === null ? null : JSON.stringify(input)])).rows);
+
+  const a = await approvalIn(ws, null);
+  assert.deepEqual(await decideAs(a, ws, viewer, "approve"), [], "a viewer");
+  assert.deepEqual(await decideAs(a, ws, other.owner, "approve"), [], "the owner of another workspace");
+  assert.deepEqual(await decideAs(a, other.ws, other.owner, "approve"), [], "named under the wrong workspace");
+  const [row] = await decideAs(a, ws, editor, "approve", { posts: [{ text: "Edited" }] });
+  assert.deepEqual({ ...row, id: String(row.id) }, { id: String(a), status: "running", input: { posts: [{ text: "Edited" }] }, decided_by: editor.id });
+  assert.deepEqual(await decideAs(a, ws, owner, "approve"), [], "a second approve");
+  assert.deepEqual(await decideAs(a, ws, owner, "deny"), [], "a deny after it was approved");
+
+  for (const u of [owner, admin]) {
+    const d = await approvalIn(ws, null);
+    const [denied] = await decideAs(d, ws, u, "deny", { ignored: true });
+    assert.deepEqual([denied.status, denied.input], ["denied", { posts: [{ text: "Hi" }] }]);
+  }
+  await assert.rejects(decideAs(a, ws, owner, "run"), /Pick approve or deny/);
+  const b = await approvalIn(ws, null);
+  await assert.rejects(decideAs(b, ws, owner, "approve", [1]), /must be an object/);
+});
+
+test("finish_approval only finishes a decided call, as done or failed; fail_stale_approvals fails calls that never finished", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws } = await team("ap-finish");
+  const other = await team("ap-finish-other");
+  const finish = (id: string, wsId: string, status: string) => asService(async (q) => (await q("select finish_approval($1, $2, $3, 'result') ok", [id, wsId, status])).rows[0].ok);
+
+  const pendingId = await approvalIn(ws, null);
+  assert.equal(await finish(pendingId, ws, "done"), false, "a pending one never becomes done");
+  const running = await approvalIn(ws, null, { status: "running" });
+  assert.equal(await finish(running, other.ws, "done"), false, "another workspace");
+  await assert.rejects(finish(running, ws, "pending"), /done or failed/);
+  assert.equal(await finish(running, ws, "done"), true);
+  assert.equal(await finish(running, ws, "failed"), false, "only once");
+  const r = (await db.query("select status, result, finished_at is not null finished from approvals where id = $1", [running])).rows[0];
+  assert.deepEqual(r, { status: "done", result: "result", finished: true });
+
+  const stale = await approvalIn(ws, null, { status: "running", decidedAgo: "11 minutes" });
+  const staleApproved = await approvalIn(other.ws, null, { status: "approved", decidedAgo: "1 hour" });
+  const fresh = await approvalIn(ws, null, { status: "running", decidedAgo: "1 minute" });
+  const oldPending = await approvalIn(ws, null);
+  await db.query("update approvals set created_at = now() - interval '2 days' where id = $1", [oldPending]);
+  const n = await asService(async (q) => (await q("select fail_stale_approvals('10 minutes') n")).rows[0].n);
+  assert.ok(n >= 2);
+  const statusOf = async (id: string) => (await db!.query("select status, result from approvals where id = $1", [id])).rows[0];
+  assert.deepEqual(await statusOf(stale), { status: "failed", result: "This stopped before it finished, so we don't know if it ran. Check before you try again." });
+  assert.equal((await statusOf(staleApproved)).status, "failed");
+  assert.equal((await statusOf(fresh)).status, "running");
+  assert.equal((await statusOf(oldPending)).status, "pending", "waiting for a person is never stale");
+});
+
+test("approvals: known values only, the chat must be in the same workspace, a deleted chat keeps the approval, a deleted workspace removes both tables' rows", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner } = await team("ap-shape");
+  const other = await team("ap-shape-other");
+  const thread = await chatIn(ws, owner);
+  const theirThread = await chatIn(other.ws, other.owner);
+  const base = "insert into approvals (workspace_id, thread_id, agent, product, tool, input, title, status) values ($1, $2, $3, $4, 'create_posts', $5, 'T', $6)";
+  for (const [agent, product, input, status] of [
+    ["zeus", "capybaroar", "{}", "pending"],
+    ["social", "Capy Baroar", "{}", "pending"],
+    ["social", "capybaroar", "[]", "pending"],
+    ["social", "capybaroar", "{}", "skipped"],
+  ]) {
+    await assert.rejects(db.query(base, [ws, null, agent, product, input, status]), /violates check constraint/, `${agent} ${product} ${input} ${status}`);
+  }
+  // A decided approval needs decided_at, a finished one finished_at.
+  await assert.rejects(db.query(base, [ws, null, "social", "capybaroar", "{}", "running"]), /violates check constraint/);
+  await assert.rejects(db.query(base, [ws, theirThread, "social", "capybaroar", "{}", "pending"]), /violates foreign key constraint/, "another workspace's chat");
+  const id = await approvalIn(ws, thread);
+  await db.query("insert into activity (workspace_id, agent, thread_id, approval_id, text) values ($1, 'social', $2, $3, 'prepared it')", [ws, thread, id]);
+  await asCommit(owner, (q) => q("delete from threads where id = $1", [thread]));
+  assert.deepEqual((await db.query("select workspace_id, thread_id from approvals where id = $1", [id])).rows, [{ workspace_id: ws, thread_id: null }]);
+  assert.deepEqual((await db.query("select workspace_id, thread_id from activity where approval_id = $1", [id])).rows, [{ workspace_id: ws, thread_id: null }]);
+  await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
+  assert.equal((await db.query("select count(*)::int n from approvals where workspace_id = $1", [ws])).rows[0].n, 0);
+  assert.equal((await db.query("select count(*)::int n from activity where workspace_id = $1", [ws])).rows[0].n, 0);
+});

@@ -37,6 +37,11 @@ test("the SQL agent and model lists match team.ts and models.ts", () => {
   const agentLists = [...sql.matchAll(/agent in \(([^)]+)\)/g)].map((m) => m[1].split(",").map((s) => s.trim().replace(/'/g, "")));
   assert.ok(agentLists.length >= 3, "messages, agent_prefs and ai_usage each check the agent");
   for (const list of agentLists) assert.deepEqual(list, ORDER);
+  // Approvals and activity (013) check the agent the same way.
+  const approvals = readFileSync(new URL("../supabase/013_approvals.sql", import.meta.url), "utf8");
+  const more = [...approvals.matchAll(/agent in \(([^)]+)\)/g)].map((m) => m[1].split(",").map((s) => s.trim().replace(/'/g, "")));
+  assert.equal(more.length, 2, "approvals and activity each check the agent");
+  for (const list of more) assert.deepEqual(list, ORDER);
   const models = sql.match(/model in \(([^)]+)\)/)![1].split(",").map((s) => s.trim().replace(/'/g, ""));
   assert.deepEqual(models, [...MODEL_CHOICES]);
 });

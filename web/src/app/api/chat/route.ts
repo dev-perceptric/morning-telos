@@ -7,6 +7,7 @@ import { knowledgeForPrompt } from "@/lib/knowledgeServer";
 import { teamClient } from "@/lib/claude";
 import { adminClient, roleGate } from "@/lib/serverAuth";
 import { loadWorkspace, teamStore, threadInWorkspace, threadTitle } from "@/lib/teamStore";
+import { teamTools } from "@/lib/teamTools";
 import { LEAD } from "@/lib/team";
 import { NEEDS } from "@/lib/workspace";
 
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
         await runTurn({ workspace: team, threadId: thread, text, forced: agent, model }, {
             client: teamClient(),
             store: teamStore(db, ws),
+            // Arrowsterr and Capybaroar through this workspace's brand keys (changes wait for approval), and Knowledge search.
+            tools: teamTools(db, { log }),
             emit,
             log,
             // The business brain: this agent's and everyone's docs, as a second cached part of the instructions.

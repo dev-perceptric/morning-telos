@@ -55,6 +55,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
 const WS = "11111111-2222-4333-8444-555555555555";
 let db: ReturnType<typeof fakeDb>;
 let claims: Record<string, unknown>[];
+let stale: Record<string, unknown>[];
 
 beforeEach(() => {
   answer = null;
@@ -77,6 +78,8 @@ beforeEach(() => {
   };
   // supabase/010_expire_trials.sql: today's daily job is already queued, so these tests see only their own jobs.
   db.rpcs.queue_daily_jobs = () => 0;
+  stale = [];
+  db.rpcs.fail_stale_approvals = (args) => (stale.push(args), 0);
   auth.db = db;
 });
 
@@ -198,4 +201,11 @@ test("a workspace with no website: Arrowsterr waits, Capybaroar is made, the job
   assert.deepEqual(db.tables.services.map((s) => [s.product, s.status, s.last_error]), [["arrowsterr", "waiting", null], ["capybaroar", "ready", null]]);
   assert.ok(!partnerCalls.some((c) => c.includes("aw.test")), "no call to Arrowsterr");
   assert.equal(brands.find((b) => b.host === "cb.test")!.domain, null);
+});
+
+test("each tick fails approved changes whose call never finished (a restart), after 10 minutes", async () => {
+  db.tables.jobs = [];
+  const res = await call({ Authorization: `Bearer ${SECRET}` });
+  assert.deepEqual(await res.json(), { claimed: 0, done: 0, retry: 0, failed: 0 });
+  assert.deepEqual(stale, [{ p_older: "10 minutes" }]);
 });
