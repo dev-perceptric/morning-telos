@@ -99,8 +99,21 @@ function GoogleIcon() {
   );
 }
 
-export function AuthScreen({ sb, invited, turnstileSiteKey = null, google: googleOn = false }: { sb: SupabaseClient; invited: boolean; turnstileSiteKey?: string | null; google?: boolean }) {
-  const [mode, setMode] = useState<Mode>(invited ? "signup" : "signin");
+export function AuthScreen({
+  sb,
+  invited,
+  signup = false,
+  turnstileSiteKey = null,
+  google: googleOn = false,
+}: {
+  sb: SupabaseClient;
+  invited: boolean;
+  /** Open on the sign-up form: the site's "Start free trial" link (#signup or /signup). */
+  signup?: boolean;
+  turnstileSiteKey?: string | null;
+  google?: boolean;
+}) {
+  const [mode, setMode] = useState<Mode>(invited || signup ? "signup" : "signin");
   const [name, setName] = useState("");
   const [business, setBusiness] = useState("");
   const [website, setWebsite] = useState("");

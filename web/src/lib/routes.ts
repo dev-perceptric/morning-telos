@@ -67,3 +67,20 @@ export function routePath(r: Route): string {
   if (r.page === "approvals") return r.id ? `/approvals/${r.id}` : "/approvals";
   return "/";
 }
+
+// The site's "Start free trial" button links to https://chat.morningtelos.com/#signup, as the old app did.
+// /signup works too. Signed out, either opens the sign-up form. Signed in, it opens home.
+const SIGNUP_HASH = /^#\/?signup\/?$/i;
+const SIGNUP_PATH = /^\/signup\/?$/i;
+
+/** True when the address asks for the sign-up form: #signup, or the /signup page. */
+export function wantsSignup(path: string, hash: string): boolean {
+  return SIGNUP_HASH.test(hash) || SIGNUP_PATH.test(path);
+}
+
+/** The address without the sign-up link, once the person is signed in, or null when there is nothing to clean. */
+export function withoutSignup(path: string, search: string, hash: string): string | null {
+  if (!wantsSignup(path, hash)) return null;
+  const p = SIGNUP_PATH.test(path) ? "/" : path;
+  return p + search + (SIGNUP_HASH.test(hash) ? "" : hash);
+}

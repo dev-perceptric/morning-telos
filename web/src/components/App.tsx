@@ -8,7 +8,7 @@ import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { initial, paletteMatch, type PaletteItem } from "@/lib/home";
 import type { ModelChoice } from "@/lib/models";
-import { routePath, type Route } from "@/lib/routes";
+import { routePath, wantsSignup, withoutSignup, type Route } from "@/lib/routes";
 import { getSupabase, type SupaConfig } from "@/lib/supa";
 import { cleanWebsite } from "@/lib/signup";
 import { agentFace, AGENTS, ORDER, type AgentKey } from "@/lib/team";
@@ -44,6 +44,8 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
     if (fromPath) writeLocal(INVITE_KEY, fromPath);
     return fromPath ?? readLocal(INVITE_KEY);
   });
+  // Read once on load: the site's "Start free trial" link (#signup or /signup) opens the sign-up form.
+  const [signup] = useState(() => wantsSignup(window.location.pathname, window.location.hash));
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => setSession(data.session));
@@ -54,6 +56,16 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
     return () => data.subscription.unsubscribe();
   }, [sb]);
 
+  // Signed in, the sign-up link just opens home, so take it out of the address.
+  useEffect(() => {
+    if (!session) return;
+    const clean = withoutSignup(window.location.pathname, window.location.search, window.location.hash);
+    if (clean !== null) {
+      window.history.replaceState(null, "", clean);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }, [session]);
+
   const clearInvite = useCallback(() => {
     writeLocal(INVITE_KEY, null);
     setInvite(null);
@@ -61,7 +73,7 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
 
   if (session === undefined) return <Loading />;
   if (recovering && session) return <NewPassword sb={sb} onDone={() => setRecovering(false)} />;
-  if (!session) return <AuthScreen sb={sb} invited={Boolean(invite)} turnstileSiteKey={turnstileSiteKey} google={google} />;
+  if (!session) return <AuthScreen sb={sb} invited={Boolean(invite)} signup={signup} turnstileSiteKey={turnstileSiteKey} google={google} />;
   if (invite) return <JoinInvite sb={sb} session={session} token={invite} onDone={clearInvite} />;
   return <Shell sb={sb} session={session} />;
 }
