@@ -28,6 +28,7 @@ import {
 import { ACTION_TOOL, SEARCH_TOOL } from "../src/lib/composio/appAction.ts";
 import { APP_ACCESS, appAction } from "../src/lib/composio/catalog.ts";
 import { HIDDEN, toolName } from "../src/lib/productTools.ts";
+import { mayUseWordpress, WP_TOOLS, WP_WRITES } from "../src/lib/wordpress/tools.ts";
 import { skillTool } from "../src/lib/skillTool.ts";
 import { AGENTS, workingAgents, type AgentKey } from "../src/lib/team.ts";
 import { withSoon } from "./soon.ts";
@@ -75,14 +76,15 @@ test("System skills name only tools their teammate has: its products' tools from
     const a = AGENTS[s.agent!];
     const apps = a.apps.includes("*") ? (["arrowsterr", "capybaroar"] as const) : a.apps.filter((x): x is "arrowsterr" | "capybaroar" => x !== "*");
     // app_search_actions and app_action only for a teammate in APP_ACCESS (src/lib/composio/catalog.ts).
-    const allowed = new Set([...TOOLS.morningtelos, ...apps.flatMap((p) => product[p]), ...(APP_ACCESS[s.agent!] ? appTools : [])]);
+    // The WordPress tools (src/lib/wordpress/tools.ts) only for a teammate who may use WordPress.
+    const allowed = new Set([...TOOLS.morningtelos, ...apps.flatMap((p) => product[p]), ...(APP_ACCESS[s.agent!] ? appTools : []), ...(mayUseWordpress(s.agent!) ? Object.keys(WP_TOOLS) : [])]);
     for (const t of s.tools) assert.ok(allowed.has(t), `${s.key} names ${t}, which ${a.god} doesn't have`);
-    if (a.readOnly) for (const t of s.tools) assert.ok(!writes.has(t), `${s.key}: ${a.god} only reads, but the skill names ${t}`);
+    if (a.readOnly) for (const t of s.tools) assert.ok(!writes.has(t) && !WP_WRITES.includes(t), `${s.key}: ${a.god} only reads, but the skill names ${t}`);
     // Tools Morning Telos never gives an agent (src/lib/productTools.ts HIDDEN).
     for (const t of s.tools) for (const p of apps) assert.ok(!HIDDEN[p].has(t), `${s.key} names ${t}, which agents never get`);
     // Each tool in the header is used in the steps, and each tool the steps lean on is in the header.
     for (const t of s.tools) assert.ok(s.body.includes(t), `${s.key} lists ${t} but never says how to use it`);
-    const known = new Set([...product.arrowsterr, ...product.capybaroar, ...TOOLS.morningtelos, ...appTools]);
+    const known = new Set([...product.arrowsterr, ...product.capybaroar, ...TOOLS.morningtelos, ...appTools, ...Object.keys(WP_TOOLS)]);
     for (const w of s.body.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? []) if (known.has(w)) assert.ok(s.tools.includes(w), `${s.key} uses ${w} but doesn't list it in tools`);
   }
 });
@@ -118,9 +120,9 @@ test("Hephaestus: build-on-framer and the page skills put their work on a connec
     assert.match(s.body, /in Settings, Apps/, `${n} says where to connect a site builder`);
     assert.match(s.body, /approv|agreed/, `${n} says changes wait for the owner's OK`);
     if (n !== "match-the-brand") assert.match(s.body, /Never publish/, n);
-    assert.doesNotMatch(s.body, /\b(FRAMER|WEBFLOW|WORDPRESS_COM)_\w*(DELETE|REMOVE)/, `${n} never names a delete`);
+    assert.doesNotMatch(s.body, /\b(FRAMER|WEBFLOW|WORDPRESS_COM|SHOPIFY)_\w*(DELETE|REMOVE)|wordpress_\w*(delete|remove)/, `${n} never names a delete`);
     // Every action a skill names is one Hephaestus may run.
-    for (const slug of s.body.match(/\b(?:FRAMER|WEBFLOW|WORDPRESS_COM)_[A-Z0-9_]+\b/g) ?? []) {
+    for (const slug of s.body.match(/\b(?:FRAMER|WEBFLOW|WORDPRESS_COM|SHOPIFY)_[A-Z0-9_]+\b/g) ?? []) {
       const toolkit = slug.startsWith("WORDPRESS_COM_") ? "wordpress_com" : slug.split("_")[0].toLowerCase();
       assert.ok(appAction(toolkit, slug), `${n} names ${slug}, which isn't in the catalog`);
     }
@@ -129,16 +131,31 @@ test("Hephaestus: build-on-framer and the page skills put their work on a connec
   assert.match(framer, /search_knowledge/);
   assert.match(framer, /FRAMER_DEPLOY/);
   assert.match(framer, /Ask before you publish/);
-  for (const n of ["write-a-page", "improve-a-page"]) assert.match(web.find((x) => x.name === n)!.body, /Framer.*\n.*Webflow.*\n.*WordPress\.com/, `${n} covers each builder`);
+  for (const n of ["write-a-page", "improve-a-page"]) assert.match(web.find((x) => x.name === n)!.body, /Framer.*\n.*Webflow.*\n.*WordPress\.com.*\n.*WordPress \(the owner's own site\).*\n.*Shopify/, `${n} covers each builder`);
+  // On WordPress a new page is a draft with a preview link, and publishing waits for the owner.
+  const write = web.find((x) => x.name === "write-a-page")!.body;
+  assert.match(write, /wordpress_add_draft_page/);
+  assert.match(write, /preview link/);
+  assert.match(write, /Publish with wordpress_publish only when the owner asks/);
+  assert.match(write, /Both start hidden/);
+  assert.match(web.find((x) => x.name === "improve-a-page")!.body, /a live page changes as soon as they approve/);
 });
 
 const body = (n: string) => SYSTEM_SKILLS.find((s) => s.agent === "web" && s.name === n)!.body;
 const steps = (n: string) => body(n).split("## Steps")[1].split("\n## ")[0];
 
-test("Hephaestus runs review-the-design before asking to publish in build-on-framer, write-a-page, improve-a-page and design-a-page", () => {
-  for (const n of ["build-on-framer", "write-a-page", "improve-a-page", "design-a-page"]) {
+test("Hephaestus runs review-the-design before asking to publish in build-on-framer, write-a-page, improve-a-page, design-a-page and publish-to-wordpress", () => {
+  for (const n of ["build-on-framer", "write-a-page", "improve-a-page", "design-a-page", "publish-to-wordpress"]) {
     assert.match(steps(n), /^\d+\. Run review-the-design .*before you ask (the owner )?to publish/m, `${n} has a step that runs review-the-design before publishing`);
   }
+  // On WordPress: a draft first, the preview link, the review, and wordpress_publish last, after the owner's OK.
+  const wp = steps("publish-to-wordpress");
+  assert.ok(wp.indexOf("wordpress_add_draft_page") < wp.indexOf("preview link"), "draft before the preview link");
+  assert.ok(wp.indexOf("review-the-design") < wp.indexOf("wordpress_publish only when the owner says so"), "review before publishing");
+  assert.match(body("publish-to-wordpress"), /Never publish without the owner's OK/);
+  assert.doesNotMatch(body("publish-to-wordpress"), /delete_|remove_/);
+  // review-the-design reads and fixes pages on WordPress and Shopify too.
+  for (const t of ["wordpress_get_page", "wordpress_update_page", "SHOPIFY_GET_PAGE_BY_ID", "SHOPIFY_UPDATE_PAGE"]) assert.ok(body("review-the-design").includes(t), `review-the-design uses ${t}`);
   // In build-on-framer the review comes before the step that publishes.
   const framer = steps("build-on-framer");
   assert.ok(framer.indexOf("review-the-design") < framer.indexOf("FRAMER_PUBLISH"), "review before FRAMER_PUBLISH");

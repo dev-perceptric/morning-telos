@@ -24,10 +24,11 @@ test("agentStatus: paused, setting up, connect an app, working", () => {
 });
 
 test("Hephaestus's card shows his site builders; Arrowsterr decides his status, since he can write pages in chat without one", () => {
-  assert.deepEqual(agentToolkits("web"), ["framer", "webflow", "wordpress_com"]);
+  assert.deepEqual(agentToolkits("web"), ["framer", "webflow", "wordpress_com", "shopify", "wordpress"]);
   const none = { paused: false, services: {} as Record<string, string>, connected: [] as string[] };
   assert.deepEqual(agentStatus("web", { ...none, services: { arrowsterr: "pending" } }), { tone: "wait", label: "Setting up" });
   assert.deepEqual(agentStatus("web", { ...none, services: { arrowsterr: "ready" } }), { tone: "ok", label: "Working" });
   assert.deepEqual(agentStatus("web", { ...none, services: { arrowsterr: "ready" }, connected: ["framer"] }), { tone: "ok", label: "Working" });
+  assert.deepEqual(agentStatus("web", { ...none, services: { arrowsterr: "ready" }, connected: ["wordpress"] }), { tone: "ok", label: "Working" });
   assert.deepEqual(agentToolkits("seo"), []);
 });

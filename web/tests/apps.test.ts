@@ -9,7 +9,7 @@ import type { TeamWorkspace, ToolContext, ToolDef, Trust } from "../src/lib/agen
 import type { Approval, NewApproval } from "../src/lib/approvals.ts";
 import { AppSetupError, forgetTools, kindOf, runTool, toolsOf, verbOf } from "../src/lib/composio/actions.ts";
 import { access, ACTION_TOOL, appToolSource, isAppApproval, missingApp, notConnected, runApproval, SEARCH_TOOL, toolkitOf, type AppToolDeps } from "../src/lib/composio/appAction.ts";
-import { APP_ACCESS, appAction, APPS, appsFor, changesApps, changeTitle, FRAMER_ACTIONS, GROUPS, TOOLKITS, WEBFLOW_ACTIONS, WORDPRESS_COM_ACTIONS } from "../src/lib/composio/catalog.ts";
+import { APP_ACCESS, appAction, appArgs, appName, APPS, appsFor, changesApps, changeTitle, DIRECT, DIRECT_APPS, directFor, FRAMER_ACTIONS, groupOf, GROUPS, isAppId, isToolkit, publishes, SHOPIFY_ACTIONS, TOOLKITS, WEBFLOW_ACTIONS, WORDPRESS_COM_ACTIONS } from "../src/lib/composio/catalog.ts";
 import { composioOn, composioUser, connectable } from "../src/lib/composio/composio.ts";
 import { accountLabel, activeAccount, authConfigFor, connectLink, dropAccount, forgetConfigs, readState, signState, STATE_TTL_MS } from "../src/lib/composio/connect.ts";
 import { closeApps, type ConnRow } from "../src/lib/composio/store.ts";
@@ -29,10 +29,10 @@ const noWait = async () => {};
 
 // ─────────────── the catalog ───────────────
 
-test("catalog: the thirteen apps the team needs, with their Composio slugs, and the SQL check lists the same ones", () => {
+test("catalog: the fourteen apps the team needs, with their Composio slugs, and the SQL check lists the same ones", () => {
   assert.deepEqual(
     APPS.map((a) => a.toolkit),
-    ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce", "slack", "zendesk", "help_scout", "framer", "webflow", "wordpress_com"],
+    ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce", "slack", "zendesk", "help_scout", "framer", "webflow", "wordpress_com", "shopify"],
   );
   for (const a of APPS) {
     assert.ok(a.name && a.blurb && a.forAgents.length, a.toolkit);
@@ -40,13 +40,13 @@ test("catalog: the thirteen apps the team needs, with their Composio slugs, and 
     for (const k of a.forAgents) assert.ok(ORDER.includes(k), `${a.toolkit}: ${k}`);
   }
   // Composio has no app of its own for these, so they need our own auth config. Framer takes only an API key.
-  assert.deepEqual(APPS.filter((a) => !a.managed).map((a) => a.toolkit), ["pipedrive", "help_scout", "framer", "webflow", "wordpress_com"]);
+  assert.deepEqual(APPS.filter((a) => !a.managed).map((a) => a.toolkit), ["pipedrive", "help_scout", "framer", "webflow", "wordpress_com", "shopify"]);
   assert.deepEqual(APPS.filter((a) => a.scheme !== "OAUTH2").map((a) => [a.toolkit, a.scheme]), [["framer", "API_KEY"]]);
   // The website builders are their own group on the Apps page, for Hephaestus.
-  assert.deepEqual(APPS.filter((a) => a.group === "website").map((a) => [a.toolkit, a.name]), [["framer", "Framer"], ["webflow", "Webflow"], ["wordpress_com", "WordPress.com"]]);
+  assert.deepEqual(APPS.filter((a) => a.group === "website").map((a) => [a.toolkit, a.name]), [["framer", "Framer"], ["webflow", "Webflow"], ["wordpress_com", "WordPress.com"], ["shopify", "Shopify"]]);
   assert.deepEqual(GROUPS.at(-1), { id: "website", label: "Website" });
-  // The newest migration that sets the list (019) names the same apps.
-  const sql = readFileSync(new URL("../supabase/019_website_builders.sql", import.meta.url), "utf8");
+  // The newest migration that sets the list (020) names the same apps.
+  const sql = readFileSync(new URL("../supabase/020_wordpress.sql", import.meta.url), "utf8");
   const listed = sql.match(/toolkit in \(([^)]+)\)/)![1].split(",").map((s) => s.trim().replace(/'/g, ""));
   assert.deepEqual(listed.sort(), Object.keys(TOOLKITS).sort());
 });
@@ -64,7 +64,11 @@ test("access: Athena reads every app; Iris, Hora, Hermes, Hestia and Hephaestus 
   assert.deepEqual(access("sales"), { toolkits: ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce"], reads: false });
   assert.deepEqual(access("support"), { toolkits: ["gmail", "outlook", "slack", "zendesk", "help_scout"], reads: false });
   // Hephaestus: the owner's own site builder.
-  assert.deepEqual(access("web"), { toolkits: ["framer", "webflow", "wordpress_com"], reads: false });
+  assert.deepEqual(access("web"), { toolkits: ["framer", "webflow", "wordpress_com", "shopify"], reads: false });
+  // And his own WordPress site, which Morning Telos connects itself.
+  assert.deepEqual(directFor("web", false), ["wordpress"]);
+  for (const k of ORDER.filter((x) => x !== "web")) assert.deepEqual(directFor(k, false), [], k);
+  assert.deepEqual(directFor("web", true), [], "coming soon gets nothing");
   for (const k of ["social", "seo"] as AgentKey[]) assert.deepEqual(access(k), { toolkits: [], reads: true }, k);
   // The Apps page's "for" list says the same as the access map.
   for (const a of APPS) assert.deepEqual([...a.forAgents].sort(), ORDER.filter((k) => k !== "chief" && access(k).toolkits.includes(a.toolkit)).sort(), a.toolkit);
@@ -92,7 +96,7 @@ test("connectable: needs the server key; Pipedrive, Help Scout and the website b
   assert.equal(connectable(TOOLKITS.help_scout, { ...ENV, COMPOSIO_AUTH_CONFIG_HELP_SCOUT: " ac_hs " }), true);
   assert.equal(connectable(undefined, ENV), false);
   // Framer takes only an API key: it still needs the API key auth config we make in Composio.
-  for (const t of ["framer", "webflow", "wordpress_com"]) {
+  for (const t of ["framer", "webflow", "wordpress_com", "shopify"]) {
     assert.equal(connectable(TOOLKITS[t], ENV), false, t);
     assert.equal(connectable(TOOLKITS[t], { ...ENV, [`COMPOSIO_AUTH_CONFIG_${t.toUpperCase()}`]: "ac_ours" }), true, t);
   }
@@ -498,12 +502,12 @@ test("closeApps removes every account of the workspace at Composio and here, and
 // ─────────────── the website builders (Hephaestus) ───────────────
 
 type FixtureTool = { slug: string; name: string; tags: string[]; input_parameters: Record<string, unknown> };
-const BUILDERS = JSON.parse(readFileSync(new URL("./fixtures/composio-builders.json", import.meta.url), "utf8")) as Record<"framer" | "webflow" | "wordpress_com", FixtureTool[]>;
-const LISTS = { framer: FRAMER_ACTIONS, webflow: WEBFLOW_ACTIONS, wordpress_com: WORDPRESS_COM_ACTIONS } as const;
+const BUILDERS = JSON.parse(readFileSync(new URL("./fixtures/composio-builders.json", import.meta.url), "utf8")) as Record<"framer" | "webflow" | "wordpress_com" | "shopify", FixtureTool[]>;
+const LISTS = { framer: FRAMER_ACTIONS, webflow: WEBFLOW_ACTIONS, wordpress_com: WORDPRESS_COM_ACTIONS, shopify: SHOPIFY_ACTIONS } as const;
 const sortReal = (toolkit: keyof typeof LISTS) => BUILDERS[toolkit].map((t) => [t.slug, kindOf(toolkit, { ...t, description: "" }).kind] as const);
 
 test("website builders: Hephaestus gets the listed actions only, each real on Composio; reads read, changes wait, nothing deletes", () => {
-  for (const toolkit of ["framer", "webflow", "wordpress_com"] as const) {
+  for (const toolkit of ["framer", "webflow", "wordpress_com", "shopify"] as const) {
     const list = LISTS[toolkit];
     assert.equal(TOOLKITS[toolkit].actions, list);
     const real = new Set(BUILDERS[toolkit].map((t) => t.slug));
@@ -557,9 +561,9 @@ test("website builders: a listed publish is a change even though Composio hints 
   assert.deepEqual(k("wordpress_com", "WORDPRESS_COM_LIST_CONTENT"), { kind: "read" });
 });
 
-function builderSetup(o: { rows?: string[] } = {}) {
+function builderSetup(o: { rows?: string[]; direct?: string[] } = {}) {
   forgetTools();
-  const c = fakeComposio({ tools: { framer: BUILDERS.framer, webflow: BUILDERS.webflow, wordpress_com: BUILDERS.wordpress_com, gmail: [] } });
+  const c = fakeComposio({ tools: { framer: BUILDERS.framer, webflow: BUILDERS.webflow, wordpress_com: BUILDERS.wordpress_com, shopify: BUILDERS.shopify, gmail: [] } });
   const user = composioUser(WS_ID);
   const accounts: Record<string, string> = {};
   const rows: ConnRow[] = (o.rows ?? ["framer", "webflow", "wordpress_com"]).map((toolkit, i) => {
@@ -578,6 +582,7 @@ function builderSetup(o: { rows?: string[] } = {}) {
     activity: async (r) => void activity.push(r),
     markReconnect: async () => {},
     net: { fetcher: c.fetch, env: ENV, sleep: noWait },
+    ...(o.direct ? { direct: async () => o.direct! } : {}),
   };
   return { c, deps, approvals, activity, accounts, source: appToolSource(deps) };
 }
@@ -639,7 +644,9 @@ test("Hephaestus: app tools for Framer, Webflow and WordPress.com; reads run at 
 
 test("Hephaestus: told which site builder to connect when none is; others can't reach his builders; approved publishes are checked again", async () => {
   const none = builderSetup({ rows: [] });
-  assert.deepEqual(await none.source(ctx("web")), { tools: [], missing: ["Website (connect Framer, Webflow or WordPress.com in Settings, Apps)"] });
+  assert.deepEqual(await none.source(ctx("web")), { tools: [], missing: ["Website (connect Framer, Webflow, WordPress.com, Shopify or WordPress in Settings, Apps)"] });
+  // His own WordPress site counts as a site builder: nothing to connect.
+  assert.deepEqual(await builderSetup({ rows: [], direct: ["wordpress"] }).source(ctx("web")), { tools: [], missing: [] });
   assert.deepEqual(await builderSetup().source({ ...ctx("social") }), { tools: [], missing: [] });
   // Iris can't use Framer, even when it's connected.
   const s = builderSetup();
@@ -670,4 +677,114 @@ test("Hephaestus: Framer's guide to its own commands comes back longer than othe
   assert.ok(guide.data.length > 13_000 && guide.data.length < 15_000, String(guide.data.length));
   assert.ok(info.data.length < 8_100, String(info.data.length));
   assert.match(guide.data, /cut short/);
+});
+
+// ─────────────── Shopify (through Composio) and the apps Morning Telos connects itself ───────────────
+
+test("Shopify: only pages and blog posts, each listed action real on Composio; products, orders, customers, discounts, payments and deletes stay blocked", () => {
+  const writes = Object.keys(SHOPIFY_ACTIONS).filter((k) => SHOPIFY_ACTIONS[k].kind === "write");
+  assert.deepEqual(writes, ["SHOPIFY_CREATE_PAGE", "SHOPIFY_UPDATE_PAGE", "SHOPIFY_CREATE_ARTICLE", "SHOPIFY_UPDATE_ARTICLE"]);
+  assert.deepEqual(Object.keys(SHOPIFY_ACTIONS).filter((k) => SHOPIFY_ACTIONS[k].kind === "read"), ["SHOPIFY_GET_SHOP_INFO", "SHOPIFY_LIST_PAGES", "SHOPIFY_GET_PAGE_BY_ID", "SHOPIFY_LIST_BLOGS", "SHOPIFY_LIST_BLOG_ARTICLES", "SHOPIFY_GET_ARTICLE"]);
+  for (const slug of Object.keys(SHOPIFY_ACTIONS)) assert.doesNotMatch(slug, /PRODUCT|ORDER|CUSTOMER|DISCOUNT|REFUND|PAYMENT|PRICE|GIFT|INVENTORY|FULFILL|THEME|DELETE/, slug);
+  const sorted = new Map(sortReal("shopify"));
+  // The real list has hundreds of store actions: every one not listed is blocked.
+  assert.ok(BUILDERS.shopify.length > 300, String(BUILDERS.shopify.length));
+  for (const t of BUILDERS.shopify) if (/PRODUCT|ORDER|CUSTOMER|DISCOUNT|REFUND|PAYMENT|DELETE|THEME|METAFIELD|REDIRECT/.test(t.slug)) assert.equal(sorted.get(t.slug), "blocked", t.slug);
+  for (const slug of ["SHOPIFY_DELETE_PAGE", "SHOPIFY_DELETE_ARTICLE", "SHOPIFY_CREATE_BLOG", "SHOPIFY_GRAPH_QL_SHOP", "SHOPIFY_CREATE_REDIRECT"]) assert.equal(sorted.get(slug), "blocked", slug);
+  // Approval titles in plain words; an update that puts it live says so.
+  assert.equal(changeTitle("shopify", "SHOPIFY_CREATE_PAGE", "Create a new page"), "Add a hidden page to Shopify");
+  assert.equal(changeTitle("shopify", "SHOPIFY_UPDATE_PAGE", "Update Page", { page_id: "1", body_html: "<p>x</p>" }), "Update a page on Shopify");
+  assert.equal(changeTitle("shopify", "SHOPIFY_UPDATE_PAGE", "Update Page", { page_id: "1", published: true }), "Publish a page on Shopify");
+  assert.equal(changeTitle("shopify", "SHOPIFY_UPDATE_ARTICLE", "Update Article", { blog_id: "1", article_id: "2", published_at: "2026-12-01T09:00:00Z" }), "Publish a blog post on Shopify");
+  assert.equal(changeTitle("shopify", "SHOPIFY_CREATE_ARTICLE", "Create Article", { published: true }), "Add a hidden blog post to Shopify", "a create has no publish title");
+  assert.equal(publishes({ published: false }), false);
+  assert.equal(publishes({ published_at: " " }), false);
+});
+
+test("appArgs: a new Shopify page or post is always made unpublished; other actions keep their inputs", () => {
+  assert.deepEqual(appArgs("shopify", "SHOPIFY_CREATE_PAGE", { title: "Roof repair", body_html: "<p>Hi</p>", published: true, published_at: "2026-11-18T00:00:00Z" }), { title: "Roof repair", body_html: "<p>Hi</p>", published: false });
+  assert.deepEqual(appArgs("shopify", "SHOPIFY_CREATE_ARTICLE", { blog_id: "7", title: "Tips" }), { blog_id: "7", title: "Tips", published: false });
+  const upd = { page_id: "1", published: true };
+  assert.equal(appArgs("shopify", "SHOPIFY_UPDATE_PAGE", upd), upd);
+  assert.deepEqual(appArgs("webflow", "WEBFLOW_PUBLISH_SITE", { site_id: "s1" }), { site_id: "s1" });
+  assert.deepEqual(appArgs("gmail", "GMAIL_SEND_EMAIL", { body: "x" }), { body: "x" });
+});
+
+test("Hephaestus on Shopify: reads run at once; a new page waits and is saved unpublished; publishing waits under its own title and is checked again", async () => {
+  const s = builderSetup({ rows: ["shopify"] });
+  const set = await s.source(ctx("web"));
+  const listed = JSON.parse((await run(set.tools, SEARCH_TOOL, { app: "Shopify" }, ctx("web"))).content);
+  assert.deepEqual(listed.actions.map((a: { action: string }) => a.action).sort(), Object.keys(SHOPIFY_ACTIONS).sort());
+  assert.equal((await run(set.tools, ACTION_TOOL, { app: "shopify", action: "SHOPIFY_LIST_PAGES" }, ctx("web"))).isError, undefined);
+  assert.deepEqual(s.c.ran.map((x) => x.slug), ["SHOPIFY_LIST_PAGES"]);
+  // The model asks for a live page: it is saved for approval as a hidden one.
+  const made = await run(set.tools, ACTION_TOOL, { app: "shopify", action: "SHOPIFY_CREATE_PAGE", arguments: { title: "Roof repair", body_html: "<h1>Roof repair</h1>", published: true } }, ctx("web"));
+  assert.ok(made.approval);
+  assert.deepEqual([s.approvals[0].title, s.approvals[0].input], ["Add a hidden page to Shopify", { title: "Roof repair", body_html: "<h1>Roof repair</h1>", published: false }]);
+  const pub = await run(set.tools, ACTION_TOOL, { app: "shopify", action: "SHOPIFY_UPDATE_PAGE", arguments: { page_id: "42", published: true } }, ctx("web"));
+  assert.ok(pub.approval);
+  assert.equal(s.approvals[1].title, "Publish a page on Shopify");
+  assert.equal(s.c.ran.length, 1, "nothing changed in the store yet");
+  // Even on autopilot a new post goes in hidden.
+  await run(set.tools, ACTION_TOOL, { app: "shopify", action: "SHOPIFY_CREATE_ARTICLE", arguments: { blog_id: "7", title: "Spring tips", published: true } }, ctx("web", 2));
+  assert.deepEqual(s.c.ran.at(-1)!.args, { blog_id: "7", title: "Spring tips", published: false });
+  // An approval edited to publish a new page still runs it hidden.
+  const ok = await runApproval({ workspace_id: WS_ID, agent: "web", product: "shopify", tool: "SHOPIFY_CREATE_PAGE", input: { title: "Roof repair", published: true } }, s.deps);
+  assert.equal(ok.ok, true);
+  assert.deepEqual(s.c.ran.at(-1), { slug: "SHOPIFY_CREATE_PAGE", account: s.accounts.shopify, user: `mt_${WS_ID}`, args: { title: "Roof repair", published: false } });
+  // The approved publish runs as asked; a delete or a product change never would.
+  assert.equal((await runApproval({ workspace_id: WS_ID, agent: "web", product: "shopify", tool: "SHOPIFY_UPDATE_PAGE", input: { page_id: "42", published: true } }, s.deps)).ok, true);
+  assert.deepEqual(s.c.ran.at(-1)!.args, { page_id: "42", published: true });
+  for (const tool of ["SHOPIFY_DELETE_PAGE", "SHOPIFY_CREATE_PRODUCT", "SHOPIFY_CREATE_ORDER"]) {
+    assert.equal((await runApproval({ workspace_id: WS_ID, agent: "web", product: "shopify", tool, input: {} }, s.deps)).ok, false, tool);
+  }
+  // Only Hephaestus changes things on Shopify; Athena only reads.
+  assert.deepEqual(await runApproval({ workspace_id: WS_ID, agent: "chief", product: "shopify", tool: "SHOPIFY_UPDATE_PAGE", input: { page_id: "42" } }, s.deps), { ok: false, text: "This teammate can't make this change any more." });
+});
+
+test("direct apps: WordPress is Morning Telos's own connection, in the Website group, for Hephaestus, never a Composio toolkit", () => {
+  assert.deepEqual(DIRECT_APPS.map((a) => [a.id, a.name, a.group, a.forAgents]), [["wordpress", "WordPress", "website", ["web"]]]);
+  assert.doesNotMatch(DIRECT.wordpress.blurb, /[–—]/);
+  assert.equal(isToolkit("wordpress"), false);
+  assert.equal(isAppId("wordpress"), true);
+  assert.equal(isAppId("shopify"), true);
+  assert.equal(isAppId("constructor"), false);
+  assert.equal(appName("wordpress"), "WordPress");
+  assert.equal(appName("wordpress_com"), "WordPress.com");
+  assert.equal(groupOf("wordpress"), "website");
+  assert.equal(groupOf("gmail"), "mail");
+  assert.equal(groupOf("nope"), undefined);
+  assert.equal(toolkitOf("WordPress"), null, "WordPress isn't run through app_action");
+  assert.equal(changesApps("web"), true);
+});
+
+test("notConnected with a direct app: it counts for its group and connects without Composio", () => {
+  const kits = ["framer", "shopify"];
+  assert.deepEqual(notConnected(kits, [], true, ["wordpress"]), ["Website (connect Framer, Shopify or WordPress in Settings, Apps)"]);
+  assert.deepEqual(notConnected(kits, ["wordpress"], true, ["wordpress"]), []);
+  assert.deepEqual(notConnected(kits, ["shopify"], true, ["wordpress"]), []);
+  // Composio off: the Composio apps can't connect, but WordPress still can.
+  assert.deepEqual(notConnected(kits, [], false, ["wordpress"]), ["Framer or Shopify (connecting apps isn't ready yet, so do the work here in chat)", "Website (connect WordPress in Settings, Apps)"]);
+  assert.deepEqual(notConnected(kits, ["wordpress"], false, ["wordpress"]), []);
+  assert.deepEqual(notConnected([], [], true, ["wordpress"]), ["Website (connect WordPress in Settings, Apps)"]);
+  // Before: unchanged without direct apps.
+  assert.deepEqual(notConnected(["gmail"], [], false), ["Gmail (connecting apps isn't ready yet, so do the work here in chat)"]);
+});
+
+test("Hephaestus with Composio off but WordPress connected: no line telling him to connect a site builder", async () => {
+  const s = builderSetup({ rows: [], direct: ["wordpress"] });
+  s.deps.on = false;
+  assert.deepEqual(await appToolSource(s.deps)(ctx("web")), { tools: [], missing: [] });
+  const none = builderSetup({ rows: [], direct: [] });
+  none.deps.on = false;
+  assert.deepEqual((await appToolSource(none.deps)(ctx("web"))).missing, [
+    "Framer, Webflow, WordPress.com or Shopify (connecting apps isn't ready yet, so do the work here in chat)",
+    "Website (connect WordPress in Settings, Apps)",
+  ]);
+  // A direct app list that fails is read as none, and never stops the app tools.
+  const broken = builderSetup({ rows: ["framer"] });
+  broken.deps.direct = async () => {
+    throw new Error("db down");
+  };
+  assert.equal((await appToolSource(broken.deps)(ctx("web"))).tools.length, 2);
 });

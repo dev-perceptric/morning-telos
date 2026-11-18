@@ -14,7 +14,7 @@ import type { ActivityRow } from "../productTools.ts";
 import type { ToolSource } from "../toolRegistry.ts";
 import { AGENTS, type AgentKey } from "../team.ts";
 import { AppSetupError, needsReconnect, runTool, toolsOf, type ActionOpts, type Conn, type JsonSchema, type Sorted } from "./actions.ts";
-import { appAction, appName, appsFor, changeTitle, GROUPS, isToolkit, TOOLKITS } from "./catalog.ts";
+import { appAction, appArgs, appName, appsFor, changeTitle, directFor, groupOf, GROUPS, isToolkit, TOOLKITS } from "./catalog.ts";
 import { composioUser } from "./composio.ts";
 import type { ConnRow } from "./store.ts";
 
@@ -34,6 +34,11 @@ export type AppToolDeps = {
   net?: ActionOpts;
   /** Who may use which app. Defaults to APP_ACCESS through access(); tests pass their own. */
   access?: (agent: AgentKey) => { toolkits: string[]; reads: boolean };
+  /**
+   * The apps Morning Telos connects itself (self-hosted WordPress) that this workspace has, working or not, so a
+   * teammate with one isn't told to connect a site builder. Their tools come from their own source.
+   */
+  direct?: (workspaceId: string) => Promise<string[]>;
   log?: (message: string) => void;
 };
 
@@ -57,17 +62,24 @@ export const missingApp = (toolkit: string) => `${appName(toolkit)} (it needs to
 
 /**
  * For a teammate who works through its apps: each kind of app it has none of yet, with the apps to connect, for the
- * prompt ("Email (connect Gmail or Outlook in Settings, Apps)"). Without Composio on the server, one line saying the
- * apps aren't ready, so the teammate does the work in chat instead of sending people to a page that can't connect.
+ * prompt ("Email (connect Gmail or Outlook in Settings, Apps)"). `direct` are the apps Morning Telos connects itself
+ * (self-hosted WordPress): they count like the rest and connect without Composio. Without Composio on the server, one
+ * line saying the Composio apps aren't ready, so the teammate does the work in chat instead of sending people to a
+ * page that can't connect them.
  */
-export function notConnected(toolkits: string[], have: string[], on: boolean): string[] {
+export function notConnected(toolkits: string[], have: string[], on: boolean, direct: string[] = []): string[] {
   const or = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`);
-  if (!toolkits.length) return [];
-  if (!on) return [`${or(toolkits.map(appName))} (connecting apps isn't ready yet, so do the work here in chat)`];
-  return GROUPS.flatMap((g) => {
-    const kit = toolkits.filter((t) => TOOLKITS[t]?.group === g.id);
-    return kit.length && !kit.some((t) => have.includes(t)) ? [`${g.label} (connect ${or(kit.map(appName))} in Settings, Apps)`] : [];
-  });
+  if (!toolkits.length && !direct.length) return [];
+  const all = [...toolkits, ...direct];
+  const covered = (g: string | undefined) => all.some((t) => groupOf(t) === g && have.includes(t));
+  const wants = (list: string[]) =>
+    GROUPS.flatMap((g) => {
+      const kit = list.filter((t) => groupOf(t) === g.id);
+      return kit.length && !covered(g.id) ? [`${g.label} (connect ${or(kit.map(appName))} in Settings, Apps)`] : [];
+    });
+  if (on) return wants(all);
+  const off = toolkits.filter((t) => !covered(groupOf(t)));
+  return [...(off.length ? [`${or(off.map(appName))} (connecting apps isn't ready yet, so do the work here in chat)`] : []), ...wants(direct)];
 }
 
 const WHY = (toolkit: string) => `This changes something in your ${appName(toolkit)} account.`;
@@ -95,8 +107,10 @@ const fail = (text: string): ToolResult => ({ content: text, isError: true });
 /** What the teammate can use now: allowed apps the workspace connected and that still work. */
 async function usable(ctx: ToolContext, deps: AppToolDeps) {
   const { toolkits, reads } = (deps.access ?? access)(ctx.agent);
+  const direct = reads ? [] : directFor(ctx.agent, AGENTS[ctx.agent]?.soon === true);
+  const own = direct.length && deps.direct ? (await deps.direct(ctx.workspace.id).catch(() => [] as string[])).filter((d) => direct.includes(d)) : [];
   // Only a teammate that changes things is told what to connect: Athena just reads whatever is there.
-  const unset = (have: string[]) => (reads ? [] : notConnected(toolkits, have, deps.on));
+  const unset = (have: string[]) => (reads ? [] : notConnected(toolkits, [...have, ...own], deps.on, direct));
   if (!deps.on || !toolkits.length) return { conns: [] as Conn[], gone: [] as string[], unset: unset([]), reads };
   const rows = (await deps.connections(ctx.workspace.id)).filter((r) => r.workspace_id === ctx.workspace.id && toolkits.includes(r.toolkit));
   const user = composioUser(ctx.workspace.id);
@@ -161,14 +175,16 @@ async function act(input: Record<string, unknown>, ctx: ToolContext, conns: Conn
   if (missing.length) return fail(`Missing ${missing.join(", ")}. app_search_actions with this action lists the inputs.`);
   if (JSON.stringify(args).length > MAX_ARGS) return fail("Those inputs are too long.");
 
-  const title = changeTitle(toolkit, t.slug, t.name);
+  // A new Shopify page or post is made unpublished, whatever the inputs say (appArgs).
+  const runArgs = appArgs(toolkit, t.slug, args);
+  const title = changeTitle(toolkit, t.slug, t.name, runArgs);
   if (t.kind === "write" && !autopilot(ctx.trust)) {
-    const ap = await deps.saveApproval({ workspace_id: ctx.workspace.id, thread_id: ctx.threadId, agent: ctx.agent, product: toolkit, tool: t.slug, input: args, title, why: WHY(toolkit) });
+    const ap = await deps.saveApproval({ workspace_id: ctx.workspace.id, thread_id: ctx.threadId, agent: ctx.agent, product: toolkit, tool: t.slug, input: runArgs, title, why: WHY(toolkit) });
     await deps.activity({ workspace_id: ctx.workspace.id, agent: ctx.agent, thread_id: ctx.threadId, approval_id: ap.id, text: `prepared "${title}" for your approval` }).catch((e) => deps.log?.(`Activity wasn't saved: ${errText(e)}`));
     return { content: APPROVAL_MESSAGES.saved(ap.id), approval: { id: ap.id, title } };
   }
   try {
-    const data = await runTool(conn, t.slug, args, deps.net);
+    const data = await runTool(conn, t.slug, runArgs, deps.net);
     if (t.kind === "write") await deps.activity({ workspace_id: ctx.workspace.id, agent: ctx.agent, thread_id: ctx.threadId, approval_id: null, text: `ran "${title}" on autopilot` }).catch((e) => deps.log?.(`Activity wasn't saved: ${errText(e)}`));
     const text = JSON.stringify(data ?? null);
     const listed = appAction(toolkit, t.slug);
@@ -271,7 +287,8 @@ export async function runApproval(ap: Pick<Approval, "workspace_id" | "agent" | 
   if (t.kind !== "write") return { ok: false, text: "This change isn't allowed." };
   const conn: Conn = { toolkit, account: row.composio_account, user: composioUser(ap.workspace_id) };
   try {
-    const data = await runTool(conn, t.slug, ap.input ?? {}, deps.net);
+    // Checked again: the owner may have edited the details, and a new page or post still starts unpublished.
+    const data = await runTool(conn, t.slug, appArgs(toolkit, t.slug, ap.input ?? {}), deps.net);
     return { ok: true, text: JSON.stringify(data ?? null) };
   } catch (e) {
     if (needsReconnect(e)) await deps.markReconnect(ap.workspace_id, toolkit, errText(e)).catch((x) => deps.log?.(`Reconnect wasn't saved: ${errText(x)}`));

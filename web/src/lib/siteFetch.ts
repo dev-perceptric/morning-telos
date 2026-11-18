@@ -75,9 +75,14 @@ export type PageFetch = (
   url: string,
   init: { redirect: "manual"; signal: AbortSignal; headers: Record<string, string> },
 ) => Promise<{ status: number; headers: { get(name: string): string | null }; body: ReadableStream<Uint8Array> | null }>;
+/** The same with a method and a body, for calling a customer's own site API (safeRequest). */
+export type SafeFetch = (
+  url: string,
+  init: { method?: string; redirect: "manual"; signal: AbortSignal; headers: Record<string, string>; body?: string | Uint8Array },
+) => ReturnType<PageFetch>;
 
-/** fetch through a safe agent. The default for fetchPage. */
-export function safeFetch(agent: Agent = defaultAgent()): PageFetch {
+/** fetch through a safe agent. The default for fetchPage and safeRequest. */
+export function safeFetch(agent: Agent = defaultAgent()): SafeFetch {
   return (url, init) => undiciFetch(url, { ...init, dispatcher: agent }) as unknown as ReturnType<PageFetch>;
 }
 let agent: Agent | null = null;
@@ -108,7 +113,13 @@ export function allowedUrl(raw: string): URL | null {
 
 /** Read the body up to max bytes. Returns the text and whether it was cut short. */
 async function readCapped(body: ReadableStream<Uint8Array> | null, max: number): Promise<{ text: string; cut: boolean }> {
-  if (!body) return { text: "", cut: false };
+  const { bytes, cut } = await readBytes(body, max);
+  return { text: new TextDecoder().decode(bytes), cut };
+}
+
+/** Read the body up to max bytes, as bytes. */
+async function readBytes(body: ReadableStream<Uint8Array> | null, max: number): Promise<{ bytes: Buffer; cut: boolean }> {
+  if (!body) return { bytes: Buffer.alloc(0), cut: false };
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -127,7 +138,7 @@ async function readCapped(body: ReadableStream<Uint8Array> | null, max: number):
     chunks.push(value);
     size += value.byteLength;
   }
-  return { text: new TextDecoder().decode(Buffer.concat(chunks)), cut };
+  return { bytes: Buffer.concat(chunks), cut };
 }
 
 function failure(url: string, e: unknown): Page {
@@ -176,4 +187,56 @@ export async function fetchPage(url: string, o: { fetch?: PageFetch; timeoutMs?:
     }
   }
   return { ok: false, url: current, status: 0, error: "The website redirected too many times.", retryable: false };
+}
+
+// ─────────────── calling a customer's own site ───────────────
+
+/** What a customer's site answered, or why it couldn't be reached. `reached` is false only when nothing answered. */
+export type Answer =
+  | { reached: true; url: string; status: number; type: string; body: Buffer; cut: boolean; location: string | null }
+  | { reached: false; url: string; status: 0; error: string; retryable: boolean };
+
+export type RequestOpts = {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string | Uint8Array;
+  fetch?: SafeFetch;
+  timeoutMs?: number;
+  maxBytes?: number;
+  /** Follow redirects by hand, each checked again. Only for calls that carry no login: a login never follows one. */
+  follow?: boolean;
+};
+
+/**
+ * One call to a customer's own site (their WordPress, an image to upload): https on the normal port only, never a
+ * private address (checked here and again on the IP it connects to, by safeFetch), 15 seconds and 2 MB unless
+ * asked otherwise. A call with an Authorization header never follows a redirect, so the login can't be sent on to
+ * another address; the redirect comes back as the answer. Never throws.
+ */
+export async function safeRequest(url: string, o: RequestOpts = {}): Promise<Answer> {
+  const send = o.fetch ?? safeFetch();
+  const signal = AbortSignal.timeout(o.timeoutMs ?? 15_000);
+  const headers = { "User-Agent": UA, ...(o.headers ?? {}) };
+  const follow = o.follow === true && !Object.keys(headers).some((k) => k.toLowerCase() === "authorization");
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const u = allowedUrl(current);
+    if (!u || u.protocol !== "https:") return { reached: false, url: current, status: 0, error: "That address can't be used. It must start with https://.", retryable: false };
+    current = u.toString();
+    try {
+      const res = await send(current, { method: o.method ?? "GET", redirect: "manual", signal, headers, ...(o.body !== undefined ? { body: o.body } : {}) });
+      const location = res.headers.get("location");
+      if (follow && res.status >= 300 && res.status < 400 && location) {
+        await res.body?.cancel().catch(() => {});
+        current = new URL(location, current).toString();
+        continue;
+      }
+      const { bytes, cut } = await readBytes(res.body, o.maxBytes ?? 2 * 1024 * 1024);
+      return { reached: true, url: current, status: res.status, type: (res.headers.get("content-type") ?? "").toLowerCase(), body: bytes, cut, location };
+    } catch (e) {
+      const f = failure(current, e);
+      return { reached: false, url: current, status: 0, error: f.ok ? "" : f.error, retryable: f.ok ? false : f.retryable };
+    }
+  }
+  return { reached: false, url: current, status: 0, error: "The website redirected too many times.", retryable: false };
 }
