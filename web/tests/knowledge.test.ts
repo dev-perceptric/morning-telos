@@ -157,3 +157,11 @@ test("buildKnowledgePrompt keeps website and file text from closing its tags", (
   assert.doesNotMatch(out, /<\/knowledge>/);
   assert.match(out, /&lt;\/doc>/);
 });
+
+test("the knowledge section names the business and wraps the docs", async () => {
+  const { knowledgeSection } = await import("../src/lib/knowledge.ts");
+  const s = knowledgeSection("Ana's Bakery", '<doc title="About">We bake.</doc>\n');
+  assert.match(s, /^What you know about Ana's Bakery\./);
+  assert.match(s, /<knowledge>\n<doc title="About">We bake\.<\/doc>\n<\/knowledge>$/);
+  assert.doesNotMatch(s, /[—–]/);
+});

@@ -206,3 +206,9 @@ test("usageOf prices Haiku 5.5 calls, cache included", () => {
   const u = usageOf(WS, { text: "", stopReason: "end_turn", model: SCAN_MODEL, usage: { input_tokens: 1_000_000, output_tokens: 1_000_000, cache_read_input_tokens: 1_000_000, cache_creation_input_tokens: 1_000_000 } });
   assert.equal(u.costUsd, 0.1 + 0.5 + 0.01 + 0.125);
 });
+
+test("a scan's usage becomes an ai_usage row with no agent or thread", async () => {
+  const { usageRow } = await import("../src/lib/siteScan.ts");
+  const row = usageRow({ workspaceId: "w1", kind: "scan_website", model: "claude-haiku-5-5", inputTokens: 1200, outputTokens: 300, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.00027 });
+  assert.deepEqual(row, { workspace_id: "w1", thread_id: null, agent: null, model: "claude-haiku-5-5", input_tokens: 1200, output_tokens: 300, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.00027 });
+});
