@@ -3,17 +3,20 @@
 // Settings, Apps: the business's own apps (Gmail, Outlook, HubSpot and more) that the AI team can use. Owners and
 // admins connect each one in one click: Composio's sign-in page opens, and it comes back here
 // (POST /api/apps/connect, GET /api/apps/composio). Nobody pastes a key. Shaped like Omniscient's Settings, Apps.
+// A self-hosted WordPress site has its own row in Website: the owner types the address, WordPress's own Approve
+// screen opens, and it comes back here (POST /api/apps/wordpress, GET /api/apps/wordpress/callback).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useState } from "react";
-import { APP_MESSAGES, appLogo, appName, APPS, GROUPS, isToolkit, type AppEntry } from "@/lib/composio/catalog";
+import { APP_MESSAGES, appLogo, appName, APPS, DIRECT, GROUPS, isAppId, type AppEntry } from "@/lib/composio/catalog";
 import { can } from "@/lib/workspace";
 import { callApi, message } from "./nav";
 import type { Workspace } from "./Settings";
-import { ErrorText, Notice } from "./ui";
+import { ErrorText, input, Notice } from "./ui";
 
 type Conn = { id: string; toolkit: string; status: "active" | "reconnect"; label: string | null };
-type List = { on: boolean; connectable: string[]; connections: Conn[] };
+type WpConn = { site: string; login: string; status: "active" | "reconnect" };
+type List = { on: boolean; connectable: string[]; connections: Conn[]; wordpress?: WpConn | null };
 
 /** The line the way back from the sign-in page left in the address, read once and then cleared. */
 function useReturnNote() {
@@ -25,7 +28,7 @@ function useReturnNote() {
     const toolkit = q.get("toolkit") ?? "";
     // Reading the address once on first render is the point of this effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setNote(app === "connected" && isToolkit(toolkit) ? { ok: true, text: APP_MESSAGES.connected(appName(toolkit)) } : { ok: false, text: (q.get("reason") ?? APP_MESSAGES.failed).slice(0, 200) });
+    setNote(app === "connected" && isAppId(toolkit) ? { ok: true, text: APP_MESSAGES.connected(appName(toolkit)) } : { ok: false, text: (q.get("reason") ?? APP_MESSAGES.failed).slice(0, 200) });
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
   return note;
@@ -37,7 +40,9 @@ export function AppsSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) 
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [asking, setAsking] = useState("");
-  const note = useReturnNote();
+  const returned = useReturnNote();
+  const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
+  const note = said ?? returned;
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +74,31 @@ export function AppsSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) 
     try {
       await callApi(sb, "/api/apps/disconnect", { workspaceId: ws.id, id: c.id });
       setAsking("");
+      await load();
+    } catch (e) {
+      setError(message(e));
+    }
+    setBusy("");
+  };
+
+  const wpConnect = async (site: string) => {
+    setError("");
+    setBusy("wordpress");
+    try {
+      const { url } = await callApi<{ url: string }>(sb, "/api/apps/wordpress", { workspaceId: ws.id, action: "connect", site });
+      window.location.assign(url);
+    } catch (e) {
+      setError(message(e));
+      setBusy("");
+    }
+  };
+  const wpDisconnect = async () => {
+    setError("");
+    setBusy("wordpress");
+    try {
+      const out = await callApi<{ note?: string }>(sb, "/api/apps/wordpress", { workspaceId: ws.id, action: "disconnect" });
+      setAsking("");
+      if (out.note) setSaid({ ok: true, text: out.note });
       await load();
     } catch (e) {
       setError(message(e));
@@ -109,6 +139,17 @@ export function AppsSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) 
                       onDisconnect={(c) => disconnect(c)}
                     />
                   ))}
+                  {g.id === DIRECT.wordpress.group ? (
+                    <WordpressRow
+                      conn={list.wordpress ?? null}
+                      admin={admin}
+                      busy={busy === "wordpress"}
+                      asking={asking === "wordpress"}
+                      onConnect={wpConnect}
+                      onAsk={(yes) => setAsking(yes ? "wordpress" : "")}
+                      onDisconnect={wpDisconnect}
+                    />
+                  ) : null}
                 </div>
               </section>
             );
@@ -159,6 +200,58 @@ function AppRow(p: { app: AppEntry; conn: Conn | null; ready: boolean; admin: bo
         {p.admin && !conn && p.ready ? (
           <button type="button" className="btn sm" onClick={p.onConnect} disabled={p.busy}>
             {p.busy ? "Opening..." : "Connect"}
+          </button>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+/** The owner's own WordPress site: the site's address and Connect, or who it is connected as. */
+function WordpressRow(p: { conn: WpConn | null; admin: boolean; busy: boolean; asking: boolean; onConnect: (site: string) => void; onAsk: (yes: boolean) => void; onDisconnect: () => void }) {
+  const { conn } = p;
+  const app = DIRECT.wordpress;
+  const [site, setSite] = useState("");
+  const form = p.admin && (!conn || conn.status === "reconnect") && !p.asking;
+  return (
+    <div className="row wrap-row">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={appLogo(app.id)} alt="" width={32} height={32} className="lg-img" />
+      <span className="main">
+        <b>{app.name}</b>
+        <small className="wrap">{conn ? `${conn.site}, as ${conn.login}` : app.blurb}</small>
+      </span>
+      <span className="row-act">
+        {conn?.status === "reconnect" ? <span className="pillst error">Needs you to connect again</span> : null}
+        {conn?.status === "active" ? <span className="pillst ok">Connected</span> : null}
+        {form ? (
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              p.onConnect(site || conn?.site || "");
+            }}
+          >
+            <input className={input} aria-label="Your WordPress site's address" placeholder={conn?.site ?? "yourbusiness.com"} value={site} onChange={(e) => setSite(e.target.value)} maxLength={300} />
+            <button type="submit" className="btn sm" disabled={p.busy || (!site.trim() && !conn)}>
+              {p.busy ? "Opening..." : conn ? "Connect again" : "Connect WordPress"}
+            </button>
+          </form>
+        ) : null}
+        {p.admin && conn && p.asking ? (
+          <>
+            <span className="text-[13px] text-ink-2">Disconnect WordPress? Your team can&apos;t use it after this.</span>
+            <button type="button" className="btn sm danger" onClick={p.onDisconnect} disabled={p.busy}>
+              {p.busy ? "Disconnecting..." : "Yes, disconnect"}
+            </button>
+            <button type="button" className="btn sm" onClick={() => p.onAsk(false)} disabled={p.busy}>
+              Keep it
+            </button>
+          </>
+        ) : null}
+        {p.admin && conn && !p.asking ? (
+          <button type="button" className="btn sm ghost" onClick={() => p.onAsk(true)} disabled={p.busy}>
+            Disconnect
           </button>
         ) : null}
       </span>

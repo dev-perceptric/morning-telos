@@ -1,6 +1,6 @@
 // The AI team's tools on the server: every tool source, put together (toolRegistry.ts), and the database side of
 // approvals (supabase/013_approvals.sql). Approvals run through runTeamApproval: Arrowsterr and Capybaroar changes
-// through productTools.ts, changes in the customer's own apps through src/lib/composio/appAction.ts. Used by POST /api/chat and POST /api/approvals/:id, and by anything else
+// through productTools.ts, changes in the customer's own apps through src/lib/composio/appAction.ts, changes on their own WordPress site through src/lib/wordpress/tools.ts. Used by POST /api/chat and POST /api/approvals/:id, and by anything else
 // that runs a turn (routines).
 //
 // To add tools, write a ToolSource (a function from ToolContext to { tools, missing }) and add it to the list in
@@ -20,6 +20,10 @@ import type { Product } from "./partner.ts";
 import { mcpUrls, productToolSource, runApproval as runProductApproval, type ActivityRow, type ProductToolDeps, type ServiceRow } from "./productTools.ts";
 import { open } from "./sealing.ts";
 import { composeTools, type ToolSource } from "./toolRegistry.ts";
+import { wpNet } from "./wordpress/net.ts";
+import { markWordpressBroken, wordpressLogin, wordpressSite } from "./wordpress/store.ts";
+import { isWordpressApproval, runWordpressApproval, wordpressToolSource, type WpToolDeps } from "./wordpress/tools.ts";
+import { passwordAad } from "./wordpress/wordpress.ts";
 
 // One MCP client for the process, so sessions and tool lists are shared between requests (kept per brand key).
 let shared: McpClient | null = null;
@@ -80,15 +84,32 @@ export function appDeps(db: SupabaseClient, log?: (message: string) => void): Ap
     saveApproval: store.save,
     activity: store.activity,
     markReconnect: (workspaceId, toolkit, why) => markReconnect(db, workspaceId, toolkit, why),
+    // Self-hosted WordPress counts as a connected site builder (src/lib/wordpress).
+    direct: async (workspaceId) => ((await wordpressSite(db, workspaceId)) ? ["wordpress"] : []),
     log,
   };
 }
 
-/** Runs an approved change where it belongs: the customer's own app, or Arrowsterr and Capybaroar. */
+/** What the WordPress tools need on the server: the site and its sealed login, the sealing key, approvals. */
+export function wordpressDeps(db: SupabaseClient, log?: (message: string) => void): WpToolDeps {
+  const store = approvalStore(db);
+  return {
+    site: (workspaceId) => wordpressLogin(db, workspaceId),
+    openPassword: (sealed, workspaceId) => open(sealed, passwordAad(workspaceId)),
+    saveApproval: store.save,
+    activity: store.activity,
+    markBroken: (workspaceId, why) => markWordpressBroken(db, workspaceId, why),
+    net: wpNet(),
+    log,
+  };
+}
+
+/** Runs an approved change where it belongs: the customer's own app or WordPress site, or Arrowsterr and Capybaroar. */
 export function runTeamApproval(db: SupabaseClient, log?: (message: string) => void): (ap: Approval) => Promise<RunResult> {
   const products = productDeps(db, log);
   const apps = appDeps(db, log);
-  return (ap) => (isAppApproval(ap) ? runAppApproval(ap, apps) : runProductApproval(ap, products));
+  const wordpress = wordpressDeps(db, log);
+  return (ap) => (isWordpressApproval(ap) ? runWordpressApproval(ap, wordpress) : isAppApproval(ap) ? runAppApproval(ap, apps) : runProductApproval(ap, products));
 }
 
 /** Every tool source, in order. The first source's tool wins when two share a name. */
@@ -98,6 +119,8 @@ export function toolSources(db: SupabaseClient, log?: (message: string) => void)
     productToolSource(productDeps(db, log)),
     // The customer's own apps through Composio (app_search_actions, app_action), with approvals.
     appToolSource(appDeps(db, log)),
+    // The customer's own self-hosted WordPress site, called directly, with approvals.
+    wordpressToolSource(wordpressDeps(db, log)),
     // search_knowledge for every working agent.
     knowledgeToolSource((ws, q, n) => searchKnowledge(ws, q, n, db)),
   ];

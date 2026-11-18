@@ -6,9 +6,11 @@ import { connectionsOf, removeConnection } from "@/lib/composio/store";
 import { envKeyring } from "@/lib/sealing";
 import { adminClient, appOrigin, roleGate } from "@/lib/serverAuth";
 import { NEEDS } from "@/lib/workspace";
+import { wordpressSite } from "@/lib/wordpress/store";
 
 // Settings, Apps: the customer's own apps through Composio (src/lib/composio). POST { workspaceId, ... }:
 //   list        (members)          whether apps work on this server, which apps connect now, and the connections
+//                                  (the self-hosted WordPress site too: src/app/api/apps/wordpress connects it)
 //   connect     { toolkit } (admins) Composio's hosted sign-in page for the app, for the workspace's Composio user.
 //                                  It comes back to GET /api/apps/composio with a sealed note of who and which app.
 //   disconnect  { id } (admins)    removes the connection here and at Composio
@@ -37,8 +39,9 @@ export async function POST(request: Request, ctx: { params: Promise<{ action: st
 
   try {
     if (action === "list") {
-      const rows = await connectionsOf(db, wsId);
+      const [rows, wp] = await Promise.all([connectionsOf(db, wsId), wordpressSite(db, wsId)]);
       return reply({
+        wordpress: wp ? { site: wp.site_url, login: wp.user_login, status: wp.status, created_at: wp.created_at } : null,
         on: composioOn(),
         connectable: APPS.filter((a) => connectable(a)).map((a) => a.toolkit),
         connections: rows.map((r) => ({ id: r.id, toolkit: r.toolkit, status: r.status, label: r.account_label, created_at: r.created_at })),

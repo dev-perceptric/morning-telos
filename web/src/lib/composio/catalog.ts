@@ -6,6 +6,9 @@
 // The website builders (Framer, Webflow, WordPress.com) were checked on Composio's API (GET /api/v3.1/toolkits/<slug>
 // and /api/v3.1/tools?toolkit_slug=<slug>, saved in tests/fixtures/composio-builders.json) on 2026-11-18. Framer has
 // over 150 actions, so each builder lists the few the team uses (`actions`); every other action of theirs is blocked.
+// Shopify was checked the same way on 2026-11-18 (478 actions, 386 not deprecated): only its pages and blog posts.
+// Self-hosted WordPress isn't on Composio: Morning Telos connects it itself (src/lib/wordpress), so it is in
+// DIRECT_APPS, not APPS.
 
 import type { AgentKey } from "../team.ts";
 import type { ComposioTool } from "./composio.ts";
@@ -27,7 +30,16 @@ export const GROUPS: { id: AppGroup; label: string }[] = [
  * A change waits for the owner's approval below autopilot, under `title` on the approval card. `long`: its answer may be
  * longer than most (Framer's own guide to building pages).
  */
-export type AppAction = { kind: "read"; long?: boolean } | { kind: "write"; title: string };
+export type AppAction =
+  | { kind: "read"; long?: boolean }
+  | {
+      kind: "write";
+      title: string;
+      /** It makes something new unpublished, whatever the inputs say (appArgs), so the owner looks before it goes live. */
+      draft?: true;
+      /** The approval card's title when the inputs put it live (published true, or a time to go live). */
+      publish?: string;
+    };
 
 export type AppEntry = ComposioTool & {
   name: string;
@@ -115,6 +127,24 @@ export const WORDPRESS_COM_ACTIONS: Readonly<Record<string, AppAction>> = {
   WORDPRESS_COM_UPDATE_DRAFT_POST: write("Update a draft post on WordPress.com"),
 };
 
+/**
+ * Shopify: the store's own pages and blog posts, nothing else (no products, orders, customers, discounts, refunds or
+ * payments). New pages and posts are made unpublished, whatever the inputs say. Publishing is an update that sets
+ * published to true, under its own title. Deleting stays blocked.
+ */
+export const SHOPIFY_ACTIONS: Readonly<Record<string, AppAction>> = {
+  SHOPIFY_GET_SHOP_INFO: read,
+  SHOPIFY_LIST_PAGES: read,
+  SHOPIFY_GET_PAGE_BY_ID: read,
+  SHOPIFY_LIST_BLOGS: read,
+  SHOPIFY_LIST_BLOG_ARTICLES: read,
+  SHOPIFY_GET_ARTICLE: read,
+  SHOPIFY_CREATE_PAGE: { kind: "write", title: "Add a hidden page to Shopify", draft: true },
+  SHOPIFY_UPDATE_PAGE: { kind: "write", title: "Update a page on Shopify", publish: "Publish a page on Shopify" },
+  SHOPIFY_CREATE_ARTICLE: { kind: "write", title: "Add a hidden blog post to Shopify", draft: true },
+  SHOPIFY_UPDATE_ARTICLE: { kind: "write", title: "Update a blog post on Shopify", publish: "Publish a blog post on Shopify" },
+};
+
 export const APPS: AppEntry[] = [
   { ...oauth("gmail"), name: "Gmail", group: "mail", blurb: "Read and answer your email, and send what you approve.", forAgents: ["sales", "support", "forms", "email"] },
   { ...oauth("outlook"), name: "Outlook", group: "mail", blurb: "Read and answer your email, and send what you approve.", forAgents: ["sales", "support", "forms", "email"] },
@@ -129,20 +159,58 @@ export const APPS: AppEntry[] = [
   { ...ownKey("framer"), name: "Framer", group: "website", blurb: "Build and update pages on your site, and publish what you approve.", forAgents: ["web"], actions: FRAMER_ACTIONS },
   { ...ownApp("webflow"), name: "Webflow", group: "website", blurb: "Add blog posts and site content, and publish what you approve.", forAgents: ["web"], actions: WEBFLOW_ACTIONS },
   { ...ownApp("wordpress_com"), name: "WordPress.com", group: "website", blurb: "Write draft posts for you to check and publish.", forAgents: ["web"], actions: WORDPRESS_COM_ACTIONS },
+  { ...ownApp("shopify"), name: "Shopify", group: "website", blurb: "Add pages and blog posts to your store, and publish what you approve.", forAgents: ["web"], actions: SHOPIFY_ACTIONS },
 ];
+
+/** An app Morning Telos connects itself, not through Composio. Shown on the Apps page in its group. */
+export type DirectApp = { id: string; name: string; group: AppGroup; blurb: string; forAgents: AgentKey[] };
+
+/**
+ * Self-hosted WordPress: the owner approves Morning Telos on their own site (WordPress's Application Passwords), and
+ * the server calls the site's REST API itself (src/lib/wordpress). supabase/020_wordpress.sql keeps the login.
+ */
+export const DIRECT_APPS: DirectApp[] = [
+  { id: "wordpress", name: "WordPress", group: "website", blurb: "Add draft pages and posts to your own WordPress site, and publish what you approve.", forAgents: ["web"] },
+];
+export const DIRECT: Readonly<Record<string, DirectApp>> = Object.fromEntries(DIRECT_APPS.map((a) => [a.id, a]));
+export const isDirect = (v: unknown): boolean => typeof v === "string" && Object.hasOwn(DIRECT, v);
 
 export const TOOLKITS: Readonly<Record<string, AppEntry>> = Object.fromEntries(APPS.map((a) => [a.toolkit, a]));
 export const isToolkit = (v: unknown): boolean => typeof v === "string" && Object.hasOwn(TOOLKITS, v);
-export const appName = (toolkit: string) => TOOLKITS[toolkit]?.name ?? toolkit;
+/** A Composio app or one Morning Telos connects itself. */
+export const isAppId = (v: unknown): boolean => isToolkit(v) || isDirect(v);
+export const appName = (toolkit: string) => (Object.hasOwn(TOOLKITS, toolkit) ? TOOLKITS[toolkit].name : Object.hasOwn(DIRECT, toolkit) ? DIRECT[toolkit].name : toolkit);
+/** The app's group on the Apps page, for a Composio app or a direct one. */
+export const groupOf = (id: string): AppGroup | undefined => (Object.hasOwn(TOOLKITS, id) ? TOOLKITS[id].group : Object.hasOwn(DIRECT, id) ? DIRECT[id].group : undefined);
 /** The listed action, for an app that lists its actions. Undefined for one that doesn't, or an action it leaves out. */
 export function appAction(toolkit: string, slug: string): AppAction | undefined {
   const list = TOOLKITS[toolkit]?.actions;
   return list && Object.hasOwn(list, slug) ? list[slug] : undefined;
 }
-/** The approval card's title for a change: the app's own words for it, or the action's name and the app. */
-export function changeTitle(toolkit: string, slug: string, name: string): string {
+/** True when an action's inputs put something live: published true, or a time to go live. */
+export const publishes = (args: Record<string, unknown>) => args.published === true || (typeof args.published_at === "string" && args.published_at.trim() !== "");
+
+/**
+ * The approval card's title for a change: the app's own words for it (its publish words when the inputs put it
+ * live), or the action's name and the app.
+ */
+export function changeTitle(toolkit: string, slug: string, name: string, args: Record<string, unknown> = {}): string {
   const a = appAction(toolkit, slug);
-  return (a?.kind === "write" ? a.title : `${name} (${appName(toolkit)})`).slice(0, 200);
+  if (a?.kind !== "write") return `${name} (${appName(toolkit)})`.slice(0, 200);
+  return (a.publish && publishes(args) ? a.publish : a.title).slice(0, 200);
+}
+
+/**
+ * The inputs an action really runs with. A `draft` action makes something new unpublished: published is false and
+ * there is no time to go live, whatever the model or an edited approval asked. Run when the change is saved for
+ * approval and again right before it runs.
+ */
+export function appArgs(toolkit: string, slug: string, args: Record<string, unknown>): Record<string, unknown> {
+  const a = appAction(toolkit, slug);
+  if (a?.kind !== "write" || !a.draft) return args;
+  const { published_at: _when, ...rest } = args;
+  void _when;
+  return { ...rest, published: false };
 }
 /** Composio's picture of a toolkit. */
 export const appLogo = (toolkit: string) => `https://logos.composio.dev/api/${encodeURIComponent(toolkit)}`;
@@ -156,7 +224,7 @@ export const appLogo = (toolkit: string) => `https://logos.composio.dev/api/${en
  * own apps; every change waits for the owner's approval below autopilot (src/lib/composio/appAction.ts), and
  * runApproval checks again.
  */
-export const APP_ACCESS: Partial<Record<AgentKey, { toolkits: "*" | readonly string[]; reads?: boolean }>> = {
+export const APP_ACCESS: Partial<Record<AgentKey, { toolkits: "*" | readonly string[]; reads?: boolean; direct?: readonly string[] }>> = {
   chief: { toolkits: "*", reads: true },
   // Email campaigns and follow-ups, sent from the owner's own inbox.
   email: { toolkits: ["gmail", "outlook"] },
@@ -166,8 +234,9 @@ export const APP_ACCESS: Partial<Record<AgentKey, { toolkits: "*" | readonly str
   sales: { toolkits: ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce"] },
   // Customer email and tickets, and the team's chat for handing things over.
   support: { toolkits: ["gmail", "outlook", "slack", "zendesk", "help_scout"] },
-  // The owner's own site builder: pages on Framer, blog posts and CMS items on Webflow, drafts on WordPress.com.
-  web: { toolkits: ["framer", "webflow", "wordpress_com"] },
+  // The owner's own site builder: pages on Framer, blog posts and CMS items on Webflow, drafts on WordPress.com, pages
+  // and blog posts on Shopify, and pages and posts on a self-hosted WordPress (direct, src/lib/wordpress).
+  web: { toolkits: ["framer", "webflow", "wordpress_com", "shopify"], direct: ["wordpress"] },
 };
 
 /** The apps a teammate may use, and whether only to read. Nothing for a teammate that is coming soon. */
@@ -178,10 +247,17 @@ export function appsFor(agent: AgentKey, soon: boolean): { toolkits: string[]; r
   return { toolkits, reads: a.reads === true };
 }
 
+/** The apps Morning Telos connects itself that a teammate may use (and change). Nothing for one coming soon. */
+export function directFor(agent: AgentKey, soon: boolean): string[] {
+  const a = APP_ACCESS[agent];
+  if (!a || soon || a.reads) return [];
+  return (a.direct ?? []).filter(isDirect);
+}
+
 /** True when a teammate may change something in a connected app (it gets the Ask me first or Autopilot setting). */
 export function changesApps(agent: AgentKey, soon = false): boolean {
   const a = appsFor(agent, soon);
-  return a.toolkits.length > 0 && !a.reads;
+  return (a.toolkits.length > 0 && !a.reads) || directFor(agent, soon).length > 0;
 }
 
 // ─────────────── words ───────────────

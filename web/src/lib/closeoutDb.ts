@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { closeServices, expireTrials, planAction, trialOver, reopenServices, removeBrandJob, revokeKeysJob, type NewJob, type ServiceRow } from "./closeout.ts";
 import { closeApps } from "./composio/store.ts";
+import { closeWordpress } from "./wordpress/store.ts";
 import type { Handler } from "./jobs.ts";
 import { partnerFor, type Product } from "./partner.ts";
 import type { PlanFields } from "./plans.ts";
@@ -28,10 +29,11 @@ async function queue(db: SupabaseClient, jobs: NewJob[]) {
 
 /**
  * Revoke the workspace's brand keys now and queue each brand's removal in 30 days. First its own apps are
- * disconnected at Composio (best effort: Composio being down never stops the close).
+ * disconnected at Composio and its WordPress login removed (best effort: Composio being down never stops the close).
  */
 export async function closeWorkspace(db: SupabaseClient, ws: string, fetcher: typeof fetch = fetch) {
   await closeApps(db, ws, { fetcher, log });
+  await closeWordpress(db, ws, log);
   return closeServices(ws, {
     services: () => servicesOf(db, ws),
     partner: (product) => partnerFor(product, process.env, fetcher, CLOSE_TIMEOUT_MS),

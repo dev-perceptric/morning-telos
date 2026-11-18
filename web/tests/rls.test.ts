@@ -1886,6 +1886,85 @@ test("app_connections: known apps only, one connection per app in a workspace, g
   assert.equal((await db.query("select count(*)::int n from app_connections where workspace_id = $1", [ws])).rows[0].n, 0);
 });
 
+// ─────────────── the owner's own WordPress site (020_wordpress.sql) ───────────────
+
+const SEALED = "v2.t1.aXY=.dGFn.Ym9keQ==";
+
+test("wordpress_sites: members read their own workspace's site and login name; the sealed password stays server only; nobody writes from the browser", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("wp-rls");
+  const other = await team("wp-other");
+  await asService(async (q) => {
+    await q("select save_wordpress($1, 'https://ana.example', 'ana', 'https://ana.example/wp-json/', $2, $3)", [ws, SEALED, owner.id]);
+    await q("select save_wordpress($1, 'https://bo.example', 'bo', 'https://bo.example/wp-json/', $2, $3)", [other.ws, SEALED, other.owner.id]);
+  });
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => {
+      assert.deepEqual((await q("select workspace_id, site_url, user_login, status, connected_by from wordpress_sites")).rows, [{ workspace_id: ws, site_url: "https://ana.example", user_login: "ana", status: "active", connected_by: owner.id }]);
+    });
+    for (const [sql, args] of [
+      ["select * from wordpress_logins", []],
+      ["select sealed_password from wordpress_logins where workspace_id = $1", [ws]],
+      ["insert into wordpress_sites (workspace_id, site_url, user_login) values ($1, 'https://evil.example', 'x')", [ws]],
+      ["update wordpress_sites set site_url = 'https://evil.example' where workspace_id = $1", [ws]],
+      ["update wordpress_sites set status = 'active' where workspace_id = $1", [ws]],
+      ["delete from wordpress_sites where workspace_id = $1", [ws]],
+      ["insert into wordpress_logins (workspace_id, api_root, sealed_password) values ($1, 'https://evil.example/wp-json/', 'v2.t1.x')", [ws]],
+      ["update wordpress_logins set api_root = 'https://evil.example/wp-json/' where workspace_id = $1", [ws]],
+      ["select save_wordpress($1, 'https://evil.example', 'x', 'https://evil.example/wp-json/', 'v2.t1.x', $2)", [ws, owner.id]],
+    ] as const) {
+      await as(u, async (q) => {
+        await assert.rejects(q(sql, [...args]), /permission denied/, sql);
+      });
+    }
+  }
+  await as(other.owner, async (q) => {
+    assert.deepEqual((await q("select workspace_id from wordpress_sites")).rows, [{ workspace_id: other.ws }]);
+    assert.equal((await q("select 1 from wordpress_sites where workspace_id = $1", [ws])).rowCount, 0);
+  });
+  for (const sql of ["select * from wordpress_sites", "select * from wordpress_logins"]) {
+    await as(null, async (q) => {
+      await assert.rejects(q(sql), /permission denied/, sql);
+    });
+  }
+  assert.equal((await db.query("select sealed_password from wordpress_logins where workspace_id = $1", [ws])).rows[0].sealed_password, SEALED);
+});
+
+test("wordpress_sites and wordpress_logins: https only, one site per workspace replaced on reconnect, the login goes with its site and its workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner } = await team("wp-shape");
+  const save = (site: string, api = "https://ana.example/wp-json/", sealed = SEALED) => asService((q) => q("select save_wordpress($1, $2, 'ana', $3, $4, $5)", [ws, site, api, sealed, owner.id]));
+  await assert.rejects(save("http://ana.example"), /wordpress_sites_site_url_check/);
+  await assert.rejects(save("https://ana.example", "http://ana.example/wp-json/"), /wordpress_logins_api_root_check/);
+  await assert.rejects(save("https://ana.example", "https://ana.example/api/"), /wordpress_logins_api_root_check/);
+  await assert.rejects(save("https://ana.example", undefined, "plain password"), /wordpress_logins_sealed_password_check/);
+  await save("https://ana.example");
+  await db.query("update wordpress_sites set status = 'reconnect' where workspace_id = $1", [ws]);
+  await db.query("update wordpress_logins set last_error = 'gone' where workspace_id = $1", [ws]);
+  // Connecting again replaces both rows and makes it work again.
+  await save("https://ana.example/blog", "https://ana.example/blog/wp-json/");
+  assert.deepEqual((await db.query("select site_url, status from wordpress_sites where workspace_id = $1", [ws])).rows, [{ site_url: "https://ana.example/blog", status: "active" }]);
+  assert.deepEqual((await db.query("select api_root, last_error from wordpress_logins where workspace_id = $1", [ws])).rows, [{ api_root: "https://ana.example/blog/wp-json/", last_error: null }]);
+  await assert.rejects(db.query("update wordpress_sites set status = 'broken' where workspace_id = $1", [ws]), /wordpress_sites_status_check/);
+  // A login can't exist without its site; a disconnect (deleting the site) removes it.
+  const lone = await team("wp-lone");
+  await assert.rejects(db.query("insert into wordpress_logins (workspace_id, api_root, sealed_password) values ($1, 'https://x.example/wp-json/', $2)", [lone.ws, SEALED]), /foreign key/);
+  await db.query("delete from wordpress_sites where workspace_id = $1", [ws]);
+  assert.equal((await db.query("select count(*)::int n from wordpress_logins where workspace_id = $1", [ws])).rows[0].n, 0);
+  await save("https://ana.example");
+  await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
+  assert.equal((await db.query("select count(*)::int n from wordpress_sites where workspace_id = $1", [ws])).rows[0].n, 0);
+  assert.equal((await db.query("select count(*)::int n from wordpress_logins where workspace_id = $1", [ws])).rows[0].n, 0);
+});
+
+test("app_connections takes Shopify (020_wordpress.sql)", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws } = await team("apps-shopify");
+  await db.query("insert into app_connections (workspace_id, toolkit, composio_account) values ($1, 'shopify', 'ca_shop1')", [ws]);
+  await assert.rejects(db.query("insert into app_connections (workspace_id, toolkit, composio_account) values ($1, 'shopify', 'ca_shop2')", [ws]), /app_connections_ws_toolkit_idx/);
+  await assert.rejects(db.query("insert into app_connections (workspace_id, toolkit, composio_account) values ($1, 'wordpress', 'ca_wp1')", [ws]), /app_connections_toolkit_check/);
+});
+
 // ─────────────── lifecycle emails (018_email_log.sql) ───────────────
 
 test("email_log: server only, and each email once per person, kind and period", async (t) => {

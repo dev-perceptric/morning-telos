@@ -84,19 +84,18 @@ function useTeam(sb: SupabaseClient, ws: Workspace) {
           ),
         ),
     );
-    sb.from("app_connections")
-      .select("toolkit, status")
-      .eq("workspace_id", ws.id)
-      .then(
-        ({ data, error }) =>
-          live &&
-          !error &&
-          setConnected(
-            ((data ?? []) as { toolkit: string; status: string }[])
-              .filter((r) => r.status === "active")
-              .map((r) => r.toolkit),
-          ),
-      );
+    // Composio apps, and the self-hosted WordPress site (wordpress_sites, supabase/020_wordpress.sql).
+    Promise.all([
+      sb.from("app_connections").select("toolkit, status").eq("workspace_id", ws.id),
+      sb.from("wordpress_sites").select("status").eq("workspace_id", ws.id),
+    ]).then(([apps, wp]) => {
+      if (!live || apps.error) return;
+      const on = ((apps.data ?? []) as { toolkit: string; status: string }[])
+        .filter((r) => r.status === "active")
+        .map((r) => r.toolkit);
+      if (!wp.error && ((wp.data ?? []) as { status: string }[]).some((r) => r.status === "active")) on.push("wordpress");
+      setConnected(on);
+    });
     return () => {
       live = false;
     };

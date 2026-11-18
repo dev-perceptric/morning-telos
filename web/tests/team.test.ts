@@ -47,17 +47,26 @@ test("Iris, Hora, Hermes and Hestia: honest jobs that name their apps and the ow
   }
 });
 
-test("Hephaestus: an honest job that names Framer, Webflow and WordPress.com and the owner's OK, and keeps Arrowsterr", () => {
+test("Hephaestus: an honest job that names Framer, Webflow, WordPress, WordPress.com and Shopify and the owner's OK, and keeps Arrowsterr", () => {
   const a = AGENTS.web;
   assert.deepEqual(a.apps, ["arrowsterr"]);
   assert.match(a.job, /Framer/);
   assert.match(a.job, /Webflow/);
   assert.match(a.job, /WordPress\.com/);
+  assert.match(a.job, /WordPress,/);
+  assert.match(a.job, /Shopify/);
   assert.match(a.job, /Nothing goes live until you approve it/);
   assert.equal(a.out.length, 3);
   assert.ok(a.rules && a.rules.length >= 4);
   assert.match(a.rules.join(" "), /Never publish, add or change anything on the website without the owner's OK, unless the owner put you on autopilot\./);
   assert.match(a.rules.join(" "), /Never invent/);
+  // His own WordPress and Shopify: drafts and hidden pages first, the preview link, and nothing about the store's sales.
+  const rules = a.rules.join(" ");
+  assert.match(rules, /your own WordPress site/);
+  assert.match(rules, /start as drafts\. Show the owner the preview link, then publish only after they approve\./);
+  assert.match(rules, /On Shopify, new pages and blog posts start hidden/);
+  assert.match(rules, /Never touch products, orders, customers or discounts\./);
+  for (const r of a.rules) assert.doesNotMatch(r, /[–—]/);
   for (const s of a.job.split(/\. /)) assert.ok(s.split(" ").length <= 25, s);
 });
 

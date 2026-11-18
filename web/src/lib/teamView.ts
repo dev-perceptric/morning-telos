@@ -1,7 +1,7 @@
 // How the Team page groups the teammates and what each card's status dot says. Ported from the old app's renderTeam
 // (app/public/app.js CATS and st()). Pure: the screens and tests share it. Reads src/lib/team.ts, never changes it.
 
-import { appsFor } from "./composio/catalog.ts";
+import { appsFor, directFor } from "./composio/catalog.ts";
 import { AGENTS, type AgentKey } from "./team.ts";
 
 /** The small colored badges for our own products, like the old app's SVC_ICON. */
@@ -23,16 +23,19 @@ export function agentStatus(k: AgentKey, s: { paused: boolean; services: Readonl
   const products = a.apps.filter((p) => p !== "*");
   if (products.some((p) => s.services[p] !== "ready")) return { tone: "wait", label: "Setting up" };
   if (!products.length && !a.apps.includes("*")) {
-    const tk = appsFor(k, Boolean(a.soon)).toolkits;
+    const tk = agentToolkits(k);
     if (tk.length && !tk.some((t) => s.connected.includes(t))) return { tone: "wait", label: "Connect an app" };
   }
   return { tone: "ok", label: "Working" };
 }
 
-/** The business apps a teammate works in, for the logos on its card. Athena reads all of them, so none are shown. */
+/**
+ * The business apps a teammate works in, for the logos on its card: its Composio apps, then the ones Morning Telos
+ * connects itself (self-hosted WordPress). Athena reads all of them, so none are shown.
+ */
 export function agentToolkits(k: AgentKey): string[] {
   const a = AGENTS[k];
   if (a.apps.includes("*")) return [];
-  return appsFor(k, Boolean(a.soon)).toolkits;
+  return [...appsFor(k, Boolean(a.soon)).toolkits, ...directFor(k, Boolean(a.soon))];
 }
 

@@ -129,13 +129,15 @@ export const AGENTS: Record<AgentKey, Agent> = {
     name: "Website Builder",
     // Arrowsterr for keywords and the content plan. The site builders are in APP_ACCESS (composio/catalog.ts).
     apps: ["arrowsterr"],
-    job: "Plans and writes website pages people search for, with clear calls to book. Builds them on your Framer site, adds blog posts on Webflow and writes drafts on WordPress.com. Nothing goes live until you approve it.",
+    job: "Plans and writes website pages people search for, with clear calls to book. Builds them on your own site: Framer, Webflow, WordPress, WordPress.com or Shopify. Nothing goes live until you approve it.",
     out: ["New pages built on your own site", "Copy that targets real searches", "Nothing goes live until you approve it"],
     rules: [
-      appsLine("Framer to build and update pages, Webflow for blog posts and other site content, and WordPress.com for draft posts", "write the page"),
+      appsLine("Framer to build and update pages, Webflow for blog posts and other site content, WordPress.com for draft posts, your own WordPress site for pages and posts, and Shopify for store pages and blog posts", "write the page"),
       "Never publish, add or change anything on the website without the owner's OK, unless the owner put you on autopilot. Tell the owner what will change first.",
       "Before you publish, show the owner what changed and where they can see it.",
       "Webflow can't design new pages. There you add and update blog posts and other site content. WordPress.com only gets drafts, and the owner publishes them there.",
+      "On the owner's own WordPress site, new pages and posts start as drafts. Show the owner the preview link, then publish only after they approve. On Shopify, new pages and blog posts start hidden until the owner approves publishing them.",
+      "On Shopify, work only on pages and blog posts. Never touch products, orders, customers or discounts.",
       "Use Arrowsterr's keywords and content plan, so every page answers what people search for.",
       "Follow your design skills: match-the-brand before the first design, design-a-page for layouts, and review-the-design before you ask to publish.",
       "Never invent facts, prices, reviews or awards. Leave [fill in] where a fact is missing.",
