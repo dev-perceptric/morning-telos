@@ -9,12 +9,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppsSettings } from "./Apps";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/routes";
 import { ASSIGNABLE, can, cleanSettings, deleteConfirmMatches, inviteLink, memberActions, roleLabel, ROLES, type MemberRow, type Role } from "@/lib/workspace";
+import { initial } from "@/lib/home";
 import { callApi, message, navigate } from "./nav";
 import { SkillsSettings } from "./Skills";
 import { SocialSettings } from "./Social";
-import { btnDanger, btnPrimary, btnSmall, card, ErrorText, input, label, Notice } from "./ui";
+import { ErrorText, input, label, Notice, PageHead } from "./ui";
 
-export type Workspace = { id: string; name: string; website: string | null; timezone: string; plan: string; trial_ends_at: string; role: Role };
+export type Workspace = { id: string; name: string; website: string | null; timezone: string; plan: string; status: string | null; trial_ends_at: string; role: Role };
 type Invite = { id: string; email: string; role: Role; token: string; expires_at: string; expired?: boolean };
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -26,6 +27,9 @@ export function SettingsPage({
   tab,
   onChanged,
   onGone,
+  email,
+  name,
+  onLogout,
 }: {
   sb: SupabaseClient;
   ws: Workspace;
@@ -35,45 +39,80 @@ export function SettingsPage({
   onChanged: () => void;
   /** The person left or deleted this workspace. */
   onGone: (notice: string) => void;
+  email: string;
+  name: string;
+  onLogout: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-6 md:flex-row md:gap-10">
-      <nav className="flex shrink-0 flex-col gap-1 md:w-44" aria-label="Settings">
-        <h1 className="mb-3 font-serif text-[30px] leading-tight">Settings</h1>
-        <div className="flex gap-1 md:flex-col">
-          {SETTINGS_TABS.map((t) => (
-            <a
-              key={t.id}
-              href={t.id === "general" ? "/settings" : `/settings/${t.id}`}
-              aria-current={tab === t.id ? "page" : undefined}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(t.id === "general" ? "/settings" : `/settings/${t.id}`);
-              }}
-              className={`rounded-[9px] px-3 py-2 text-[15px] ${tab === t.id ? "bg-sunk font-semibold text-ink" : "text-ink-3 hover:bg-sunk hover:text-ink"}`}
-            >
-              {t.label}
-            </a>
-          ))}
-        </div>
+    <>
+      <PageHead title="Settings" sub="Your business, your people and your account.">
+        <button type="button" className="btn" onClick={onLogout}>
+          Log out
+        </button>
+      </PageHead>
+      <nav className="tabs" aria-label="Settings">
+        {SETTINGS_TABS.map((t) => (
+          <a
+            key={t.id}
+            href={t.id === "general" ? "/settings" : `/settings/${t.id}`}
+            aria-current={tab === t.id ? "page" : undefined}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(t.id === "general" ? "/settings" : `/settings/${t.id}`);
+            }}
+          >
+            {t.label}
+          </a>
+        ))}
       </nav>
-      <div className="flex min-w-0 flex-1 flex-col gap-6">
-        {tab === "general" ? (
-          <>
+      {tab === "general" ? (
+        <>
+          <div className="two">
             <GeneralSettings key={ws.id} sb={sb} ws={ws} onChanged={onChanged} />
-            {can(ws.role, "deleteWorkspace") ? <DeleteWorkspace key={`del-${ws.id}`} sb={sb} ws={ws} onGone={onGone} /> : null}
-          </>
-        ) : tab === "members" ? (
-          <MembersSettings key={ws.id} sb={sb} ws={ws} userId={userId} onGone={onGone} />
-        ) : tab === "apps" ? (
-          <AppsSettings key={`apps-${ws.id}`} sb={sb} ws={ws} />
-        ) : tab === "skills" ? (
-          <SkillsSettings key={`skills-${ws.id}`} sb={sb} ws={ws} />
-        ) : (
-          <SocialSettings key={`social-${ws.id}`} sb={sb} ws={ws} />
-        )}
+            <Account email={email} name={name} role={ws.role} />
+          </div>
+          {can(ws.role, "deleteWorkspace") ? <DeleteWorkspace key={`del-${ws.id}`} sb={sb} ws={ws} onGone={onGone} /> : null}
+          <p className="legal">
+            <a className="link" href="https://morningtelos.com/terms/" target="_blank" rel="noopener noreferrer">
+              Terms
+            </a>{" "}
+            ·{" "}
+            <a className="link" href="https://morningtelos.com/privacy/" target="_blank" rel="noopener noreferrer">
+              Privacy
+            </a>
+          </p>
+        </>
+      ) : tab === "members" ? (
+        <MembersSettings key={ws.id} sb={sb} ws={ws} userId={userId} onGone={onGone} />
+      ) : tab === "apps" ? (
+        <AppsSettings key={`apps-${ws.id}`} sb={sb} ws={ws} />
+      ) : tab === "skills" ? (
+        <SkillsSettings key={`skills-${ws.id}`} sb={sb} ws={ws} />
+      ) : (
+        <SocialSettings key={`social-${ws.id}`} sb={sb} ws={ws} />
+      )}
+    </>
+  );
+}
+
+/** Who is signed in, and Log out. */
+function Account({ email, name, role }: { email: string; name: string; role: Role }) {
+  return (
+    <section className="card pad">
+      <div className="sh">
+        <h2>Your account</h2>
       </div>
-    </div>
+      <div className="flex items-center gap-3">
+        <span className="avatar-me lg">{initial(name || email)}</span>
+        <span className="min-w-0">
+          <b className="block text-[14px]">{name || email}</b>
+          <small className="block text-[12.5px] text-ink-4 wrap">
+            {email} · {roleLabel(role)}
+          </small>
+        </span>
+      </div>
+      <p className="hint-s mt-4">To change your password, log out and pick Forgot password on the log in page.</p>
+    </section>
   );
 }
 
@@ -108,18 +147,18 @@ function GeneralSettings({ sb, ws, onChanged }: { sb: SupabaseClient; ws: Worksp
   }
 
   return (
-    <form onSubmit={save} className={card}>
-      <div>
-        <h2 className="text-[18px] font-semibold">Your business</h2>
-        <p className="text-[14px] text-ink-3">{editable ? "Your team uses these details in their work." : "Only admins and the owner can change these."}</p>
+    <form onSubmit={save} className="card pad">
+      <div className="sh">
+        <h2>Business</h2>
       </div>
-      <div>
+      {editable ? null : <p className="hint-s mb-3">Only admins and the owner can change these.</p>}
+      <div className="fld">
         <label className={label} htmlFor="ws-name">
           Business name
         </label>
         <input id="ws-name" className={input} value={name} onChange={(e) => setName(e.target.value)} disabled={!editable} maxLength={120} required />
       </div>
-      <div>
+      <div className="fld">
         <label className={label} htmlFor="ws-site">
           Website <span className="font-normal text-ink-4">(optional)</span>
         </label>
@@ -135,26 +174,26 @@ function GeneralSettings({ sb, ws, onChanged }: { sb: SupabaseClient; ws: Worksp
           disabled={!editable}
         />
       </div>
-      <div>
+      <div className="fld">
         <label className={label} htmlFor="ws-tz">
           Time zone
         </label>
-        <select id="ws-tz" className={input} value={timezone} onChange={(e) => setTimezone(e.target.value)} disabled={!editable}>
+        <select id="ws-tz" className="sel" value={timezone} onChange={(e) => setTimezone(e.target.value)} disabled={!editable}>
           {zones.map((z) => (
             <option key={z} value={z}>
               {z.replace(/_/g, " ")}
             </option>
           ))}
         </select>
-        <p className="mt-1.5 text-[13px] text-ink-4">Your team uses this for schedules and dates.</p>
+        <small>Routines run on this time zone.</small>
       </div>
       {error ? <ErrorText>{error}</ErrorText> : null}
-      {saved && !changed ? <Notice>Saved.</Notice> : null}
       {editable ? (
-        <div>
-          <button type="submit" className={`${btnPrimary} sm:w-auto`} disabled={busy || !changed}>
-            {busy ? "Saving..." : "Save changes"}
+        <div className="flex items-center gap-3">
+          <button type="submit" className="btn primary" disabled={busy || !changed}>
+            {busy ? "Saving..." : "Save"}
           </button>
+          {saved && !changed ? <span className="ok-t">Saved</span> : null}
         </div>
       ) : null}
     </form>
@@ -166,7 +205,7 @@ export function ConfirmButton({ label: text, confirm, onConfirm }: { label: stri
   const [asking, setAsking] = useState(false);
   if (!asking)
     return (
-      <button type="button" className={btnSmall} onClick={() => setAsking(true)}>
+      <button type="button" className="btn sm ghost" onClick={() => setAsking(true)}>
         {text}
       </button>
     );
@@ -174,7 +213,7 @@ export function ConfirmButton({ label: text, confirm, onConfirm }: { label: stri
     <span className="inline-flex flex-wrap items-center justify-end gap-2">
       <button
         type="button"
-        className={`${btnSmall} border-red text-red`}
+        className="btn sm danger"
         onClick={() => {
           setAsking(false);
           onConfirm();
@@ -182,7 +221,7 @@ export function ConfirmButton({ label: text, confirm, onConfirm }: { label: stri
       >
         {confirm}
       </button>
-      <button type="button" className={btnSmall} onClick={() => setAsking(false)}>
+      <button type="button" className="btn sm" onClick={() => setAsking(false)}>
         Cancel
       </button>
     </span>
@@ -194,7 +233,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       type="button"
-      className={btnSmall}
+      className="btn sm"
       onClick={() =>
         navigator.clipboard?.writeText(text).then(() => {
           setCopied(true);
@@ -271,128 +310,126 @@ function MembersSettings({ sb, ws, userId, onGone }: { sb: SupabaseClient; ws: W
       {error ? <ErrorText>{error}</ErrorText> : null}
       {done ? <Notice>{done}</Notice> : null}
 
-      <section className={card}>
-        <div>
-          <h2 className="text-[18px] font-semibold">Members</h2>
-          <p className="text-[14px] text-ink-3">People who can use {ws.name} on Morning Telos.</p>
-        </div>
-        <ul className="flex flex-col divide-y divide-line">
-          {(members ?? []).map((m) => {
-            const may = memberActions(me, m);
-            const who = m.email ?? "this person";
-            return (
-              <li key={m.user_id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="min-w-0 break-all text-[15px]">
+      <div className="sh">
+        <h2>
+          People<span className="num">{members?.length || ""}</span>
+        </h2>
+      </div>
+      <div className="card list">
+        {(members ?? []).map((m) => {
+          const may = memberActions(me, m);
+          const who = m.email ?? "this person";
+          return (
+            <div key={m.user_id} className="row wrap-row">
+              <span className="avatar-me lg">{initial(m.email)}</span>
+              <span className="main">
+                <b className="wrap">
                   {m.email ?? "Unknown"}
-                  {m.user_id === userId ? <span className="text-ink-4"> (you)</span> : null}
-                </span>
-                <span className="flex flex-wrap items-center gap-2 sm:justify-end">
-                  {may.changeRole ? (
-                    <select
-                      aria-label={`Role for ${who}`}
-                      className="h-9 rounded-[9px] border border-line bg-surface px-2 text-[14px]"
-                      value={m.role}
-                      onChange={(e) => {
-                        const next = e.target.value as Role;
-                        act(() => sb.from("workspace_members").update({ role: next }).eq("workspace_id", ws.id).eq("user_id", m.user_id), `${who} is now ${roleLabel(next).toLowerCase()}.`);
-                      }}
-                    >
-                      {ASSIGNABLE.map((r) => (
-                        <option key={r} value={r}>
-                          {roleLabel(r)}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="rounded-full bg-sunk px-2.5 py-1 text-[13px] text-ink-2">{roleLabel(m.role)}</span>
-                  )}
-                  {may.remove ? (
-                    <ConfirmButton
-                      label="Remove"
-                      confirm={`Remove ${who}`}
-                      onConfirm={() => act(() => sb.from("workspace_members").delete().eq("workspace_id", ws.id).eq("user_id", m.user_id), `${who} was removed.`)}
-                    />
-                  ) : null}
-                  {may.leave ? (
-                    <ConfirmButton
-                      label="Leave workspace"
-                      confirm="Yes, leave"
-                      onConfirm={async () => {
-                        setError("");
-                        const { error } = await sb.from("workspace_members").delete().eq("workspace_id", ws.id).eq("user_id", userId);
-                        if (error) return setError(error.message);
-                        onGone(`You left ${ws.name}.`);
-                      }}
-                    />
-                  ) : null}
-                </span>
-              </li>
-            );
-          })}
-          {members === null ? <li className="py-3 text-[14px] text-ink-4">Loading...</li> : null}
-        </ul>
-      </section>
+                  {m.user_id === userId ? <span className="font-normal text-ink-4"> (you)</span> : null}
+                </b>
+                <small>{roleLabel(m.role)}</small>
+              </span>
+              <span className="row-act">
+                {may.changeRole ? (
+                  <select
+                    aria-label={`Role for ${who}`}
+                    className="sel sm"
+                    value={m.role}
+                    onChange={(e) => {
+                      const next = e.target.value as Role;
+                      act(() => sb.from("workspace_members").update({ role: next }).eq("workspace_id", ws.id).eq("user_id", m.user_id), `${who} is now ${roleLabel(next).toLowerCase()}.`);
+                    }}
+                  >
+                    {ASSIGNABLE.map((r) => (
+                      <option key={r} value={r}>
+                        {roleLabel(r)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="tag">{roleLabel(m.role)}</span>
+                )}
+                {may.remove ? (
+                  <ConfirmButton
+                    label="Remove"
+                    confirm={`Remove ${who}`}
+                    onConfirm={() => act(() => sb.from("workspace_members").delete().eq("workspace_id", ws.id).eq("user_id", m.user_id), `${who} was removed.`)}
+                  />
+                ) : null}
+                {may.leave ? (
+                  <ConfirmButton
+                    label="Leave workspace"
+                    confirm="Yes, leave"
+                    onConfirm={async () => {
+                      setError("");
+                      const { error } = await sb.from("workspace_members").delete().eq("workspace_id", ws.id).eq("user_id", userId);
+                      if (error) return setError(error.message);
+                      onGone(`You left ${ws.name}.`);
+                    }}
+                  />
+                ) : null}
+              </span>
+            </div>
+          );
+        })}
+        {members === null ? <div className="empty">Loading...</div> : null}
+      </div>
 
       {admin ? (
-        <section className={card}>
-          <div>
-            <h2 className="text-[18px] font-semibold">Invite someone</h2>
-            <p className="text-[14px] text-ink-3">They get a link to join. It works for 7 days.</p>
+        <section className="sec">
+          <div className="sh">
+            <h2>Invite someone</h2>
           </div>
-          <form onSubmit={invite} className="flex flex-col gap-3 sm:flex-row">
-            <input
-              type="email"
-              aria-label="Email to invite"
-              placeholder="teammate@yourbusiness.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className={input}
-            />
-            <select aria-label="Role" className={`${input} sm:w-36`} value={role} onChange={(e) => setRole(e.target.value as Role)}>
-              {ASSIGNABLE.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
-                </option>
-              ))}
-            </select>
-            <button type="submit" className={`${btnPrimary} sm:w-auto sm:shrink-0`} disabled={busy}>
-              {busy ? "Inviting..." : "Send invite"}
-            </button>
-          </form>
-          {made ? (
-            <div className="flex flex-col gap-3 rounded-[10px] bg-clay-bg px-4 py-3 text-[14px] text-ink-2">
-              <span>
-                {made.emailed
-                  ? `We emailed an invite to ${made.invite.email}. You can also send them this link.`
-                  : made.emailError || `Send this link to ${made.invite.email}. They sign up or log in with that email to join.`}
-              </span>
-              <code className="break-all font-mono text-[13px]">{made.link}</code>
-              <div>
-                <CopyButton text={made.link} />
+          <div className="card pad">
+            <p className="mb-3 text-[13.5px] text-ink-3">They get a link to join. It works for 7 days.</p>
+            <form onSubmit={invite} className="invite-f">
+              <input type="email" aria-label="Email to invite" placeholder="teammate@yourbusiness.com" value={email} onChange={(e) => setEmail(e.target.value)} required className={input} />
+              <select aria-label="Role" className="sel" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+                {ASSIGNABLE.map((r) => (
+                  <option key={r} value={r}>
+                    {roleLabel(r)}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="btn primary" disabled={busy}>
+                {busy ? "Inviting..." : "Send invite"}
+              </button>
+            </form>
+            {made ? (
+              <div className="note-box mt-3 flex flex-col gap-2">
+                <span>
+                  {made.emailed
+                    ? `We emailed an invite to ${made.invite.email}. You can also send them this link.`
+                    : made.emailError || `Send this link to ${made.invite.email}. They sign up or log in with that email to join.`}
+                </span>
+                <code>{made.link}</code>
+                <div>
+                  <CopyButton text={made.link} />
+                </div>
               </div>
-            </div>
-          ) : null}
-
+            ) : null}
+          </div>
           {invites.length ? (
-            <div className="flex flex-col">
-              <h3 className="mb-1 text-[14px] font-semibold text-ink-2">Waiting to join</h3>
-              <ul className="flex flex-col divide-y divide-line">
+            <>
+              <div className="sh mt-4">
+                <h2>Waiting to join</h2>
+              </div>
+              <div className="card list">
                 {invites.map((i) => {
                   const expired = Boolean(i.expired);
                   return (
-                    <li key={i.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <span className="min-w-0 break-all text-[15px]">
-                        {i.email}{" "}
-                        <span className="text-[13px] text-ink-4">
-                          {roleLabel(i.role)}, {expired ? "expired" : `expires ${shortDate(i.expires_at)}`}
-                        </span>
+                    <div key={i.id} className="row wrap-row">
+                      <span className="main">
+                        <b className="wrap">{i.email}</b>
+                        <small>
+                          {roleLabel(i.role)} · {expired ? "expired" : `expires ${shortDate(i.expires_at)}`}
+                        </small>
                       </span>
-                      <span className="flex flex-wrap gap-2 sm:justify-end">
+                      <span className="row-act">
                         {expired ? null : <CopyButton text={link(i.token)} />}
                         <button
                           type="button"
-                          className={btnSmall}
+                          className="btn sm ghost"
                           onClick={() =>
                             act(async () => {
                               const r = await sb.from("workspace_invites").delete().eq("id", i.id);
@@ -404,24 +441,28 @@ function MembersSettings({ sb, ws, userId, onGone }: { sb: SupabaseClient; ws: W
                           {expired ? "Remove" : "Cancel invite"}
                         </button>
                       </span>
-                    </li>
+                    </div>
                   );
                 })}
-              </ul>
-            </div>
+              </div>
+            </>
           ) : null}
         </section>
       ) : null}
 
-      <section className={card}>
-        <h2 className="text-[18px] font-semibold">What each role can do</h2>
-        <ul className="flex flex-col gap-1.5 text-[15px]">
+      <section className="sec">
+        <div className="sh">
+          <h2>What each role can do</h2>
+        </div>
+        <div className="card list">
           {ROLES.map((r) => (
-            <li key={r.id}>
-              <strong>{r.label}:</strong> {r.can}
-            </li>
+            <div key={r.id} className="row">
+              <p>
+                <b>{r.label}:</b> {r.can}
+              </p>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
     </>
   );
@@ -449,25 +490,25 @@ function DeleteWorkspace({ sb, ws, onGone }: { sb: SupabaseClient; ws: Workspace
   }
 
   return (
-    <form onSubmit={remove} className={`${card} border-[#f0cfc2]`}>
-      <div>
-        <h2 className="text-[18px] font-semibold text-red">Delete this workspace</h2>
-        <p className="text-[14px] text-ink-3">
-          This deletes {ws.name} for good. All members lose access, and every chat, file and setting is gone. You can&apos;t undo it.
+    <section className="sec">
+      <div className="sh">
+        <h2>Delete workspace</h2>
+      </div>
+      <form onSubmit={remove} className="card pad" autoComplete="off">
+        <p className="mb-3 text-[13.5px] text-ink-3">
+          This deletes {ws.name} for good: your people, chats, knowledge, approvals and routines, and it cancels your plan. All members lose access. It can&apos;t be undone.
         </p>
-      </div>
-      <div>
-        <label className={label} htmlFor="ws-delete">
-          Type <strong>{ws.name}</strong> to confirm
-        </label>
-        <input id="ws-delete" className={input} autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
-      </div>
-      {error ? <ErrorText>{error}</ErrorText> : null}
-      <div>
-        <button type="submit" className={btnDanger} disabled={!ready || busy}>
-          {busy ? "Deleting..." : "Delete workspace"}
+        <div className="fld">
+          <label className={label} htmlFor="ws-delete">
+            Type <strong>{ws.name}</strong> to confirm
+          </label>
+          <input id="ws-delete" className={input} autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
+        </div>
+        {error ? <ErrorText>{error}</ErrorText> : null}
+        <button type="submit" className="btn danger-o" disabled={!ready || busy}>
+          {busy ? "Deleting..." : "Delete workspace forever"}
         </button>
-      </div>
-    </form>
+      </form>
+    </section>
   );
 }

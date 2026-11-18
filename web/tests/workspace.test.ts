@@ -129,6 +129,10 @@ test("page routes", () => {
   assert.deepEqual(parseRoute("/approvals/42"), { page: "approvals", id: 42 });
   assert.deepEqual(parseRoute("/approvals/0"), { page: "home" });
   assert.deepEqual(parseRoute("/approvals/abc"), { page: "home" });
+  assert.deepEqual(parseRoute("/team/seo"), { page: "agent", key: "seo" });
+  assert.deepEqual(parseRoute("/team/seo/"), { page: "agent", key: "seo" });
+  assert.deepEqual(parseRoute("/team/zeus"), { page: "home" });
+  assert.deepEqual(parseRoute("/billing"), { page: "billing" });
   for (const r of [
     { page: "approvals", id: null },
     { page: "approvals", id: 42 },
@@ -143,6 +147,8 @@ test("page routes", () => {
     { page: "routines" },
     { page: "memory" },
     { page: "settings", tab: "skills" },
+    { page: "agent", key: "email" },
+    { page: "billing" },
     { page: "invite", token },
   ] as const) {
     assert.deepEqual(parseRoute(routePath(r)), r);

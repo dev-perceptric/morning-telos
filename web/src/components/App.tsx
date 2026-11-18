@@ -1,25 +1,32 @@
 "use client";
 
-// The whole client app: the sign-in screens, then the app shell with its pages: Home (talk to the team), a chat,
-// Team and Settings. Billing (P1.6) plugs in here.
+// The whole client app: the sign-in screens, then the app shell with its pages. The shell is the current app's
+// (app/public/index.html): a 252px sidebar with search, new chat, the pages with icons, recent chats and who is
+// signed in; on a phone a top bar and a bottom tab bar with More.
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { initial, paletteMatch, type PaletteItem } from "@/lib/home";
+import type { ModelChoice } from "@/lib/models";
+import { routePath, type Route } from "@/lib/routes";
 import { getSupabase, type SupaConfig } from "@/lib/supa";
-import { setupCard, type SetupCard } from "@/lib/setupStatus";
 import { cleanWebsite } from "@/lib/signup";
-import { inviteTokenFromPath, roleLabel } from "@/lib/workspace";
+import { agentFace, AGENTS, ORDER, type AgentKey } from "@/lib/team";
+import { can, inviteTokenFromPath, roleLabel } from "@/lib/workspace";
+import { ApprovalsPage } from "./Approvals";
 import { AuthScreen, NewPassword } from "./AuthScreen";
-import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
-import { SettingsPage, type Workspace } from "./Settings";
-import { ApprovalsPage, NeedsYou, RecentActivity } from "./Approvals";
+import { BillingPage } from "./Billing";
+import { ThreadPage, type StartChat } from "./Chat";
+import { Home } from "./Home";
+import { Icon, Mark, type IconName } from "./icons";
 import { KnowledgePage } from "./Knowledge";
 import { MemoryPage } from "./Memory";
+import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
 import { RoutinesPage } from "./Routines";
+import { SettingsPage, type Workspace } from "./Settings";
 import { ConnectSocialCard } from "./Social";
-import { TeamHome, TeamPage, ThreadPage, type StartChat } from "./Team";
-import { AGENTS } from "@/lib/team";
-import { btnPrimary, btnSecondary, ErrorText, Frame, input, label, Logo, Notice } from "./ui";
+import { AgentPage, TeamPage } from "./Team";
+import { btnPrimary, btnSecondary, Drawer, ErrorText, Frame, input, label, Notice, to } from "./ui";
 
 // An invite token waits here from the moment the link is opened until the person is signed in.
 const INVITE_KEY = "mt.invite";
@@ -61,9 +68,9 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
 
 function Loading() {
   return (
-    <main className="grid min-h-screen place-items-center text-[14px] text-ink-4" aria-busy="true">
+    <div className="boot" aria-busy="true">
       Loading...
-    </main>
+    </div>
   );
 }
 
@@ -116,7 +123,6 @@ function JoinInvite({ sb, session, token, onDone }: { sb: SupabaseClient; sessio
 
 /** Signed in: load the person's workspaces. No workspace yet (Google sign-up) means set one up first. */
 function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
-  const route = useRoute();
   const [list, setList] = useState<Workspace[] | null>(null);
   const [error, setError] = useState("");
   const [current, setCurrent] = useState<string | null>(() => readLocal(WS_KEY));
@@ -125,29 +131,11 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
   useEffect(() => writeLocal(NOTICE_KEY, null), []);
   // Bump to load the list again (after a change).
   const [version, setVersion] = useState(0);
-  // What's typed on Home, the first message of a chat being started, and the chat this tab started (its page keeps
-  // streaming while the address changes from /chat to /chat/<id>).
-  const [draft, setDraft] = useState("");
-  const [start, setStart] = useState<StartChat | null>(null);
-  const [ownThread, setOwnThread] = useState<string | null>(null);
-  const startChat = useCallback((text: string) => {
-    setDraft("");
-    setOwnThread(null);
-    setStart({ text });
-    navigate("/chat");
-  }, []);
-  // Run now on the Routines page: a new chat that streams the routine.
-  const runRoutine = useCallback((r: { id: string; title: string; instruction: string }) => {
-    setOwnThread(null);
-    setStart({ text: r.instruction, routineId: r.id, title: r.title });
-    navigate("/chat");
-  }, []);
-  const started = useCallback(() => setStart(null), []);
   const load = useCallback(() => setVersion((v) => v + 1), []);
   useEffect(() => {
     let live = true;
     sb.from("workspace_members")
-      .select("role, created_at, workspace:workspaces(id, name, website, timezone, plan, trial_ends_at)")
+      .select("role, created_at, workspace:workspaces(id, name, website, timezone, plan, status, trial_ends_at)")
       .eq("user_id", session.user.id)
       .order("created_at")
       .then(({ data, error }) => {
@@ -164,6 +152,7 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
   const pick = useCallback((id: string) => {
     writeLocal(WS_KEY, id);
     setCurrent(id);
+    navigate("/");
   }, []);
 
   if (error) return <Frame><ErrorText>{error}</ErrorText></Frame>;
@@ -179,183 +168,473 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
     load();
   };
 
-  return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <Sidebar sb={sb} session={session} list={list} ws={ws} page={route.page} onPick={pick} />
-      <main className="min-w-0 flex-1 px-4 py-8 sm:px-8 md:py-12">
-        <div className="mx-auto flex max-w-3xl flex-col gap-6">
-          {notice ? (
-            <div className="flex items-start justify-between gap-3 rounded-[10px] bg-clay-bg px-3 py-2 text-[14px] text-ink-2" role="status">
-              <span>{notice}</span>
-              <button type="button" className="text-ink-4 hover:text-ink" aria-label="Close" onClick={() => setNotice("")}>
-                ×
-              </button>
-            </div>
-          ) : null}
-          {route.page === "settings" ? (
-            <SettingsPage sb={sb} ws={ws} userId={session.user.id} tab={route.tab} onChanged={load} onGone={gone} />
-          ) : route.page === "thread" ? (
-            <ThreadPage
-              key={`${ws.id}:${route.id && route.id !== ownThread ? route.id : "new"}`}
-              sb={sb}
-              ws={ws}
-              id={route.id}
-              start={route.id ? null : start}
-              onStarted={started}
-              onThread={setOwnThread}
-            />
-          ) : route.page === "team" ? (
-            <TeamPage
-              key={ws.id}
-              sb={sb}
-              ws={ws}
-              onAsk={(k) => {
-                setDraft(`@${AGENTS[k].god} `);
-                navigate("/");
-              }}
-            />
-          ) : route.page === "knowledge" ? (
-            <KnowledgePage key={ws.id} sb={sb} ws={ws} />
-          ) : route.page === "routines" ? (
-            <RoutinesPage key={ws.id} sb={sb} ws={ws} onRun={runRoutine} />
-          ) : route.page === "memory" ? (
-            <MemoryPage key={ws.id} sb={sb} ws={ws} />
-          ) : route.page === "approvals" ? (
-            <ApprovalsPage key={ws.id} sb={sb} ws={ws} id={route.id} />
-          ) : (
-            <Home sb={sb} ws={ws} draft={draft} onDraft={setDraft} onStart={startChat} />
-          )}
-        </div>
-      </main>
-    </div>
-  );
+  return <Frame2 key={ws.id} sb={sb} session={session} list={list} ws={ws} notice={notice} onNotice={setNotice} onPick={pick} onChanged={load} onGone={gone} />;
 }
 
-function Home({ sb, ws, draft, onDraft, onStart }: { sb: SupabaseClient; ws: Workspace; draft: string; onDraft: (v: string) => void; onStart: (text: string) => void }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <TeamHome key={ws.id} sb={sb} ws={ws} draft={draft} onDraft={onDraft} onStart={onStart} />
-      <NeedsYou key={`needs-${ws.id}`} sb={sb} ws={ws} />
-      <RecentActivity key={`activity-${ws.id}`} sb={sb} ws={ws} />
-      <SetupStatus key={`setup-${ws.id}`} sb={sb} workspaceId={ws.id} />
-      <ConnectSocialCard key={`social-${ws.id}`} sb={sb} ws={ws} />
-    </div>
-  );
-}
+type Chrome = { pending: number; threads: { id: string; title: string; updated_at: string }[] };
 
-/** A small card while the workspace's brands in Arrowsterr and Capybaroar are being set up or wait for the website. Nothing once both are ready. */
-function SetupStatus({ sb, workspaceId }: { sb: SupabaseClient; workspaceId: string }) {
-  const [card, setCard] = useState<SetupCard | null>(null);
+/** The approvals count and the latest chats for the sidebar. Looked up again on every page change. */
+function useChrome(sb: SupabaseClient, workspaceId: string, key: string): Chrome & { reload: () => void } {
+  const [c, setC] = useState<Chrome>({ pending: 0, threads: [] });
+  const [n, setN] = useState(0);
   useEffect(() => {
     let live = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const check = () => {
-      sb.rpc("service_status", { ws: workspaceId }).then(({ data, error }) => {
-        if (!live) return;
-        // Before 006_jobs.sql runs, or on a hiccup, say nothing rather than show an error here.
-        const next = error ? null : setupCard((data ?? []) as { status: string }[]);
-        setCard(next);
-        // Look again while it's working: every 10 seconds while pending, every minute while a problem is being fixed.
-        if (next) timer = setTimeout(check, next.tone === "working" ? 10_000 : 60_000);
-      });
-    };
-    check();
+    Promise.all([
+      sb.from("approvals").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "pending"),
+      sb.from("threads").select("id, title, updated_at").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(30),
+    ]).then(([a, t]) => live && setC({ pending: a.error ? 0 : (a.count ?? 0), threads: t.error ? [] : ((t.data ?? []) as Chrome["threads"]) }));
     return () => {
       live = false;
-      clearTimeout(timer);
     };
-  }, [sb, workspaceId]);
-
-  if (!card) return null;
-  return (
-    <div className={`${card.tone === "problem" ? "bg-clay-bg" : "bg-sunk"} flex items-start gap-3 rounded-[12px] px-4 py-3`} role="status">
-      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${card.tone === "problem" ? "bg-clay" : "bg-ink-4"}`} aria-hidden />
-      <div className="min-w-0">
-        <p className="text-[15px] font-semibold text-ink">{card.title}</p>
-        <p className="text-[14px] text-ink-3">{card.text}</p>
-        {card.action ? (
-          <button type="button" className="mt-2 text-[14px] font-medium text-clay-2 underline-offset-2 hover:underline" onClick={() => navigate(card.action!.path)}>
-            {card.action.label}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
+  }, [sb, workspaceId, key, n]);
+  return { ...c, reload: useCallback(() => setN((x) => x + 1), []) };
 }
 
-const NAV = [
-  { page: "home", label: "Home", path: "/" },
-  { page: "approvals", label: "Approvals", path: "/approvals" },
-  { page: "team", label: "Team", path: "/team" },
-  { page: "routines", label: "Routines", path: "/routines" },
-  { page: "knowledge", label: "Knowledge", path: "/knowledge" },
-  { page: "memory", label: "Memory", path: "/memory" },
-  { page: "settings", label: "Settings", path: "/settings" },
-] as const;
+type NavItem = { page: string; label: string; path: string; icon: IconName; count?: boolean };
+const MAIN_NAV: NavItem[] = [
+  { page: "home", label: "Home", path: "/", icon: "home" },
+  { page: "approvals", label: "Approvals", path: "/approvals", icon: "inbox", count: true },
+  { page: "team", label: "Team", path: "/team", icon: "team" },
+  { page: "routines", label: "Routines", path: "/routines", icon: "clock" },
+];
+const SETUP_NAV: NavItem[] = [
+  { page: "knowledge", label: "Knowledge", path: "/knowledge", icon: "book" },
+  { page: "memory", label: "Memory", path: "/memory", icon: "memory" },
+  { page: "billing", label: "Billing", path: "/billing", icon: "card" },
+  { page: "settings", label: "Settings", path: "/settings", icon: "gear" },
+];
+// The phone's bottom bar, like the current app: four pages and More.
+const TAB_NAV = [MAIN_NAV[0], MAIN_NAV[1], MAIN_NAV[2], SETUP_NAV[0]];
+const MORE_NAV = [MAIN_NAV[3], SETUP_NAV[1], SETUP_NAV[2], SETUP_NAV[3]];
 
-/** The left side on a computer, the top bar on a phone: workspace, pages, and the signed-in person. */
-function Sidebar({
+/** Which nav item a page lights up: a chat is Home's, a teammate is Team's. */
+const navPage = (page: string) => (page === "thread" ? "home" : page === "agent" ? "team" : page);
+
+function go(e: React.MouseEvent, path: string) {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  navigate(path);
+}
+
+/** The app around a workspace: the sidebar (or the phone's top and bottom bars), the page, and the search palette. */
+function Frame2({
   sb,
   session,
   list,
   ws,
-  page,
+  notice,
+  onNotice,
   onPick,
+  onChanged,
+  onGone,
 }: {
   sb: SupabaseClient;
   session: Session;
   list: Workspace[];
   ws: Workspace;
-  page: string;
+  notice: string;
+  onNotice: (t: string) => void;
   onPick: (id: string) => void;
+  onChanged: () => void;
+  onGone: (text: string) => void;
 }) {
+  const route = useRoute();
+  const path = routePath(route);
+  const chrome = useChrome(sb, ws.id, path);
+  const name = String(session.user.user_metadata?.name ?? "").trim();
+  const email = session.user.email ?? "";
+  const [palette, setPalette] = useState(false);
+  const [more, setMore] = useState(false);
+  // What's typed on Home, the model picked there, the first message of a chat being started, and the chat this tab
+  // started (its page keeps streaming while the address changes from /chat to /chat/<id>).
+  const [draft, setDraft] = useState("");
+  const [model, setModel] = useState<ModelChoice>("auto");
+  const [start, setStart] = useState<StartChat | null>(null);
+  const [ownThread, setOwnThread] = useState<string | null>(null);
+  const reload = chrome.reload;
+  const startChat = useCallback((text: string) => {
+    setDraft("");
+    setOwnThread(null);
+    setStart({ text });
+    navigate("/chat");
+  }, []);
+  // Run now on the Routines page: a new chat that streams the routine.
+  const runRoutine = useCallback((r: { id: string; title: string; instruction: string }) => {
+    setOwnThread(null);
+    setStart({ text: r.instruction, routineId: r.id, title: r.title });
+    navigate("/chat");
+  }, []);
+  const started = useCallback(() => setStart(null), []);
+  const threadMade = useCallback(
+    (id: string) => {
+      setOwnThread(id);
+      reload();
+    },
+    [reload],
+  );
+  const ask = useCallback((k: AgentKey) => {
+    setDraft(`@${AGENTS[k].god} `);
+    navigate("/");
+    focusComposer();
+  }, []);
+  const newChat = useCallback(() => {
+    navigate("/");
+    focusComposer();
+  }, []);
+  const logout = useCallback(() => {
+    sb.auth.signOut();
+  }, [sb]);
+
+  // ⌘K or Ctrl+K opens and closes the search palette.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPalette((p) => !p);
+      }
+    };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, []);
+  // A new page starts at the top, like the current app. A chat keeps its own scroll.
+  useEffect(() => {
+    if (route.page !== "thread") window.scrollTo({ top: 0 });
+    document.title = `${pageTitle(route)} · Morning Telos`;
+  }, [path, route]);
+
+  const active = navPage(route.page);
+  const narrow = route.page === "home" || route.page === "thread";
+  const navLink = (n: NavItem) => (
+    <a key={n.page} className={`nl${active === n.page ? " on" : ""}`} href={n.path} aria-current={active === n.page ? "page" : undefined} onClick={(e) => go(e, n.path)}>
+      <Icon name={n.icon} />
+      {n.label}
+      {n.count && chrome.pending ? <span className="count">{chrome.pending}</span> : null}
+    </a>
+  );
+
   return (
-    <aside className="flex shrink-0 flex-col gap-4 border-b border-line bg-side px-4 py-3 md:sticky md:top-0 md:h-screen md:w-60 md:border-r md:border-b-0 md:py-5">
-      <div className="flex items-center justify-between gap-3">
-        <Logo />
+    <div className="shell">
+      <aside className="sb" aria-label="Main navigation">
+        <WorkspaceButton list={list} ws={ws} onPick={onPick} />
+        <div className="sb-actions">
+          <button type="button" className="search-btn" onClick={() => setPalette(true)}>
+            <Icon name="search" small />
+            Search or jump to
+            <kbd>⌘K</kbd>
+          </button>
+          <button type="button" className="new-btn" aria-label="New chat" title="New chat" onClick={newChat}>
+            <Icon name="plus" small />
+          </button>
+        </div>
+        <nav className="grp" aria-label="Main">
+          {MAIN_NAV.map(navLink)}
+          <div className="grp">
+            <h6>Setup</h6>
+            {SETUP_NAV.map(navLink)}
+          </div>
+        </nav>
+        <div className="grp">
+          <h6>Recent</h6>
+          {chrome.threads.length ? (
+            chrome.threads.slice(0, 6).map((t) => (
+              <a key={t.id} className={`rc${route.page === "thread" && route.id === t.id ? " on" : ""}`} href={`/chat/${t.id}`} onClick={(e) => go(e, `/chat/${t.id}`)}>
+                <span>{t.title || "Chat"}</span>
+              </a>
+            ))
+          ) : (
+            <span className="rc none">No chats yet</span>
+          )}
+        </div>
+        <div className="sb-foot">
+          <a className="me-btn" href={to("/settings")} onClick={(e) => go(e, "/settings")}>
+            <span className="avatar-me">{initial(name || email)}</span>
+            <span className="min-w-0">
+              <b>{name || email}</b>
+              <small>{roleLabel(ws.role)}</small>
+            </span>
+          </a>
+          <button type="button" className="icon-btn" aria-label="Log out" title="Log out" onClick={logout}>
+            <Icon name="logout" />
+          </button>
+        </div>
+      </aside>
+
+      <div className="mainw">
+        <header className="mtop">
+          <Mark />
+          <b>{ws.name}</b>
+          <button type="button" className="icon-btn" aria-label="Search" onClick={() => setPalette(true)}>
+            <Icon name="search" />
+          </button>
+          <a className="avatar-me" href={to("/settings")} aria-label="Settings" onClick={(e) => go(e, "/settings")}>
+            {initial(name || email)}
+          </a>
+        </header>
+        <main className="mainp">
+          <div className={`view on${narrow ? " narrow" : ""}`} key={route.page === "thread" ? "thread" : path}>
+            {notice ? (
+              <div className="note-box mb-4 flex items-start justify-between gap-3" role="status">
+                <span>{notice}</span>
+                <button type="button" className="text-ink-4 hover:text-ink" aria-label="Close" onClick={() => onNotice("")}>
+                  <Icon name="close" small />
+                </button>
+              </div>
+            ) : null}
+            {route.page === "settings" ? (
+              <SettingsPage sb={sb} ws={ws} userId={session.user.id} tab={route.tab} onChanged={onChanged} onGone={onGone} email={email} name={name} onLogout={logout} />
+            ) : route.page === "thread" ? (
+              <ThreadPage
+                key={`${ws.id}:${route.id && route.id !== ownThread ? route.id : "new"}`}
+                sb={sb}
+                ws={ws}
+                id={route.id}
+                start={route.id ? null : start}
+                model={model}
+                onStarted={started}
+                onThread={threadMade}
+              />
+            ) : route.page === "team" ? (
+              <TeamPage sb={sb} ws={ws} onAsk={ask} />
+            ) : route.page === "agent" ? (
+              <AgentPage key={route.key} sb={sb} ws={ws} agent={route.key} onAsk={ask} />
+            ) : route.page === "knowledge" ? (
+              <KnowledgePage sb={sb} ws={ws} />
+            ) : route.page === "routines" ? (
+              <RoutinesPage sb={sb} ws={ws} onRun={runRoutine} />
+            ) : route.page === "memory" ? (
+              <MemoryPage sb={sb} ws={ws} />
+            ) : route.page === "billing" ? (
+              <BillingPage sb={sb} ws={ws} onChanged={onChanged} />
+            ) : route.page === "approvals" ? (
+              <ApprovalsPage sb={sb} ws={ws} id={route.id} onDecided={reload} />
+            ) : (
+              <>
+                <Home sb={sb} ws={ws} name={name} draft={draft} onDraft={setDraft} onStart={startChat} model={model} onModel={setModel} />
+                <ConnectSocialCard sb={sb} ws={ws} />
+              </>
+            )}
+          </div>
+        </main>
       </div>
-      {list.length > 1 ? (
-        <div>
-          <label className="mb-1 block text-[12px] font-semibold text-ink-4" htmlFor="ws-pick">
-            Workspace
-          </label>
-          <select id="ws-pick" className="h-10 w-full rounded-[9px] border border-line bg-surface px-2 text-[14px]" value={ws.id} onChange={(e) => onPick(e.target.value)}>
-            {list.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : (
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold">{ws.name}</p>
-          <p className="text-[13px] text-ink-4">{roleLabel(ws.role)}</p>
-        </div>
-      )}
-      <nav className="flex gap-1 md:flex-col" aria-label="Main">
-        {NAV.map((n) => (
-          <a
-            key={n.page}
-            href={n.path}
-            aria-current={page === n.page || (n.page === "home" && page === "thread") ? "page" : undefined}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate(n.path);
-            }}
-            className={`rounded-[9px] px-3 py-2 text-[15px] ${page === n.page || (n.page === "home" && page === "thread") ? "bg-surface font-semibold text-ink shadow-sm" : "text-ink-3 hover:bg-sunk hover:text-ink"}`}
-          >
+
+      <nav className="tabbar" aria-label="Main">
+        {TAB_NAV.map((n) => (
+          <a key={n.page} className={active === n.page ? "on" : ""} href={n.path} aria-current={active === n.page ? "page" : undefined} onClick={(e) => go(e, n.path)}>
+            <Icon name={n.icon} />
             {n.label}
+            {n.count && chrome.pending ? <span className="count">{chrome.pending}</span> : null}
           </a>
         ))}
-      </nav>
-      <div className="flex items-center justify-between gap-2 border-t border-line pt-3 text-[13px] md:mt-auto md:flex-col md:items-start">
-        <span className="min-w-0 truncate text-ink-3">{session.user.email}</span>
-        <button type="button" className="rounded-[9px] border border-line bg-surface px-3 py-1.5 text-[14px] hover:bg-sunk" onClick={() => sb.auth.signOut()}>
-          Log out
+        <button type="button" className={MORE_NAV.some((n) => n.page === active) ? "on" : ""} onClick={() => setMore(true)}>
+          <Icon name="more" />
+          More
         </button>
+      </nav>
+
+      <Drawer open={more} title="More" onClose={() => setMore(false)}>
+        <div className="card list">
+          {MORE_NAV.map((n) => (
+            <a
+              key={n.page}
+              className="row"
+              href={n.path}
+              onClick={(e) => {
+                setMore(false);
+                go(e, n.path);
+              }}
+            >
+              <Icon name={n.icon} />
+              <span className="main">
+                <b>{n.label}</b>
+              </span>
+              <Icon name="next" small />
+            </a>
+          ))}
+          {list.length > 1
+            ? list
+                .filter((w) => w.id !== ws.id)
+                .map((w) => (
+                  <button key={w.id} type="button" className="row" onClick={() => onPick(w.id)}>
+                    <Mark />
+                    <span className="main">
+                      <b>Switch to {w.name}</b>
+                    </span>
+                  </button>
+                ))
+            : null}
+          <button type="button" className="row" onClick={logout}>
+            <Icon name="logout" />
+            <span className="main">
+              <b>Log out</b>
+            </span>
+          </button>
+        </div>
+      </Drawer>
+
+      {palette ? <Palette ws={ws} threads={chrome.threads} onClose={() => setPalette(false)} onNew={newChat} /> : null}
+    </div>
+  );
+}
+
+const TITLES: Record<string, string> = { home: "Home", thread: "Chat", team: "Team", knowledge: "Knowledge", routines: "Routines", memory: "Memory", approvals: "Approvals", settings: "Settings", billing: "Billing", invite: "Invite" };
+const pageTitle = (r: Route) => (r.page === "agent" ? AGENTS[r.key].god : TITLES[r.page]);
+
+/** Put the cursor in Home's message box once Home is on screen. */
+function focusComposer() {
+  setTimeout(() => {
+    const ta = document.getElementById("composer") as HTMLTextAreaElement | null;
+    ta?.focus();
+    ta?.setSelectionRange(ta.value.length, ta.value.length);
+  }, 80);
+}
+
+/** The business at the top of the sidebar. With more than one workspace it opens a menu to switch. */
+function WorkspaceButton({ list, ws, onPick }: { list: Workspace[]; ws: Workspace; onPick: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [open]);
+  const face = (
+    <>
+      <Mark />
+      <span className="min-w-0">
+        <b>{ws.name}</b>
+        <small>AI team</small>
+      </span>
+    </>
+  );
+  if (list.length < 2)
+    return (
+      <a className="ws" href={to("/settings")} onClick={(e) => go(e, "/settings")}>
+        {face}
+      </a>
+    );
+  return (
+    <div className="dd ws-dd" ref={box}>
+      <button type="button" className="ws" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {face}
+        <Icon name="down" small />
+      </button>
+      <div className={`dd-menu${open ? " on" : ""}`} role="listbox" aria-label="Workspaces">
+        {list.map((w) => (
+          <button
+            key={w.id}
+            type="button"
+            role="option"
+            aria-selected={w.id === ws.id}
+            onClick={() => {
+              setOpen(false);
+              if (w.id !== ws.id) onPick(w.id);
+            }}
+          >
+            {w.id === ws.id ? <Icon name="tick" small className="tick" /> : <span className="tick" />}
+            <span className="dd-t">{w.name}</span>
+            <span className="n">{roleLabel(w.role)}</span>
+          </button>
+        ))}
       </div>
-    </aside>
+    </div>
+  );
+}
+
+const PAGES: PaletteItem[] = [
+  { label: "Home", group: "Pages", path: "/" },
+  { label: "Approvals", group: "Pages", path: "/approvals" },
+  { label: "Team", group: "Pages", path: "/team" },
+  { label: "Routines", group: "Pages", path: "/routines", keywords: "schedule" },
+  { label: "Knowledge", group: "Pages", path: "/knowledge", keywords: "docs" },
+  { label: "Memory", group: "Pages", path: "/memory", keywords: "facts" },
+  { label: "Billing", group: "Pages", path: "/billing", keywords: "plan" },
+  { label: "Settings", group: "Pages", path: "/settings", keywords: "business" },
+  { label: "Members", group: "Pages", path: "/settings/members", keywords: "settings people invite" },
+  { label: "Social accounts", group: "Pages", path: "/settings/social", keywords: "settings" },
+  { label: "Apps", group: "Pages", path: "/settings/apps", keywords: "settings gmail outlook" },
+  { label: "Skills", group: "Pages", path: "/settings/skills", keywords: "settings" },
+];
+
+/** Search or jump to: pages, teammates and chats, like the current app's palette. Arrows move, Enter opens. */
+function Palette({ ws, threads, onClose, onNew }: { ws: Workspace; threads: Chrome["threads"]; onClose: () => void; onNew: () => void }) {
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(0);
+  const items: PaletteItem[] = [
+    ...(can(ws.role, "chat") ? [{ label: "New chat", group: "Actions" as const, path: "/" }] : []),
+    ...PAGES,
+    ...ORDER.map((k) => ({ label: `${AGENTS[k].god} · ${AGENTS[k].name}`, group: "Teammates" as const, path: `/team/${k}` })),
+    ...threads.map((t) => ({ label: t.title || "Chat", group: "Chats" as const, path: `/chat/${t.id}` })),
+  ];
+  const found = paletteMatch(items, q);
+  const pick = Math.min(sel, Math.max(found.length - 1, 0));
+  const run = (it: PaletteItem | undefined) => {
+    if (!it) return;
+    onClose();
+    if (it.group === "Actions") onNew();
+    else navigate(it.path);
+  };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, [onClose]);
+  let last = "";
+  return (
+    <div className="pal-wrap on" role="dialog" aria-modal="true" aria-label="Search" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="pal">
+        <div className="field">
+          <Icon name="search" />
+          <input
+            autoFocus
+            placeholder="Search pages, teammates and chats"
+            aria-label="Search"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setSel(0);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                if (found.length) setSel((pick + (e.key === "ArrowDown" ? 1 : found.length - 1)) % found.length);
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                run(found[pick]);
+              }
+            }}
+          />
+          <kbd>esc</kbd>
+        </div>
+        <div className="pal-l">
+          {found.length ? (
+            found.map((it, i) => {
+              const head = it.group !== last ? <h5>{it.group}</h5> : null;
+              last = it.group;
+              const k = it.group === "Teammates" ? (it.path.split("/")[2] as AgentKey) : null;
+              return (
+                <Fragment key={`${it.group}:${it.path}`}>
+                  {head}
+                  <button type="button" className={i === pick ? "on" : ""} onMouseEnter={() => setSel(i)} onClick={() => run(it)}>
+                    {k ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={agentFace(k)} alt="" />
+                    ) : (
+                      <span className="pi">{it.group === "Actions" ? "+" : it.group === "Chats" ? "#" : "›"}</span>
+                    )}
+                    <span className="min-w-0 wrap">{it.label}</span>
+                  </button>
+                </Fragment>
+              );
+            })
+          ) : (
+            <div className="empty">
+              <b>No results</b>Try another word.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

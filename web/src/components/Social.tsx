@@ -10,10 +10,10 @@ import { networkName, sortChannels, type SocialChannel } from "@/lib/socialChann
 import { can } from "@/lib/workspace";
 import { callApi, message, navigate } from "./nav";
 import type { Workspace } from "./Settings";
-import { btnPrimary, btnSmall, card, ErrorText, Notice } from "./ui";
+import { Empty, ErrorText, Notice } from "./ui";
 
 /** Opens the connect page in a new tab. The tab opens on the click, so pop-up blockers let it through. */
-function useConnect(sb: SupabaseClient, workspaceId: string) {
+export function useConnect(sb: SupabaseClient, workspaceId: string) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [opened, setOpened] = useState(false);
@@ -61,36 +61,28 @@ function useChannels(sb: SupabaseClient, workspaceId: string) {
 
 const OPENED = "We opened the connect page in a new tab. Sign in to each account there. They show up here when you're done.";
 
-/** Home: a short card for editors to connect their accounts. Hidden once they're all connected. */
+/** Home: a card when connected accounts need a new sign-in. Connecting the first ones is in Finish setup. */
 export function ConnectSocialCard({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {
   const { connect, busy, error, opened } = useConnect(sb, ws.id);
   const { rows } = useChannels(sb, ws.id);
   if (!can(ws.role, "connectSocial") || rows === null) return null;
   const lost = rows.filter((r) => r.status === "lost").length;
-  const connected = rows.length - lost;
-  if (connected && !lost && !opened && !error) return null;
+  if (!lost && !opened && !error) return null;
   return (
-    <section className={card}>
-      <div>
-        <h2 className="text-[18px] font-semibold">{lost ? "Reconnect your social accounts" : "Connect social accounts"}</h2>
-        <p className="text-[14px] text-ink-3">
-          {lost
-            ? `${lost === 1 ? "One account needs" : `${lost} accounts need`} you to sign in again so Aphrodite can keep posting.`
-            : "Link Instagram, Facebook, LinkedIn and more, so Aphrodite can post for you. You don't need a new account."}
-        </p>
+    <section className="sec">
+      <div className="card list">
+        <div className="row">
+          <span className="main">
+            <b>Reconnect your social accounts</b>
+            <small className="wrap">{lost === 1 ? "One account needs" : `${lost} accounts need`} you to sign in again so Aphrodite can keep posting.</small>
+          </span>
+          <button type="button" className="btn sm" onClick={connect} disabled={busy}>
+            {busy ? "Opening..." : "Reconnect"}
+          </button>
+        </div>
       </div>
       {error ? <ErrorText>{error}</ErrorText> : null}
       {opened ? <Notice>{OPENED}</Notice> : null}
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className={`${btnPrimary} sm:w-auto`} onClick={connect} disabled={busy}>
-          {busy ? "Opening..." : lost ? "Reconnect" : "Connect social accounts"}
-        </button>
-        {rows.length ? (
-          <button type="button" className="text-[14px] font-medium text-ink-3 hover:text-ink" onClick={() => navigate("/settings/social")}>
-            See your accounts
-          </button>
-        ) : null}
-      </div>
     </section>
   );
 }
@@ -101,47 +93,51 @@ export function SocialSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace }
   const { connect, busy, error, opened } = useConnect(sb, ws.id);
   const { rows, error: loadError } = useChannels(sb, ws.id);
   return (
-    <section className={card}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-[18px] font-semibold">Social accounts</h2>
-          <p className="text-[14px] text-ink-3">{editor ? "The accounts Aphrodite posts to. You sign in to each one on a secure page." : "The accounts Aphrodite posts to. Editors and up can connect more."}</p>
-        </div>
+    <>
+      <div className="sh">
+        <h2>Social accounts</h2>
         {editor ? (
-          <button type="button" className={`${btnPrimary} sm:w-auto sm:shrink-0`} onClick={connect} disabled={busy}>
+          <button type="button" className="btn primary sm" onClick={connect} disabled={busy}>
             {busy ? "Opening..." : "Connect social accounts"}
           </button>
         ) : null}
       </div>
+      <p className="hint-s mb-3">{editor ? "The accounts Aphrodite posts to. You sign in to each one on a secure page." : "The accounts Aphrodite posts to. Editors and up can connect more."}</p>
       {error ? <ErrorText>{error}</ErrorText> : null}
       {loadError ? <ErrorText>{loadError}</ErrorText> : null}
       {opened ? <Notice>{OPENED}</Notice> : null}
-      <ul className="flex flex-col divide-y divide-line">
+      <div className="card list">
         {(rows ?? []).map((c) => (
-          <li key={c.channel_id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <span className="min-w-0 break-words text-[15px]">
-              <strong className="font-semibold">{networkName(c.network)}</strong>
-              {c.name ? <span className="text-ink-3"> {c.name}</span> : null}
+          <div key={c.channel_id} className="row">
+            <span className="ini">{networkName(c.network)[0]}</span>
+            <span className="main">
+              <b>{networkName(c.network)}</b>
+              {c.name ? <small>{c.name}</small> : null}
             </span>
-            <span className="flex flex-wrap items-center gap-2 sm:justify-end">
-              {c.status === "lost" ? (
-                <>
-                  <span className="rounded-full bg-[#fbeae4] px-2.5 py-1 text-[13px] text-red">Needs you to sign in again</span>
-                  {editor ? (
-                    <button type="button" className={btnSmall} onClick={connect} disabled={busy}>
-                      Reconnect
-                    </button>
-                  ) : null}
-                </>
-              ) : (
-                <span className="rounded-full bg-sunk px-2.5 py-1 text-[13px] text-ink-2">Connected</span>
-              )}
-            </span>
-          </li>
+            {c.status === "lost" ? (
+              <>
+                <span className="pillst error">Needs you to sign in again</span>
+                {editor ? (
+                  <button type="button" className="btn sm" onClick={connect} disabled={busy}>
+                    Reconnect
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <span className="pillst ok">Connected</span>
+            )}
+          </div>
         ))}
-        {rows === null && !loadError ? <li className="py-3 text-[14px] text-ink-4">Loading...</li> : null}
-        {rows?.length === 0 ? <li className="py-3 text-[14px] text-ink-4">No social accounts yet.</li> : null}
-      </ul>
-    </section>
+        {rows === null && !loadError ? <div className="empty">Loading...</div> : null}
+        {rows?.length === 0 ? <Empty title="No social accounts yet">Connect Instagram, Facebook, LinkedIn and more.</Empty> : null}
+      </div>
+      {rows?.length ? (
+        <p className="hint-s mt-3">
+          <button type="button" className="link-u" onClick={() => navigate("/team/social")}>
+            See what Aphrodite does
+          </button>
+        </p>
+      ) : null}
+    </>
   );
 }

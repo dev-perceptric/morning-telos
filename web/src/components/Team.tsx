@@ -1,634 +1,35 @@
 "use client";
 
-// The AI team on screen: the Home composer, a chat thread that streams replies, and the Team page.
-// Ported from the old app's chat (app/public/app.js runChat, the @ menu) and laid out like Omniscient's Ask.
-// Chats are read straight from Supabase as the signed-in person, so row level security decides what they see.
-// Sending goes through POST /api/chat, which streams NDJSON (src/lib/chat.ts readLines).
+// The Team page and each teammate's own page, laid out like the current app (app/public/app.js renderTeam and
+// openAgent: .uc cards by section, and #agent/<key> with Overview, Chat and Settings tabs).
+// Pausing a teammate and its trust level (Ask me first or Autopilot) are saved in agent_prefs as the signed-in
+// person, so row level security decides who may change them.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChatEvent } from "@/lib/agentLoop";
-import { inlineParts, readLines } from "@/lib/chat";
-import { changesApps } from "@/lib/composio/catalog";
-import { PLANS, type PaidPlan } from "@/lib/plans";
-import { insertSkill, matchSkills, menuAgent, skillsFor, slashQuery, type SkillRow } from "@/lib/skills";
-import { agentFace, AGENTS, agentByGod, insertMention, isAgentKey, LEAD, mentionMatches, mentionQuery, ORDER, type AgentKey } from "@/lib/team";
+import { useCallback, useEffect, useState } from "react";
+import { appLogo, appName, changesApps } from "@/lib/composio/catalog";
+import { ago } from "@/lib/home";
+import { skillsFor, type SkillRow } from "@/lib/skills";
+import { agentPicture, AGENTS, isAgentKey, type AgentKey } from "@/lib/team";
+import { agentStatus, agentToolkits, PRODUCT_BADGE, TEAM_SECTIONS, type AgentStatus } from "@/lib/teamView";
 import { can } from "@/lib/workspace";
-import { ApprovalCard } from "./Approvals";
-import { callApi, message, navigate } from "./nav";
+import { Face, useSkillRows } from "./Chat";
+import { Icon } from "./icons";
+import { navigate } from "./nav";
 import type { Workspace } from "./Settings";
-import { btnPrimary, btnSmall, card, ErrorText, Notice } from "./ui";
+import { Empty, ErrorText, PageHead, Section, Switch, to } from "./ui";
 
-type Item =
-  | { kind: "user"; text: string }
-  | { kind: "agent"; agent: AgentKey; text: string; error?: boolean; blocked?: string }
-  | { kind: "note"; agent: AgentKey; text: string; full?: boolean }
-  | { kind: "tool"; agent: AgentKey; text: string }
-  | { kind: "approval"; id: number; title: string };
+export { Face } from "./Chat";
 
-type ThreadRow = { id: string; title: string; updated_at: string };
-type MessageRow = { id: number; role: "user" | "agent" | "note"; agent: string | null; content: string; meta: Record<string, unknown> | null };
+/** Teammates whose tools can change something, in our products or the business's own apps (not Athena, who only reads, and not the ones coming soon). */
+const makesChanges = (k: AgentKey) => !AGENTS[k].soon && !AGENTS[k].readOnly && (AGENTS[k].apps.length > 0 || changesApps(k));
 
-const when = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-export function Face({ agent, size = 32 }: { agent: AgentKey; size?: number }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={agentFace(agent)} alt="" width={size} height={size} className="shrink-0 rounded-full bg-sunk" style={{ width: size, height: size }} />;
-}
-
-/** The person's words, with tagged teammates marked. */
-function WithTags({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(/(@\w+)/g).map((part, i) =>
-        part.startsWith("@") && agentByGod(part.slice(1)) ? (
-          <span key={i} className="font-semibold text-clay-2">
-            @{AGENTS[agentByGod(part.slice(1))!].god}
-          </span>
-        ) : (
-          <span key={i}>{part}</span>
-        ),
-      )}
-    </>
-  );
-}
-
-/** A reply: line breaks kept, **bold** shown bold, and nothing in it treated as HTML. */
-function Reply({ text }: { text: string }) {
-  return (
-    <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-ink">
-      {inlineParts(text).map((p, i) => (p.bold ? <strong key={i}>{p.text}</strong> : <span key={i}>{p.text}</span>))}
-    </p>
-  );
-}
-
-// ─────────────── the composer ───────────────
-
-/**
- * A message box. Typing @ opens a menu of teammates, and / a menu of the tagged teammate's skills (Athena's, or
- * `agent`'s, when nobody is tagged). Enter sends and Shift+Enter starts a new line.
- */
-export function Composer({
-  value,
-  onChange,
-  onSend,
-  disabled,
-  busy,
-  placeholder,
-  autoFocus,
-  skills = [],
-  agent = LEAD,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onSend: (text: string) => void;
-  disabled?: boolean;
-  busy?: boolean;
-  placeholder: string;
-  autoFocus?: boolean;
-  /** The workspace's own skills. The System skills are always there. */
-  skills?: SkillRow[];
-  /** Whose skills / shows when the message tags nobody. */
-  agent?: AgentKey;
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const [query, setQuery] = useState<{ kind: "mention" | "skill"; q: string } | null>(null);
-  const [pick, setPick] = useState(0);
-  const skillAgent = menuAgent(value, agent);
-  const people = query?.kind === "mention" ? mentionMatches(query.q) : [];
-  const found = query?.kind === "skill" ? matchSkills(skillsFor(skillAgent, skills), query.q).slice(0, 8) : [];
-  const count = people.length || found.length;
-  const open = count > 0;
-
-  const look = (ta: HTMLTextAreaElement) => {
-    const before = ta.value.slice(0, ta.selectionStart);
-    const m = mentionQuery(before);
-    const k = m === null ? slashQuery(before) : null;
-    setQuery(m !== null ? { kind: "mention", q: m } : k !== null ? { kind: "skill", q: k } : null);
-    setPick(0);
-  };
-  const place = (next: { text: string; cursor: number }) => {
-    const ta = ref.current;
-    onChange(next.text);
-    setQuery(null);
-    requestAnimationFrame(() => {
-      ta?.focus();
-      ta?.setSelectionRange(next.cursor, next.cursor);
-    });
-  };
-  const choose = (k: AgentKey) => {
-    const ta = ref.current;
-    if (ta) place(insertMention(ta.value, ta.selectionStart, k));
-  };
-  const chooseSkill = (name: string) => {
-    const ta = ref.current;
-    if (ta) place(insertSkill(ta.value, ta.selectionStart, name));
-  };
-  const chooseAt = (i: number) => {
-    if (people.length) choose(people[Math.min(i, people.length - 1)]);
-    else if (found.length) chooseSkill(found[Math.min(i, found.length - 1)].name);
-  };
-  const send = () => {
-    const t = value.trim();
-    if (!t || disabled || busy) return;
-    onSend(t);
-    setQuery(null);
-  };
-  const tag = () => {
-    const v = value && !value.endsWith(" ") ? `${value} @` : `${value}@`;
-    onChange(v);
-    setQuery({ kind: "mention", q: "" });
-    requestAnimationFrame(() => {
-      ref.current?.focus();
-      ref.current?.setSelectionRange(v.length, v.length);
-    });
-  };
-
-  return (
-    <form
-      className="relative rounded-2xl border border-line bg-surface p-3 shadow-sm focus-within:border-ink-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        send();
-      }}
-    >
-      {open && people.length ? (
-        <div role="listbox" aria-label="AI team" className="absolute bottom-full left-0 z-10 mb-2 flex w-full max-w-sm flex-col gap-0.5 rounded-[12px] border border-line bg-surface p-1.5 shadow-lg">
-          {people.map((k, i) => (
-            <button
-              key={k}
-              type="button"
-              role="option"
-              aria-selected={i === pick}
-              className={`flex items-center gap-3 rounded-[9px] px-2 py-1.5 text-left ${i === pick ? "bg-sunk" : "hover:bg-sunk"}`}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                choose(k);
-              }}
-            >
-              <Face agent={k} size={28} />
-              <span className="min-w-0">
-                <span className="block text-[14px] font-semibold">{AGENTS[k].god}</span>
-                <span className="block text-[13px] text-ink-3">
-                  {AGENTS[k].name}
-                  {AGENTS[k].soon ? ". Coming soon" : ""}
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {open && found.length ? (
-        <div role="listbox" aria-label={`${AGENTS[skillAgent].god}'s skills`} className="absolute bottom-full left-0 z-10 mb-2 flex w-full max-w-md flex-col gap-0.5 rounded-[12px] border border-line bg-surface p-1.5 shadow-lg">
-          <p className="px-2 pt-1 text-[12px] font-semibold text-ink-4">{AGENTS[skillAgent].god}&apos;s skills</p>
-          {found.map((x, i) => (
-            <button
-              key={x.key}
-              type="button"
-              role="option"
-              aria-selected={i === pick}
-              className={`flex flex-col rounded-[9px] px-2 py-1.5 text-left ${i === pick ? "bg-sunk" : "hover:bg-sunk"}`}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                chooseSkill(x.name);
-              }}
-            >
-              <span className="text-[14px] font-semibold">/{x.name}</span>
-              <span className="break-words text-[13px] text-ink-3">{x.description.split(". ")[0].replace(/\.$/, "")}.</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-      <label className="sr-only" htmlFor="composer">
-        Message your team
-      </label>
-      <textarea
-        id="composer"
-        ref={ref}
-        rows={2}
-        value={value}
-        autoFocus={autoFocus}
-        disabled={disabled}
-        placeholder={placeholder}
-        className="block max-h-56 min-h-12 w-full resize-none bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-4 disabled:text-ink-4"
-        onChange={(e) => {
-          onChange(e.target.value);
-          look(e.target);
-        }}
-        onClick={(e) => look(e.currentTarget)}
-        onBlur={() => setTimeout(() => setQuery(null), 150)}
-        onKeyDown={(e) => {
-          if (open) {
-            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-              e.preventDefault();
-              setPick((p) => (p + (e.key === "ArrowDown" ? 1 : count - 1)) % count);
-              return;
-            }
-            if (e.key === "Enter" || e.key === "Tab") {
-              e.preventDefault();
-              chooseAt(pick);
-              return;
-            }
-            if (e.key === "Escape") {
-              e.preventDefault();
-              setQuery(null);
-              return;
-            }
-          }
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            send();
-          }
-        }}
-      />
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <button type="button" className="rounded-[9px] px-2 py-1 text-[14px] font-medium text-ink-3 hover:bg-sunk hover:text-ink disabled:opacity-50" onClick={tag} disabled={disabled}>
-          @ Tag a teammate
-        </button>
-        <button type="submit" className={`${btnPrimary} h-9 w-auto px-4 text-[14px]`} disabled={disabled || busy || !value.trim()}>
-          {busy ? "Working..." : "Send"}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-/** The workspace's own skills, for the / menu. Empty until 014_routines_skills_memory.sql runs. */
-export function useSkillRows(sb: SupabaseClient, workspaceId: string): SkillRow[] {
-  const [rows, setRows] = useState<SkillRow[]>([]);
-  useEffect(() => {
-    let live = true;
-    sb.from("skills")
-      .select("id, agent, name, description, body")
-      .eq("workspace_id", workspaceId)
-      .then(({ data, error }) => {
-        if (live && !error) setRows((data ?? []) as SkillRow[]);
-      });
-    return () => {
-      live = false;
-    };
-  }, [sb, workspaceId]);
-  return rows;
-}
-
-/** The first message of a new chat: typed on Home, or a routine started with Run now. */
-export type StartChat = { text: string; routineId?: string; title?: string };
-
-// ─────────────── Home ───────────────
-
-const IDEAS = [
-  "@Artemis how is our AI visibility this week?",
-  "@Aphrodite plan next week's posts",
-  "@Iris write a welcome email for new customers",
-  "@Hermes follow up on this week's new leads",
-  "@Hora find times for a call next week",
-  "@Hestia answer the customer emails waiting for us",
-  "What can my AI team do for me?",
-];
-
-/** Home: what should the team do today, and the latest chats. */
-export function TeamHome({ sb, ws, draft, onDraft, onStart }: { sb: SupabaseClient; ws: Workspace; draft: string; onDraft: (v: string) => void; onStart: (text: string) => void }) {
-  const editor = can(ws.role, "chat");
-  const threads = useThreads(sb, ws.id, 8);
-  const skills = useSkillRows(sb, ws.id);
-  return (
-    <section className="flex flex-col gap-6 py-4">
-      <div>
-        <p className="mb-1 text-[14px] text-ink-3">{ws.name}</p>
-        <h1 className="font-serif text-[34px] leading-tight">What should your team do today?</h1>
-      </div>
-      <Composer value={draft} onChange={onDraft} onSend={onStart} disabled={!editor} placeholder={editor ? "Ask your team anything. Type @ to tag a teammate, or / for a skill." : "Viewers can read chats but can't send messages."} autoFocus={editor} skills={skills} />
-      {editor ? (
-        <div className="flex flex-wrap gap-2">
-          {IDEAS.map((t) => (
-            <button key={t} type="button" className="rounded-full border border-line bg-surface px-3 py-1.5 text-left text-[14px] text-ink-2 hover:border-line-2 hover:bg-sunk" onClick={() => onDraft(t)}>
-              <WithTags text={t} />
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {threads.rows?.length ? (
-        <div>
-          <h2 className="mb-2 text-[13px] font-semibold text-ink-4">Recent chats</h2>
-          <ul className="flex flex-col divide-y divide-line rounded-2xl border border-line bg-surface">
-            {threads.rows.map((t) => (
-              <li key={t.id}>
-                <a
-                  href={`/chat/${t.id}`}
-                  className="flex items-start justify-between gap-3 px-4 py-3 hover:bg-sunk"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate(`/chat/${t.id}`);
-                  }}
-                >
-                  <span className="min-w-0 break-words text-[15px]">{t.title || "Chat"}</span>
-                  <span className="shrink-0 text-[13px] text-ink-4">{when(t.updated_at)}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {threads.error ? <ErrorText>{threads.error}</ErrorText> : null}
-    </section>
-  );
-}
-
-function useThreads(sb: SupabaseClient, workspaceId: string, limit: number) {
-  const [rows, setRows] = useState<ThreadRow[] | null>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let live = true;
-    sb.from("threads")
-      .select("id, title, updated_at")
-      .eq("workspace_id", workspaceId)
-      .order("updated_at", { ascending: false })
-      .limit(limit)
-      .then(({ data, error }) => {
-        if (!live) return;
-        // Before 011_ai_team.sql runs there are no chats yet. Say nothing rather than show a database error.
-        if (error) return setError(/threads/.test(error.message) ? "" : error.message);
-        setRows((data ?? []) as ThreadRow[]);
-      });
-    return () => {
-      live = false;
-    };
-  }, [sb, workspaceId, limit]);
-  return { rows, error };
-}
-
-// ─────────────── a thread ───────────────
-
-/** The approvals an agent's reply prepared (meta.approvals, saved by the agent loop), as cards under it. */
-const approvalsIn = (meta: Record<string, unknown> | null): Item[] =>
-  (Array.isArray(meta?.approvals) ? (meta.approvals as { id?: unknown; title?: unknown }[]) : [])
-    .filter((a) => typeof a?.id === "number")
-    .map((a) => ({ kind: "approval" as const, id: a.id as number, title: typeof a.title === "string" ? a.title : "A change" }));
-
-const toItems = (m: MessageRow): Item[] => {
-  const agent = isAgentKey(m.agent) ? m.agent : "chief";
-  if (m.role === "user") return [{ kind: "user", text: m.content }];
-  // A note about an approval ("Approved and done: ...") is shown whole. A handoff note shows who handed it to whom.
-  if (m.role === "note") return [{ kind: "note", agent, text: m.content, full: m.meta?.approval !== undefined }];
-  return [{ kind: "agent", agent, text: m.content, error: Boolean(m.meta?.error), blocked: typeof m.meta?.blocked === "string" ? m.meta.blocked : undefined }, ...approvalsIn(m.meta)];
-};
-
-/** POST /api/chat and read its NDJSON stream. Calls onEvent for each line. Throws the route's error message. */
-async function streamChat(sb: SupabaseClient, body: Record<string, unknown>, onEvent: (e: ChatEvent) => void) {
-  const token = (await sb.auth.getSession()).data.session?.access_token;
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(body),
-  }).catch(() => null);
-  if (!res) throw new Error("Couldn't reach the server. Check your connection and try again.");
-  if (!res.ok || !res.body) {
-    const out = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(out.error || "Something went wrong. Try again.");
-  }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const { events, rest } = readLines(buffer);
-    buffer = rest;
-    events.forEach(onEvent);
-  }
-  readLines(`${buffer}\n`).events.forEach(onEvent);
-}
-
-/** One chat. Loads its messages, sends new ones and shows replies as they arrive. `start` is the first message of a new chat. */
-export function ThreadPage({
-  sb,
-  ws,
-  id,
-  start,
-  onStarted,
-  onThread,
-}: {
-  sb: SupabaseClient;
-  ws: Workspace;
-  id: string | null;
-  start: StartChat | null;
-  onStarted: () => void;
-  /** Tells the app which thread this page started, so the address can change to it without a new page. */
-  onThread: (id: string) => void;
-}) {
-  const editor = can(ws.role, "chat");
-  const [items, setItems] = useState<Item[]>([]);
-  const [title, setTitle] = useState("");
-  const [status, setStatus] = useState<{ agent: AgentKey; text: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(Boolean(id));
-  // The thread this page is showing. A new chat learns its id from the stream, and the address changes without a reload.
-  const thread = useRef<string | null>(id);
-  const bottom = useRef<HTMLDivElement>(null);
-  const skills = useSkillRows(sb, ws.id);
-  // The / menu shows the skills of whoever answered last, when the reply tags nobody.
-  const lastAgent = [...items].reverse().find((x): x is Extract<Item, { kind: "agent" }> => x.kind === "agent")?.agent ?? LEAD;
-
-  useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [items, status]);
-
-  // Load a thread opened from a link. Not one this page just started: its messages are already on screen.
-  useEffect(() => {
-    if (!id || (thread.current === id && items.length)) return;
-    thread.current = id;
-    let live = true;
-    Promise.all([
-      sb.from("threads").select("title").eq("id", id).eq("workspace_id", ws.id).maybeSingle(),
-      sb.from("messages").select("id, role, agent, content, meta").eq("thread_id", id).eq("workspace_id", ws.id).order("id"),
-    ]).then(([t, m]) => {
-      if (!live) return;
-      setLoading(false);
-      if (t.error || m.error) return setError((t.error ?? m.error)!.message);
-      if (!t.data) return setError("That chat was not found.");
-      setTitle((t.data as { title: string }).title);
-      setItems(((m.data ?? []) as MessageRow[]).flatMap(toItems));
-    });
-    return () => {
-      live = false;
-    };
-    // Only a new address loads the thread again.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sb, ws.id, id]);
-
-  const send = useCallback(
-    async (text: string, routine?: { id: string; title: string }) => {
-      setBusy(true);
-      setError("");
-      setDraft("");
-      setItems((xs) => [...xs, { kind: "user", text }]);
-      if (!thread.current) setTitle(routine ? `Routine: ${routine.title}` : text.replace(/\s+/g, " ").trim());
-      // Approval cards wait for the reply that prepared them, so they show under it, as they do after a reload.
-      let waiting: Item[] = [];
-      try {
-        await streamChat(sb, { workspaceId: ws.id, threadId: thread.current, text, ...(routine ? { routineId: routine.id } : {}) }, (e) => {
-          if (e.type === "thread") {
-            if (thread.current !== e.id) {
-              thread.current = e.id;
-              onThread(e.id);
-              navigate(`/chat/${e.id}`, true);
-            }
-          } else if (e.type === "status") setStatus({ agent: e.agent, text: e.text });
-          else if (e.type === "tool") setItems((xs) => [...xs, { kind: "tool", agent: e.agent, text: e.text }]);
-          else if (e.type === "approval") waiting.push({ kind: "approval", id: e.id, title: e.title });
-          else if (e.type === "handoff") {
-            setStatus(null);
-            setItems((xs) => [...xs, { kind: "note", agent: e.from, text: `${AGENTS[e.from].god} handed this to ${AGENTS[e.to].god}: ${e.note}` }]);
-          } else if (e.type === "message") {
-            setStatus(null);
-            const cards = waiting;
-            waiting = [];
-            setItems((xs) => [...xs, { kind: "agent", agent: e.agent, text: e.text, error: e.error, blocked: e.blocked }, ...cards]);
-          }
-        });
-      } catch (err) {
-        setError(message(err));
-      }
-      if (waiting.length) setItems((xs) => [...xs, ...waiting]);
-      setStatus(null);
-      setBusy(false);
-    },
-    [sb, ws.id, onThread],
-  );
-
-  // A new chat from Home: send its first message once.
-  const started = useRef(false);
-  useEffect(() => {
-    if (id || !start || started.current) return;
-    started.current = true;
-    onStarted();
-    send(start.text, start.routineId ? { id: start.routineId, title: start.title ?? "" } : undefined);
-  }, [id, start, onStarted, send]);
-
-  return (
-    <section className="flex min-h-[70vh] flex-col gap-5 py-2">
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="min-w-0 break-words font-serif text-[24px] leading-tight">{title || (loading ? "" : "New chat")}</h1>
-        <button type="button" className={`${btnSmall} shrink-0`} onClick={() => navigate("/")}>
-          New chat
-        </button>
-      </div>
-      <div className="flex flex-1 flex-col gap-4" aria-live="polite">
-        {loading ? <p className="text-[14px] text-ink-4">Loading...</p> : null}
-        {!loading && !items.length && !busy && !error ? <p className="text-[14px] text-ink-4">No messages yet.</p> : null}
-        {items.map((it, i) => (
-          <ItemView key={i} item={it} sb={sb} ws={ws} />
-        ))}
-        {status ? (
-          <div className="flex items-center gap-3 text-[14px] text-ink-3" role="status">
-            <Face agent={status.agent} size={24} />
-            <span>
-              {AGENTS[status.agent].god} is {status.text.toLowerCase()}...
-            </span>
-          </div>
-        ) : null}
-        {error ? <ErrorText>{error}</ErrorText> : null}
-        <div ref={bottom} />
-      </div>
-      <div className="sticky bottom-4">
-        <Composer
-          value={draft}
-          onChange={setDraft}
-          onSend={(t) => send(t)}
-          busy={busy}
-          disabled={!editor}
-          placeholder={editor ? "Reply, type @ to tag a teammate, or / for a skill." : "Viewers can read chats but can't send messages."}
-          skills={skills}
-          agent={lastAgent}
-        />
-      </div>
-    </section>
-  );
-}
-
-function ItemView({ item, sb, ws }: { item: Item; sb: SupabaseClient; ws: Workspace }) {
-  if (item.kind === "approval")
-    return (
-      <div className="pl-11">
-        <ApprovalCard sb={sb} ws={ws} id={item.id} title={item.title} />
-      </div>
-    );
-  if (item.kind === "user")
-    return (
-      <div className="flex justify-end">
-        <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-sunk px-4 py-2.5 text-[15px] text-ink">
-          <WithTags text={item.text} />
-        </p>
-      </div>
-    );
-  if (item.kind === "note" || item.kind === "tool")
-    return (
-      <div className="flex items-center gap-2 pl-1 text-[13px] text-ink-3">
-        <Face agent={item.agent} size={20} />
-        <span className="min-w-0 break-words">{item.kind === "note" && !item.full ? item.text.split(":")[0] : item.text}</span>
-      </div>
-    );
-  const a = AGENTS[item.agent];
-  return (
-    <div className="flex items-start gap-3">
-      <Face agent={item.agent} />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="text-[14px] font-semibold">
-          {a.god} <span className="font-normal text-ink-4">{a.name}</span>
-        </p>
-        <div className={item.error ? "rounded-[10px] bg-[#fbeae4] px-3 py-2" : ""}>
-          <Reply text={item.text} />
-        </div>
-        {item.blocked === "expired" || item.blocked === "allowance" ? <PickPlan sb={sb} ws={ws} /> : null}
-      </div>
-    </div>
-  );
-}
-
-/** Under a limit message: the owner picks a plan (Stripe Checkout); everyone else is told who can. */
-function PickPlan({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [done, setDone] = useState("");
-  if (ws.role !== "owner") return <p className="text-[14px] text-ink-3">Ask the workspace owner to pick a plan.</p>;
-  const choose = async (plan: PaidPlan) => {
-    setBusy(true);
-    setError("");
-    try {
-      const out = await callApi<{ url?: string; changed?: boolean }>(sb, "/api/billing/checkout", { workspaceId: ws.id, plan });
-      if (out.url) return window.location.assign(out.url);
-      if (out.changed) setDone(`You're on ${PLANS[plan].name} now. Send your message again.`);
-    } catch (err) {
-      setError(message(err));
-    }
-    setBusy(false);
-  };
-  return (
-    <div className="mt-1 flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
-        {(["starter", "pro"] as const).map((p) => (
-          <button key={p} type="button" className={btnSmall} disabled={busy} onClick={() => choose(p)}>
-            Upgrade to {PLANS[p].name}, ${PLANS[p].price} a month
-          </button>
-        ))}
-      </div>
-      {error ? <ErrorText>{error}</ErrorText> : null}
-      {done ? <Notice>{done}</Notice> : null}
-    </div>
-  );
-}
-
-// ─────────────── Team ───────────────
-
-/** Every teammate, with what they do. Coming soon ones are marked. Admins can pause one. */
-export function TeamPage({ sb, ws, onAsk }: { sb: SupabaseClient; ws: Workspace; onAsk: (agent: AgentKey) => void }) {
-  const admin = can(ws.role, "changeTeam");
-  const editor = can(ws.role, "chat");
+/** What every Team screen needs: who is paused or on autopilot, our products' setup, and the connected apps. */
+function useTeam(sb: SupabaseClient, ws: Workspace) {
   const [paused, setPaused] = useState<Set<AgentKey>>(new Set());
   const [autopilot, setAutopilot] = useState<Set<AgentKey>>(new Set());
+  const [services, setServices] = useState<Record<string, string>>({});
+  const [connected, setConnected] = useState<string[]>([]);
   const [error, setError] = useState("");
   useEffect(() => {
     let live = true;
@@ -642,6 +43,12 @@ export function TeamPage({ sb, ws, onAsk }: { sb: SupabaseClient; ws: Workspace;
         setPaused(new Set(rows.filter((r) => !r.enabled).map((r) => r.agent as AgentKey)));
         setAutopilot(new Set(rows.filter((r) => r.trust >= 2).map((r) => r.agent as AgentKey)));
       });
+    // Before the migrations run, or on a hiccup, these say nothing rather than show an error.
+    sb.rpc("service_status", { ws: ws.id }).then(({ data, error }) => live && !error && setServices(Object.fromEntries(((data ?? []) as { product: string; status: string }[]).map((r) => [r.product, r.status]))));
+    sb.from("app_connections")
+      .select("toolkit, status")
+      .eq("workspace_id", ws.id)
+      .then(({ data, error }) => live && !error && setConnected(((data ?? []) as { toolkit: string; status: string }[]).filter((r) => r.status === "active").map((r) => r.toolkit)));
     return () => {
       live = false;
     };
@@ -673,90 +80,448 @@ export function TeamPage({ sb, ws, onAsk }: { sb: SupabaseClient; ws: Workspace;
     });
   };
 
+  const status = (k: AgentKey): AgentStatus => agentStatus(k, { paused: paused.has(k), services, connected });
+  return { paused, autopilot, services, connected, error, toggle, setTrust, status };
+}
+
+const dot = (s: AgentStatus) => `status${s.tone === "wait" ? " wait" : s.tone === "idle" ? " idle" : ""}`;
+
+/** The colored product badges and app logos at the top right of a card. */
+function Badges({ k }: { k: AgentKey }) {
+  const products = AGENTS[k].apps.filter((p) => PRODUCT_BADGE[p]);
+  const apps = agentToolkits(k).slice(0, 3);
+  if (!products.length && !apps.length) return null;
   return (
-    <section className="flex flex-col gap-6 py-4">
-      <div>
-        <h1 className="font-serif text-[34px] leading-tight">Your AI team</h1>
-        <p className="text-[15px] text-ink-3">Tag a teammate with @ in any chat. Athena answers when you don&apos;t tag anyone.</p>
-      </div>
-      {error ? <ErrorText>{error}</ErrorText> : null}
-      <ul className="grid gap-4 sm:grid-cols-2">
-        {ORDER.map((k) => {
-          const a = AGENTS[k];
-          const off = paused.has(k);
-          return (
-            <li key={k} className={`${card} ${a.soon ? "opacity-75" : ""}`}>
-              <div className="flex items-start gap-3">
-                <Face agent={k} size={48} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[18px] font-semibold">{a.god}</h2>
-                    {a.soon ? <span className="rounded-full bg-sunk px-2.5 py-0.5 text-[12px] text-ink-3">Coming soon</span> : null}
-                    {off && !a.soon ? <span className="rounded-full bg-clay-bg px-2.5 py-0.5 text-[12px] text-clay-2">Paused</span> : null}
-                  </div>
-                  <p className="text-[14px] text-ink-3">{a.name}</p>
-                </div>
-              </div>
-              <p className="text-[15px] text-ink-2">{a.job}</p>
-              <ul className="flex flex-col gap-1 text-[14px] text-ink-3">
-                {a.out.map((o) => (
-                  <li key={o}>{o}</li>
-                ))}
-              </ul>
-              {makesChanges(k) ? <TrustSetting agent={k} on={autopilot.has(k)} admin={admin} onChange={(on) => setTrust(k, on)} /> : null}
-              {!a.soon && (editor || admin) ? (
-                <div className="flex flex-wrap gap-2">
-                  {editor && !off ? (
-                    <button type="button" className={btnSmall} onClick={() => onAsk(k)}>
-                      Ask {a.god}
-                    </button>
-                  ) : null}
-                  {admin ? (
-                    <button type="button" className={btnSmall} onClick={() => toggle(k)}>
-                      {off ? "Turn on" : "Pause"}
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <span className="ics">
+      {products.map((p) => (
+        <span key={p} className="ic wide" title={PRODUCT_BADGE[p].name} style={{ background: PRODUCT_BADGE[p].color }}>
+          {PRODUCT_BADGE[p].label}
+        </span>
+      ))}
+      {apps.map((t) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={t} className="ic logo-ic" src={appLogo(t)} alt={appName(t)} title={appName(t)} />
+      ))}
+    </span>
   );
 }
 
-/** Teammates whose tools can change something, in our products or the business's own apps (not Athena, who only reads, and not the ones coming soon). */
-const makesChanges = (k: AgentKey) => !AGENTS[k].soon && !AGENTS[k].readOnly && (AGENTS[k].apps.length > 0 || changesApps(k));
+// ─────────────── the Team page ───────────────
 
-/** Ask me first or Autopilot, for one teammate. Admins and the owner change it; everyone else sees it. */
-function TrustSetting({ agent, on, admin, onChange }: { agent: AgentKey; on: boolean; admin: boolean; onChange: (on: boolean) => void }) {
-  const options = [
-    { on: false, label: "Ask me first" },
-    { on: true, label: "Autopilot" },
-  ];
+/** Every teammate, grouped like the current app, with what they do. Admins set each one's trust level here too. */
+export function TeamPage({ sb, ws, onAsk }: { sb: SupabaseClient; ws: Workspace; onAsk: (agent: AgentKey) => void }) {
+  const admin = can(ws.role, "changeTeam");
+  const editor = can(ws.role, "chat");
+  const team = useTeam(sb, ws);
+
   return (
-    <div className="flex flex-col gap-1.5 border-t border-line pt-3">
-      <p className="text-[13px] font-medium text-ink-3">Changes</p>
+    <>
+      <PageHead title="Team" sub="Your AI employees, each named after a Greek god. Tag any of them with @." />
+      {team.error ? <ErrorText>{team.error}</ErrorText> : null}
+      {TEAM_SECTIONS.map((sec) => (
+        <section key={sec.title} className="uc-sec">
+          <h2>{sec.title}</h2>
+          <ul className="uc-grid">
+            {sec.agents.map((k) => {
+              const a = AGENTS[k];
+              const st = team.status(k);
+              const off = team.paused.has(k);
+              return (
+                <li key={k} className={`card uc${a.soon ? " soon" : ""}`}>
+                  <div className="top">
+                    <Face agent={k} size={40} />
+                    <Badges k={k} />
+                  </div>
+                  <div className="r1">
+                    <span className="eyebrow">{a.god}</span>
+                    <span className={dot(st)}>{st.label}</span>
+                  </div>
+                  <h3>{a.name}</h3>
+                  <p>{a.job}</p>
+                  <ul>
+                    {a.out.map((o) => (
+                      <li key={o}>{o}</li>
+                    ))}
+                  </ul>
+                  {makesChanges(k) ? <TrustChips agent={k} on={team.autopilot.has(k)} admin={admin} onChange={(on) => team.setTrust(k, on)} /> : null}
+                  <div className="ft">
+                    <a
+                      href={`/team/${k}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate(`/team/${k}`);
+                      }}
+                    >
+                      See how it works →
+                    </a>
+                    {!a.soon && editor && !off ? (
+                      <button type="button" className="btn primary sm try" onClick={() => onAsk(k)}>
+                        Try in chat
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </>
+  );
+}
+
+/** Ask me first or Autopilot, on a card. Admins and the owner change it; everyone else sees it. */
+function TrustChips({ agent, on, admin, onChange }: { agent: AgentKey; on: boolean; admin: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <div className="trust-row">
+      <span className="trust-l">Changes</span>
       {admin ? (
-        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={`How ${AGENTS[agent].god} makes changes`}>
-          {options.map((o) => (
-            <button
-              key={o.label}
-              type="button"
-              role="radio"
-              aria-checked={on === o.on}
-              className={`rounded-full px-3 py-1.5 text-[14px] ${on === o.on ? "bg-ink text-white" : "border border-line bg-surface text-ink-2 hover:bg-sunk"}`}
-              onClick={() => on !== o.on && onChange(o.on)}
-            >
-              {o.label}
+        <span className="seg" role="radiogroup" aria-label={`How ${AGENTS[agent].god} makes changes`}>
+          {[
+            { v: false, l: "Ask me first" },
+            { v: true, l: "Autopilot" },
+          ].map((o) => (
+            <button key={o.l} type="button" role="radio" aria-checked={on === o.v} onClick={() => on !== o.v && onChange(o.v)}>
+              {o.l}
             </button>
           ))}
+        </span>
+      ) : (
+        <span className="trust-v">{on ? "Autopilot" : "Ask me first"}</span>
+      )}
+    </div>
+  );
+}
+
+// ─────────────── one teammate ───────────────
+
+type Tab = "ov" | "chat" | "set";
+const WEEK = () => new Date(Date.now() - 7 * 864e5).toISOString();
+type ApRow = { id: number; title: string; tool: string; created_at: string };
+type ActRow = { id: number; text: string; thread_id: string | null; created_at: string };
+type ChatRow = { id: string; title: string; updated_at: string };
+type DocRow = { id: string; title: string; agent: string | null };
+
+const TRUST: { v: boolean; t: string; s: string }[] = [
+  { v: false, t: "Ask me first", s: "Changes wait for your OK in Approvals. Reading and research run right away." },
+  { v: true, t: "Autopilot", s: "Changes run right away and show up in Activity. Use it once you trust this teammate." },
+];
+
+/** One teammate's page: who they are, what they did this week, what waits on you, their chats, trust and rules. */
+export function AgentPage({ sb, ws, agent: k, onAsk }: { sb: SupabaseClient; ws: Workspace; agent: AgentKey; onAsk: (agent: AgentKey) => void }) {
+  const a = AGENTS[k];
+  const admin = can(ws.role, "changeTeam");
+  const editor = can(ws.role, "chat");
+  const team = useTeam(sb, ws);
+  const skillRows = useSkillRows(sb, ws.id);
+  const [tab, setTab] = useState<Tab>("ov");
+  const [stats, setStats] = useState<{ replies: number; done: number } | null>(null);
+  const [needs, setNeeds] = useState<ApRow[] | null>(null);
+  const [recent, setRecent] = useState<ActRow[] | null>(null);
+  const [chats, setChats] = useState<ChatRow[] | null>(null);
+  const [docs, setDocs] = useState<DocRow[] | null>(null);
+  const st = team.status(k);
+  const off = team.paused.has(k);
+
+  const load = useCallback(() => {
+    let live = true;
+    const since = WEEK();
+    const n = (r: { count: number | null }) => r.count ?? 0;
+    Promise.all([
+      sb.from("messages").select("id", { count: "exact", head: true }).eq("workspace_id", ws.id).eq("role", "agent").eq("agent", k).gte("created_at", since),
+      sb.from("approvals").select("id", { count: "exact", head: true }).eq("workspace_id", ws.id).eq("agent", k).eq("status", "done").gte("decided_at", since),
+    ]).then(([r, d]) => live && setStats({ replies: n(r), done: n(d) }));
+    sb.from("approvals")
+      .select("id, title, tool, created_at")
+      .eq("workspace_id", ws.id)
+      .eq("agent", k)
+      .eq("status", "pending")
+      .order("id", { ascending: false })
+      .limit(5)
+      .then(({ data }) => live && setNeeds((data ?? []) as ApRow[]));
+    sb.from("activity")
+      .select("id, text, thread_id, created_at")
+      .eq("workspace_id", ws.id)
+      .eq("agent", k)
+      .order("id", { ascending: false })
+      .limit(6)
+      .then(({ data }) => live && setRecent((data ?? []) as ActRow[]));
+    sb.from("knowledge_docs")
+      .select("id, title, agent")
+      .eq("workspace_id", ws.id)
+      .or(`agent.is.null,agent.eq.${k}`)
+      .order("updated_at", { ascending: false })
+      .then(({ data }) => live && setDocs((data ?? []) as DocRow[]));
+    // The chats this teammate answered in, newest first.
+    sb.from("messages")
+      .select("thread_id")
+      .eq("workspace_id", ws.id)
+      .eq("role", "agent")
+      .eq("agent", k)
+      .order("id", { ascending: false })
+      .limit(60)
+      .then(async ({ data }) => {
+        const ids = [...new Set(((data ?? []) as { thread_id: string }[]).map((m) => m.thread_id))].slice(0, 8);
+        if (!ids.length) return live && setChats([]);
+        const t = await sb.from("threads").select("id, title, updated_at").eq("workspace_id", ws.id).in("id", ids).order("updated_at", { ascending: false });
+        if (live) setChats((t.data ?? []) as ChatRow[]);
+      });
+    return () => {
+      live = false;
+    };
+  }, [sb, ws.id, k]);
+  useEffect(() => load(), [load]);
+
+  const skills = skillsFor(k, skillRows as SkillRow[]);
+  const products = a.apps.filter((p) => PRODUCT_BADGE[p]);
+  const toolkits = agentToolkits(k);
+
+  return (
+    <>
+      <a
+        className="back"
+        href={to("/team")}
+        onClick={(e) => {
+          e.preventDefault();
+          navigate("/team");
+        }}
+      >
+        <Icon name="back" small />
+        Team
+      </a>
+      <div className="ag-h">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={agentPicture(k)} alt={`Marble statue of ${a.god}`} />
+        <div className="tx">
+          <span className="eyebrow">{a.god}</span>
+          <h1>{a.name}</h1>
+          <p>{a.job}</p>
+          <div className="tools">
+            {a.soon ? <span className="toolc">Coming soon</span> : null}
+            {products.map((p) => (
+              <span key={p} className="toolc">
+                <i style={{ background: team.services[p] === "ready" ? "var(--green)" : "var(--ink-4)" }} />
+                {PRODUCT_BADGE[p].name}
+                {team.services[p] === "ready" ? "" : ", setting up"}
+              </span>
+            ))}
+            {toolkits.map((t) => (
+              <span key={t} className="toolc">
+                <i style={{ background: team.connected.includes(t) ? "var(--green)" : "var(--ink-4)" }} />
+                {appName(t)}
+              </span>
+            ))}
+            {a.apps.includes("*") ? <span className="toolc">Every connected service, read only</span> : null}
+          </div>
+        </div>
+        <div className="ag-side">
+          <div className="onoff">
+            <span className={dot(st)}>{st.label}</span>
+            {admin && !a.soon ? <Switch on={!off} label={`${a.god} on or off`} onChange={() => team.toggle(k)} /> : null}
+          </div>
+          {!a.soon && editor && !off ? (
+            <button type="button" className="btn sm" onClick={() => onAsk(k)}>
+              Message
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {team.error ? <ErrorText>{team.error}</ErrorText> : null}
+      <div className="tabs" role="tablist">
+        {(
+          [
+            ["ov", "Overview"],
+            ["chat", "Chats"],
+            ["set", "Settings"],
+          ] as const
+        ).map(([id, l]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tab === "ov" ? (
+        <div className="tp on">
+          <div className="card kpis">
+            <Kpi label="Replies" value={stats?.replies} note="Last 7 days" />
+            <Kpi label="Changes done" value={stats?.done} note="Last 7 days" />
+            <Kpi label="Waiting on you" value={needs?.length} note="Right now" />
+            <Kpi label="Status" value={st.label} note={a.soon ? "Coming soon" : st.tone === "ok" ? "Ready to work" : st.label === "Paused" ? "Turned off" : st.label === "Connect an app" ? "In Settings, Apps" : "We're setting up its tools"} />
+          </div>
+          <div className="two sec">
+            <div>
+              <div className="sh">
+                <h2>Needs you</h2>
+              </div>
+              <div className="card list">
+                {needs?.length ? (
+                  needs.map((p) => (
+                    <button key={p.id} type="button" className="row" onClick={() => navigate(`/approvals/${p.id}`)}>
+                      <Face agent={k} />
+                      <span className="main">
+                        <b>{p.title}</b>
+                        <small>{p.tool.replace(/_/g, " ")}</small>
+                      </span>
+                      <span className="go">Review</span>
+                    </button>
+                  ))
+                ) : (
+                  <Empty title="Nothing waiting">All caught up.</Empty>
+                )}
+              </div>
+            </div>
+            <div>
+              <div className="sh">
+                <h2>Recent work</h2>
+              </div>
+              <div className="card list">
+                {recent?.length ? (
+                  recent.map((r) => (
+                    <button key={r.id} type="button" className="row" disabled={!r.thread_id} onClick={() => r.thread_id && navigate(`/chat/${r.thread_id}`)}>
+                      <p>{r.text}</p>
+                      <span className="meta">{ago(r.created_at)}</span>
+                    </button>
+                  ))
+                ) : (
+                  <Empty title="No work yet">Send a message to get started.</Empty>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : tab === "chat" ? (
+        <div className="tp on">
+          <div className="card list">
+            {chats?.length ? (
+              chats.map((c) => (
+                <button key={c.id} type="button" className="row" onClick={() => navigate(`/chat/${c.id}`)}>
+                  <span className="main">
+                    <b>{c.title || "Chat"}</b>
+                  </span>
+                  <span className="meta">{ago(c.updated_at)}</span>
+                </button>
+              ))
+            ) : (
+              <Empty title="No chats yet">{a.soon ? `${a.god} is coming soon.` : `Tag @${a.god} in a chat to get started.`}</Empty>
+            )}
+          </div>
+          {!a.soon && editor && !off ? (
+            <div className="mt-3">
+              <button type="button" className="btn primary sm" onClick={() => onAsk(k)}>
+                New chat with {a.god}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : (
-        <p className="text-[14px] text-ink-2">{on ? "Autopilot" : "Ask me first"}</p>
+        <div className="tp on">
+          <div className="two">
+            <div>
+              <div className="sh">
+                <h2>Trust level</h2>
+              </div>
+              <div className="card list" role="radiogroup" aria-label={`How ${a.god} makes changes`}>
+                {makesChanges(k) ? (
+                  TRUST.map((o) => (
+                    <button key={o.t} type="button" className="radio" role="radio" aria-checked={team.autopilot.has(k) === o.v} disabled={!admin} onClick={() => team.autopilot.has(k) !== o.v && team.setTrust(k, o.v)}>
+                      <span className="rd" />
+                      <span>
+                        <b>{o.t}</b>
+                        <small>{o.s}</small>
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <Empty title="Reads only">{a.god} looks things up and never changes anything, so there is nothing to approve.</Empty>
+                )}
+              </div>
+              {makesChanges(k) && !admin ? <p className="hint-s">Owners and admins can change this.</p> : null}
+            </div>
+            <div>
+              <Section
+                className="mt-0"
+                title="Rules and notes"
+                more={
+                  <a
+                    href={to("/knowledge")}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate("/knowledge");
+                    }}
+                  >
+                    Edit in Knowledge
+                  </a>
+                }
+              >
+                <div className="card list">
+                  {docs?.length ? (
+                    docs.map((d) => (
+                      <a
+                        key={d.id}
+                        className="row"
+                        href={to("/knowledge")}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate("/knowledge");
+                        }}
+                      >
+                        <span className="main">
+                          <b>{d.title}</b>
+                          <small>{d.agent ? `Only for ${a.god}` : "Everyone"}</small>
+                        </span>
+                      </a>
+                    ))
+                  ) : (
+                    <Empty title="Nothing yet">Add your services, prices and rules in Knowledge.</Empty>
+                  )}
+                </div>
+              </Section>
+            </div>
+          </div>
+          <Section
+            title="Skills"
+            num={skills.length || undefined}
+            more={
+              <a
+                href={to("/settings/skills")}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/settings/skills");
+                }}
+              >
+                Manage skills
+              </a>
+            }
+          >
+            <div className="card list">
+              {skills.length ? (
+                skills.map((s) => (
+                  <div key={s.key} className="row">
+                    <span className="main">
+                      <b>/{s.name}</b>
+                      <small className="wrap">{s.description}</small>
+                    </span>
+                    <span className="tag">{s.scope === "system" ? "Ours" : "Yours"}</span>
+                  </div>
+                ))
+              ) : (
+                <Empty title="No skills yet" />
+              )}
+            </div>
+          </Section>
+        </div>
       )}
-      <p className="text-[13px] text-ink-4">{on ? "Changes run right away. You see them in Recent work on Home." : "Every change waits for your OK in Approvals."}</p>
+    </>
+  );
+}
+
+export function Kpi({ label: name, value, note }: { label: string; value: number | string | undefined; note: string }) {
+  return (
+    <div className="kpi">
+      <small>{name}</small>
+      <b>{value ?? "·"}</b>
+      <em className="flat">{note}</em>
     </div>
   );
 }
