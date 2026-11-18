@@ -75,6 +75,8 @@ beforeEach(() => {
     claims.push(args);
     return db.tables.jobs.map((j) => ({ ...j }));
   };
+  // supabase/010_expire_trials.sql: today's daily job is already queued, so these tests see only their own jobs.
+  db.rpcs.queue_daily_jobs = () => 0;
   auth.db = db;
 });
 

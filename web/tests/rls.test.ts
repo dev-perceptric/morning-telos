@@ -828,3 +828,90 @@ test("adding the website sets a waiting Arrowsterr service pending and queues pr
     await assert.rejects(q("select website_added()"), /permission denied|trigger functions can only be called as triggers/);
   });
 });
+
+// ─────────────── trials that end without a plan ───────────────
+
+test("queue_daily_jobs: one expire_trials job per UTC day, even from many calls at once", async (t) => {
+  if (!db) return t.skip("no test database");
+  const asServer = async (c: pg.Client) => {
+    await c.query("begin");
+    await c.query("set local role service_role");
+    const n = (await c.query("select queue_daily_jobs() n")).rows[0].n as number;
+    await c.query("commit");
+    return n;
+  };
+  const conns = await Promise.all([connect(dbUrl), connect(dbUrl), connect(dbUrl)]);
+  try {
+    // Three worker ticks at the same moment, then five more one after another.
+    const made = await Promise.all(conns.map(asServer));
+    for (let i = 0; i < 5; i++) made.push(await asServer(conns[0]));
+    assert.equal(made.reduce((a, b) => a + b, 0), 1);
+  } finally {
+    await Promise.all(conns.map((c) => c.end()));
+  }
+  const today = (await db.query("select to_char(now() at time zone 'utc', 'YYYY-MM-DD') d")).rows[0].d;
+  const rows = (await db.query("select workspace_id, payload, max_attempts, done_at, run_at <= now() due from jobs where kind = 'expire_trials'")).rows;
+  assert.deepEqual(rows, [{ workspace_id: null, payload: { day: today }, max_attempts: 20, done_at: null, due: true }]);
+  // Done or not, today's job is never queued twice; another day's is.
+  await db.query("update jobs set done_at = now() where kind = 'expire_trials'");
+  assert.equal((await db.query("select queue_daily_jobs() n")).rows[0].n, 0);
+  await assert.rejects(db.query("insert into jobs (kind, payload) values ('expire_trials', $1)", [{ day: today }]), /jobs_daily_idx/);
+  await db.query("update jobs set payload = '{\"day\": \"2000-01-01\"}' where kind = 'expire_trials'");
+  assert.equal((await db.query("select queue_daily_jobs() n")).rows[0].n, 1);
+  // Other jobs (no day in the payload) are never limited by it.
+  const ws = (await db.query("insert into workspaces (name) values ('Daily Co') returning id")).rows[0].id;
+  await db.query("insert into jobs (kind, workspace_id) values ('provision', $1), ('provision', $1)", [ws]);
+  await db.query("delete from jobs where kind = 'expire_trials'");
+});
+
+test("expired_workspaces: trials over with open services, never running trials, paid plans or closed ones; matches trialOver()", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { trialOver } = await import("../src/lib/closeout.ts");
+  const cases: { name: string; plan: string; status: string; days: number; services: string[]; want: boolean }[] = [
+    { name: "trial over, brands ready", plan: "trial", status: "trialing", days: -1, services: ["ready", "ready"], want: true },
+    { name: "trial over, pending and waiting", plan: "trial", status: "trialing", days: -3, services: ["pending", "waiting"], want: true },
+    { name: "trial over, one failed", plan: "trial", status: "trialing", days: -3, services: ["failed", "removed"], want: true },
+    { name: "trial still running", plan: "trial", status: "trialing", days: 2, services: ["ready", "ready"], want: false },
+    { name: "active", plan: "pro", status: "active", days: -30, services: ["ready", "ready"], want: false },
+    { name: "past due", plan: "starter", status: "past_due", days: -30, services: ["ready", "ready"], want: false },
+    { name: "first payment going through", plan: "pro", status: "incomplete", days: -1, services: ["ready", "ready"], want: false },
+    { name: "canceled but the webhook's close was missed", plan: "pro", status: "canceled", days: -30, services: ["ready", "ready"], want: true },
+    { name: "already removing", plan: "trial", status: "trialing", days: -20, services: ["removing", "removing"], want: false },
+    { name: "already removed", plan: "trial", status: "trialing", days: -40, services: ["removed", "removed"], want: false },
+  ];
+  // Close every other test's workspaces so only these are expired with open services.
+  await db.query("update services set status = 'removed'");
+  const ids = new Map<string, string>();
+  for (const c of cases) {
+    const w = (await db.query("insert into workspaces (name, plan, status, trial_ends_at) values ($1, $2, $3, now() + make_interval(days => $4)) returning id, trial_ends_at", [c.name, c.plan, c.status, c.days])).rows[0];
+    await db.query("update services set status = $2 where workspace_id = $1 and product = 'arrowsterr'", [w.id, c.services[0]]);
+    await db.query("update services set status = $2 where workspace_id = $1 and product = 'capybaroar'", [w.id, c.services[1]]);
+    ids.set(w.id, c.name);
+    const ts = trialOver({ plan: c.plan, status: c.status, trial_ends_at: (w.trial_ends_at as Date).toISOString() });
+    // trialOver() is the plan rule only; the SQL adds "still has an open service".
+    if (c.services.some((s) => !["removing", "removed"].includes(s))) assert.equal(ts, c.want, `TypeScript: ${c.name}`);
+  }
+  await db.query("begin");
+  try {
+    await db.query("set local role service_role");
+    const found = (await db.query("select * from expired_workspaces(50) id")).rows.map((r) => ids.get(r.id));
+    assert.deepEqual([...found].sort(), cases.filter((c) => c.want).map((c) => c.name).sort());
+    assert.equal((await db.query("select * from expired_workspaces(2)")).rowCount, 2);
+    assert.equal((await db.query("select * from expired_workspaces(0)")).rowCount, 0);
+  } finally {
+    await db.query("rollback");
+  }
+});
+
+test("members and visitors can't call queue_daily_jobs or expired_workspaces", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("daily1@example.com", { business: "Daily Owner" });
+  for (const u of [o, null]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select queue_daily_jobs()"), /permission denied for function queue_daily_jobs/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("select * from expired_workspaces(10)"), /permission denied for function expired_workspaces/);
+    });
+  }
+});

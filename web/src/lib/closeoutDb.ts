@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { closeServices, planAction, reopenServices, removeBrandJob, revokeKeysJob, type NewJob, type ServiceRow } from "./closeout.ts";
+import { closeServices, expireTrials, planAction, trialOver, reopenServices, removeBrandJob, revokeKeysJob, type NewJob, type ServiceRow } from "./closeout.ts";
 import type { Handler } from "./jobs.ts";
 import { partnerFor, type Product } from "./partner.ts";
 import type { PlanFields } from "./plans.ts";
@@ -66,12 +66,17 @@ export function reopenWorkspace(db: SupabaseClient, ws: string) {
   });
 }
 
-/** After Stripe changes a workspace's plan: close its brands when the subscription ended, reopen them when it came back. */
-export async function afterPlanChange(db: SupabaseClient, ws: string, fetcher: typeof fetch = fetch) {
+async function planOf(db: SupabaseClient, ws: string): Promise<PlanFields | null> {
   const { data, error } = await db.from("workspaces").select("plan, status, trial_ends_at").eq("id", ws).maybeSingle();
   if (error) throw new Error(error.message);
+  return (data as PlanFields | null) ?? null;
+}
+
+/** After Stripe changes a workspace's plan: close its brands when the subscription ended, reopen them when it came back. */
+export async function afterPlanChange(db: SupabaseClient, ws: string, fetcher: typeof fetch = fetch) {
+  const data = await planOf(db, ws);
   if (!data) return "none";
-  const action = planAction(data as PlanFields);
+  const action = planAction(data);
   if (action === "close") await closeWorkspace(db, ws, fetcher);
   if (action === "reopen") await reopenWorkspace(db, ws);
   return action;
@@ -98,4 +103,23 @@ export function brandJobHandlers(db: SupabaseClient, fetcher: typeof fetch = fet
     },
   };
   return { revoke_keys: (job) => revokeKeysJob(job, deps), remove_brand: (job) => removeBrandJob(job, deps) };
+}
+
+/** The daily expire_trials job: close the brands of every trial that ended without a plan (Stripe sends nothing then). */
+export function expireTrialsHandler(db: SupabaseClient, fetcher: typeof fetch = fetch): Handler {
+  return () =>
+    expireTrials({
+      find: async (n) => {
+        const { data, error } = await db.rpc("expired_workspaces", { n });
+        if (error) throw new Error(/expired_workspaces/.test(error.message) ? "Run supabase/010_expire_trials.sql in Supabase." : `Could not find expired trials: ${error.message}`);
+        return (data ?? []) as string[];
+      },
+      expired: async (ws) => {
+        const data = await planOf(db, ws);
+        return Boolean(data) && trialOver(data!);
+      },
+      close: (ws) => closeWorkspace(db, ws, fetcher),
+      reopen: (ws) => reopenWorkspace(db, ws),
+      log,
+    });
 }

@@ -9,6 +9,8 @@
 //                   services pending and queue provision, which makes fresh brand keys (src/lib/provision.ts).
 //   revokeKeysJob, removeBrandJob: the two job handlers. They read only their payload, because a deleted
 //                   workspace's rows are gone by the time they run.
+//   expireTrials:   the daily expire_trials job. Stripe sends nothing when a trial ends with no subscription, so
+//                   this closes those workspaces through the same close (supabase/010_expire_trials.sql).
 
 import type { Job, JobResult } from "./jobs.ts";
 import { PRODUCTS, type Partner, type Product } from "./partner.ts";
@@ -41,6 +43,15 @@ export function planAction(ws: PlanFields, now = Date.now()): "close" | "reopen"
   const plan = effectivePlan(ws, now).plan;
   if (plan !== "expired") return "reopen";
   return ws.status && ENDED_STATUSES.has(ws.status) ? "close" : "none";
+}
+
+/**
+ * True when the daily expire_trials job should close the workspace: no plan is in force (the trial ended and no
+ * subscription pays). A first payment still going through ("incomplete") is left to Stripe, which always follows it
+ * with active or incomplete_expired. Same rule as expired_workspaces() in supabase/010_expire_trials.sql.
+ */
+export function trialOver(ws: PlanFields, now = Date.now()): boolean {
+  return effectivePlan(ws, now).plan === "expired" && ws.status !== "incomplete";
 }
 
 // ─────────────── close ───────────────
@@ -161,3 +172,50 @@ export const revokeKeysJob = (job: Job, d: BrandJobDeps) => brandCall(job, d, (a
 /** remove_brand: 30 days after close, delete the brand in the product. */
 export const removeBrandJob = (job: Job, d: BrandJobDeps) =>
   brandCall(job, d, (api, id) => api.removeBrand(id), (b) => d.markRemoved(b.workspace_id, b.product, b.brand_id));
+
+// ─────────────── the daily expire_trials job ───────────────
+
+/** How many expired workspaces one run closes. Each close waits at most 8 seconds per partner, both at once. */
+export const EXPIRE_BATCH = 100;
+const EXPIRE_CONCURRENCY = 4;
+
+export type ExpireDeps = {
+  /** Up to n workspaces whose plan is expired and that still have open services (expired_workspaces() in SQL). */
+  find: (n: number) => Promise<string[]>;
+  /** Reads the workspace again: true while trialOver() still holds. */
+  expired: (workspaceId: string) => Promise<boolean>;
+  close: (workspaceId: string) => Promise<unknown>;
+  reopen: (workspaceId: string) => Promise<unknown>;
+  log: (message: string) => void;
+};
+
+/**
+ * Closes every workspace whose trial ended without a plan. One workspace's error never stops the others: the job
+ * retries later, and the ones already closed are left out the next time. A full batch also retries, for the rest.
+ */
+export async function expireTrials(d: ExpireDeps, batch = EXPIRE_BATCH): Promise<JobResult> {
+  const ids = await d.find(batch);
+  const errors: string[] = [];
+  let next = 0;
+  const one = async (ws: string) => {
+    try {
+      // Checked again right before, in case a subscription started since find().
+      if (!(await d.expired(ws))) return;
+      await d.close(ws);
+      // A subscription that started during the close: its webhook may have found nothing to reopen yet.
+      if (!(await d.expired(ws))) await d.reopen(ws);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      d.log(`Expire trial for workspace ${ws}: ${message}`);
+      errors.push(`${ws}: ${message}`);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(EXPIRE_CONCURRENCY, ids.length) }, async () => {
+      while (next < ids.length) await one(ids[next++]);
+    }),
+  );
+  if (errors.length) return { status: "retry", error: `Could not close ${errors.length} of ${ids.length} expired workspaces. ${errors[0]}` };
+  if (ids.length >= batch) return { status: "retry", error: `Closed ${ids.length} expired workspaces. More to go.` };
+  return { status: "done" };
+}
