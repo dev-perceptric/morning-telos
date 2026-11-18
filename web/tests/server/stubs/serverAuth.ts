@@ -8,6 +8,8 @@ export const auth = {
   /** "<user id>:<workspace id>" → role */
   roles: new Map<string, Min>(),
   emails: new Map<string, string>(),
+  /** User ids whose email is not confirmed yet. */
+  unconfirmed: new Set<string>(),
 };
 
 export const supabaseUrl = () => "https://db.test";
@@ -23,6 +25,13 @@ export async function requireRole(request: Request, workspaceId: unknown, min: M
 }
 
 export const adminClient = () => auth.db;
+
+/** Same as signedInUser in src/lib/serverAuth.ts: the user id in the header, with their email from `auth.emails`. */
+export async function signedInUser(request: Request) {
+  const userId = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!userId) return null;
+  return { id: userId, email: auth.emails.get(userId) ?? `${userId}@example.com`, email_confirmed_at: auth.unconfirmed.has(userId) ? undefined : "2026-01-01T00:00:00Z" };
+}
 
 /** Same shape as roleGate in src/lib/serverAuth.ts, on top of the stand-in requireRole. */
 export function roleGate(request: Request, workspaceId: unknown) {

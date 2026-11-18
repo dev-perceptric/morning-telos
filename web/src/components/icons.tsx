@@ -84,6 +84,12 @@ const PATHS = {
   upload: <path d="M12 16V4M6 10l6-6 6 6M4 20h16" />,
   refresh: <path d="M20 11a8 8 0 0 0-14.9-3M4 5v4h4M4 13a8 8 0 0 0 14.9 3M20 19v-4h-4" />,
   play: <path d="m8 5 11 7-11 7Z" />,
+  shield: (
+    <>
+      <path d="M12 3 4.5 6v6c0 4.5 3.2 7.9 7.5 9 4.3-1.1 7.5-4.5 7.5-9V6Z" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof PATHS;

@@ -39,6 +39,7 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
       APP_URL: ${APP_URL:-}
+      STAFF_EMAILS: ${STAFF_EMAILS:-}
       SEALING_KEYS: ${SEALING_KEYS:-}
       SEALING_KEY_CURRENT: ${SEALING_KEY_CURRENT:-}
       COMPOSIO_API_KEY: ${COMPOSIO_API_KEY:-}
@@ -79,3 +80,32 @@ services:
         wget -q -T 280 -O /dev/null --header "Authorization: Bearer $$CRON_SECRET" --post-data "" http://web-new:3000/api/worker || echo "worker call failed";
         sleep 60;
         done
+
+  # Nightly database backup to R2 at 03:17 UTC, and every Sunday after it a check that the newest backup is there,
+  # recent and whole (web/scripts/backup-cron.ts). The image is web/Dockerfile.backup: Node 22 and pg_dump 17.
+  # It joins the Supabase project's network (sb-morningtelos) and reaches Postgres as db:5432 through
+  # BACKUP_DATABASE_URL. It gets only the backup keys, and the web app never gets them (web/tests/deploy.test.ts).
+  # The private key that reads backups is never on this server: the full restore test runs in GitHub Actions
+  # (.github/workflows/restore-test.yml). To run one now and read the log:
+  #   docker compose -f deploy/web-compose.yml run --rm backup node scripts/backup.ts
+  #   docker compose -f deploy/web-compose.yml run --rm backup node scripts/restore.ts check
+  backup:
+    image: ghcr.io/dev-perceptric/morningtelos-backup:latest
+    pull_policy: always
+    restart: unless-stopped
+    init: true
+    networks: [sb-morningtelos]
+    environment:
+      BACKUP_DATABASE_URL: ${BACKUP_DATABASE_URL:-}
+      BACKUP_PUBLIC_KEY: ${BACKUP_PUBLIC_KEY:-}
+      BACKUP_PING_URL: ${BACKUP_PING_URL:-}
+      BACKUP_PREFIX: ${BACKUP_PREFIX:-}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+
+# The self-hosted Supabase runs as its own Docker project (sb-morningtelos). Only the backup service joins its network.
+networks:
+  sb-morningtelos:
+    external: true

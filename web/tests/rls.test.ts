@@ -1997,3 +1997,150 @@ test("queue_hourly_jobs: one lifecycle_emails job per UTC hour, even from many c
     });
   }
 });
+
+// ─────────────── staff console (017_staff.sql) ───────────────
+
+// asService (above) runs as the server, the way the staff routes call Supabase.
+
+test("staff_actions and the staff functions: server only; members and visitors can't read, write or call them", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, viewer } = await team("staff-rls");
+  const staffId = randomUUID();
+  await db.query("insert into staff_actions (staff_user_id, staff_email, workspace_id, action, details) values ($1, 'vin@morningtelos.com', $2, 'extend_trial', '{\"days\": 3}')", [staffId, ws]);
+  const id = (await db.query("select id from staff_actions where workspace_id = $1", [ws])).rows[0].id;
+  for (const u of [owner, admin, viewer, null]) {
+    for (const [sql, args] of [
+      ["select * from staff_actions", []],
+      ["select * from staff_actions where workspace_id = $1", [ws]],
+      ["insert into staff_actions (staff_user_id, workspace_id, action) values ($1, $2, 'set_plan')", [u?.id ?? staffId, ws]],
+      ["update staff_actions set details = '{}' where id = $1", [id]],
+      ["delete from staff_actions where id = $1", [id]],
+      ["select * from staff_workspaces(now() - interval '30 days')", []],
+      ["select * from staff_workspaces(now() - interval '30 days', $1)", [ws]],
+      ["select staff_ai_total(now() - interval '30 days')", []],
+      ["select staff_set_plan($1, 'x@y.z', $2, 'internal', 'active')", [u?.id ?? staffId, ws]],
+      ["select staff_extend_trial($1, 'x@y.z', $2, 90)", [u?.id ?? staffId, ws]],
+      ["select staff_retry_job($1, 'x@y.z', $2, 1)", [u?.id ?? staffId, ws]],
+    ] as const) {
+      await as(u, async (q) => {
+        await assert.rejects(q(sql, [...args]), /permission denied/, `${u?.email ?? "visitor"}: ${sql}`);
+      });
+    }
+  }
+  // The owner's plan and trial are what they were, and the log has only the row the server wrote.
+  assert.deepEqual((await db.query("select plan, status from workspaces where id = $1", [ws])).rows[0], { plan: "trial", status: "trialing" });
+  assert.equal((await db.query("select count(*)::int n from staff_actions where workspace_id = $1", [ws])).rows[0].n, 1);
+  // Even with table rights back, RLS with no policies still shows nothing.
+  await db.query("grant select, insert on staff_actions to authenticated");
+  try {
+    await as(owner, async (q) => {
+      assert.equal((await q("select * from staff_actions")).rowCount, 0);
+      await assert.rejects(q("insert into staff_actions (staff_user_id, workspace_id, action) values ($1, $2, 'set_plan')", [owner.id, ws]), /row-level security/);
+    });
+  } finally {
+    await db.query("revoke select, insert on staff_actions from authenticated");
+  }
+});
+
+test("staff_workspaces: every workspace with its owner's email, member count and AI spend since a time; or just one", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner } = await team("staff-list");
+  const other = await team("staff-list2");
+  await db.query("update workspace_members set email = null where workspace_id = $1 and role = 'owner'", [other.ws]);
+  await db.query(
+    "insert into ai_usage (workspace_id, model, cost_usd, created_at) values ($1, 'm', 1.25, now()), ($1, 'm', 0.5, now() - interval '1 hour'), ($1, 'm', 9, now() - interval '60 days'), ($2, 'm', 2, now())",
+    [ws, other.ws],
+  );
+  const rows = await asService(async (q) => (await q("select * from staff_workspaces(now() - interval '30 days')")).rows);
+  const mine = rows.find((r) => r.id === ws);
+  assert.ok(mine);
+  assert.equal(mine.owner_email, owner.email);
+  assert.equal(mine.members, 4);
+  assert.equal(Number(mine.ai_usd), 1.75);
+  assert.equal(mine.plan, "trial");
+  // No email saved on the member row: the sign-in account's email.
+  assert.equal(rows.find((r) => r.id === other.ws)?.owner_email, other.owner.email);
+  const one = await asService(async (q) => (await q("select * from staff_workspaces(now() - interval '30 days', $1)", [ws])).rows);
+  assert.deepEqual(one.map((r) => r.id), [ws]);
+  // The total counts every workspace's spend since then, deleted workspaces too.
+  await db.query("insert into ai_usage (workspace_id, model, cost_usd) values (null, 'm', 0.25)");
+  const total = await asService(async (q) => Number((await q("select staff_ai_total(now() - interval '30 days') n")).rows[0].n));
+  const expect = Number((await db.query("select round(sum(cost_usd), 2) n from ai_usage where created_at >= now() - interval '30 days'")).rows[0].n);
+  assert.equal(total, expect);
+  assert.ok(total >= 4);
+});
+
+test("staff_set_plan and staff_extend_trial change the workspace and log who did it, in one go", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws } = await team("staff-plan");
+  const staffId = randomUUID();
+  const d = await asService(async (q) => (await q("select staff_set_plan($1, 'vin@morningtelos.com', $2, 'internal', 'active') d", [staffId, ws])).rows[0].d);
+  assert.deepEqual(d, { from: { plan: "trial", status: "trialing" }, to: { plan: "internal", status: "active" } });
+  assert.deepEqual((await db.query("select plan, status, public.effective_plan(plan, status, trial_ends_at) e from workspaces where id = $1", [ws])).rows[0], { plan: "internal", status: "active", e: "internal" });
+  // An unknown plan is refused by the plan check, and nothing is logged for it.
+  await assert.rejects(asService((q) => q("select staff_set_plan($1, 'vin@morningtelos.com', $2, 'enterprise', 'active')", [staffId, ws])), /workspaces_plan_check/);
+  // No such workspace: null, and no log row.
+  assert.equal(await asService(async (q) => (await q("select staff_set_plan($1, null, $2, 'pro', 'active') d", [staffId, randomUUID()])).rows[0].d), null);
+
+  // A trial still running: 7 days after its end.
+  await db.query("update workspaces set plan = 'trial', status = 'trialing', trial_ends_at = now() + interval '2 days' where id = $1", [ws]);
+  const before = (await db.query("select trial_ends_at from workspaces where id = $1", [ws])).rows[0].trial_ends_at as Date;
+  await asService((q) => q("select staff_extend_trial($1, 'vin@morningtelos.com', $2, 7)", [staffId, ws]));
+  const after = (await db.query("select trial_ends_at from workspaces where id = $1", [ws])).rows[0].trial_ends_at as Date;
+  assert.equal(after.getTime() - before.getTime(), 7 * 864e5);
+  // A trial that already ended: 3 days from now.
+  await db.query("update workspaces set trial_ends_at = now() - interval '10 days' where id = $1", [ws]);
+  await asService((q) => q("select staff_extend_trial($1, 'vin@morningtelos.com', $2, 3)", [staffId, ws]));
+  const left = Number((await db.query("select extract(epoch from trial_ends_at - now()) s from workspaces where id = $1", [ws])).rows[0].s);
+  assert.ok(Math.abs(left - 3 * 86400) < 60, `trial ends in ${left}s`);
+  assert.equal((await db.query("select public.effective_plan(plan, status, trial_ends_at) e from workspaces where id = $1", [ws])).rows[0].e, "trial");
+  for (const days of [0, 91, -5]) {
+    await assert.rejects(asService((q) => q("select staff_extend_trial($1, null, $2, $3)", [staffId, ws, days])), /1 to 90 days/);
+  }
+
+  const log = (await db.query("select staff_user_id, staff_email, action, details from staff_actions where workspace_id = $1 order by id", [ws])).rows;
+  assert.deepEqual(log.map((r) => r.action), ["set_plan", "extend_trial", "extend_trial"]);
+  assert.ok(log.every((r) => r.staff_user_id === staffId && r.staff_email === "vin@morningtelos.com"));
+  assert.equal(log[1].details.days, 7);
+  // The log outlives the workspace.
+  await db.query("delete from workspaces where id = $1", [ws]);
+  assert.equal((await db.query("select count(*)::int n from staff_actions where staff_user_id = $1 and workspace_id is null", [staffId])).rows[0].n, 3);
+});
+
+test("staff_retry_job: only a failed job in that workspace runs again, and it's logged", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws } = await team("staff-retry");
+  const other = await team("staff-retry2");
+  const add = async (w: string, attempts: number, done = false) =>
+    (await db!.query(`insert into jobs (kind, workspace_id, attempts, max_attempts, last_error, run_at, done_at) values ('provision', $1, $2, 5, 'Arrowsterr did not answer in time.', now() - interval '1 hour', ${done ? "now()" : "null"}) returning id`, [w, attempts])).rows[0].id as string;
+  const failed = await add(ws, 5);
+  const trying = await add(ws, 2);
+  const finished = await add(ws, 5, true);
+  const theirs = await add(other.ws, 5);
+  const staffId = randomUUID();
+  const retry = (w: string, job: string) => asService(async (q) => (await q("select staff_retry_job($1, 'vin@morningtelos.com', $2, $3) d", [staffId, w, job])).rows[0].d);
+  assert.equal(await retry(ws, trying), null, "still trying");
+  assert.equal(await retry(ws, finished), null, "done");
+  assert.equal(await retry(ws, theirs), null, "another workspace's job");
+  assert.equal((await db.query("select attempts from jobs where id = $1", [theirs])).rows[0].attempts, 5);
+  const d = await retry(ws, failed);
+  assert.equal(d.kind, "provision");
+  assert.equal(d.last_error, "Arrowsterr did not answer in time.");
+  const row = (await db.query("select attempts, locked_until, run_at <= now() due from jobs where id = $1", [failed])).rows[0];
+  assert.deepEqual(row, { attempts: 0, locked_until: null, due: true });
+  // claim_jobs takes it again: not done, due, not held, attempts left.
+  const claimable = (await db.query("select count(*)::int n from jobs where id = $1 and done_at is null and run_at <= now() and locked_until is null and attempts < max_attempts", [failed])).rows[0].n;
+  assert.equal(claimable, 1);
+  const log = (await db.query("select action, details from staff_actions where workspace_id = $1", [ws])).rows;
+  assert.equal(log.length, 1);
+  assert.equal(log[0].action, "retry_job");
+  assert.equal(String(log[0].details.job), String(failed));
+});
+
+test("staff_actions only takes known actions and object details", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws } = await team("staff-shape");
+  await assert.rejects(db.query("insert into staff_actions (staff_user_id, workspace_id, action) values ($1, $2, 'delete_everything')", [randomUUID(), ws]), /staff_actions_action_check/);
+  await assert.rejects(db.query("insert into staff_actions (staff_user_id, workspace_id, action, details) values ($1, $2, 'set_plan', '[1]')", [randomUUID(), ws]), /staff_actions_details_check/);
+  await assert.rejects(db.query("insert into staff_actions (workspace_id, action) values ($1, 'set_plan')", [ws]), /null value/);
+});

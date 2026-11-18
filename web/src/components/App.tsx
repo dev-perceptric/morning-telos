@@ -9,7 +9,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { identify, inWorkspace, isRecent, pageView, resetAnalytics, trackOnce } from "@/lib/analytics";
 import { initial, paletteMatch, type PaletteItem } from "@/lib/home";
 import type { ModelChoice } from "@/lib/models";
-import { routePath, type Route } from "@/lib/routes";
+import { routePath, wantsSignup, withoutSignup, type Route } from "@/lib/routes";
 import { getSupabase, type SupaConfig } from "@/lib/supa";
 import { cleanWebsite } from "@/lib/signup";
 import { agentFace, AGENTS, ORDER, type AgentKey } from "@/lib/team";
@@ -25,6 +25,7 @@ import { MemoryPage } from "./Memory";
 import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
 import { RoutinesPage } from "./Routines";
 import { SettingsPage, type Workspace } from "./Settings";
+import { StaffPage, useIsStaff } from "./Staff";
 import { ConnectSocialCard } from "./Social";
 import { AgentPage, TeamPage } from "./Team";
 import { btnPrimary, btnSecondary, Drawer, ErrorText, Frame, input, label, Notice, to } from "./ui";
@@ -48,6 +49,8 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
     if (fromPath) writeLocal(INVITE_KEY, fromPath);
     return fromPath ?? readLocal(INVITE_KEY);
   });
+  // Read once on load: the site's "Start free trial" link (#signup or /signup) opens the sign-up form.
+  const [signup] = useState(() => wantsSignup(window.location.pathname, window.location.hash));
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => setSession(data.session));
@@ -59,6 +62,16 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
     return () => data.subscription.unsubscribe();
   }, [sb]);
 
+  // Signed in, the sign-up link just opens home, so take it out of the address.
+  useEffect(() => {
+    if (!session) return;
+    const clean = withoutSignup(window.location.pathname, window.location.search, window.location.hash);
+    if (clean !== null) {
+      window.history.replaceState(null, "", clean);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }, [session]);
+
   const clearInvite = useCallback(() => {
     writeLocal(INVITE_KEY, null);
     setInvite(null);
@@ -66,7 +79,7 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
 
   if (session === undefined) return <Loading />;
   if (recovering && session) return <NewPassword sb={sb} onDone={() => setRecovering(false)} />;
-  if (!session) return <AuthScreen sb={sb} invited={Boolean(invite)} turnstileSiteKey={turnstileSiteKey} google={google} />;
+  if (!session) return <AuthScreen sb={sb} invited={Boolean(invite)} signup={signup} turnstileSiteKey={turnstileSiteKey} google={google} />;
   if (invite) return <JoinInvite sb={sb} session={session} token={invite} onDone={clearInvite} />;
   return <Shell sb={sb} session={session} />;
 }
@@ -216,6 +229,8 @@ const SETUP_NAV: NavItem[] = [
 // The phone's bottom bar, like the current app: four pages and More.
 const TAB_NAV = [MAIN_NAV[0], MAIN_NAV[1], MAIN_NAV[2], SETUP_NAV[0]];
 const MORE_NAV = [MAIN_NAV[3], SETUP_NAV[1], SETUP_NAV[2], SETUP_NAV[3]];
+// Only for Morning Telos staff (STAFF_EMAILS on the server). Everyone else never sees it.
+const STAFF_NAV: NavItem = { page: "staff", label: "Staff", path: "/staff", icon: "shield" };
 
 /** Which nav item a page lights up: a chat is Home's, a teammate is Team's. */
 const navPage = (page: string) => (page === "thread" ? "home" : page === "agent" ? "team" : page);
@@ -251,6 +266,9 @@ function Frame2({
   const route = useRoute();
   const path = routePath(route);
   const chrome = useChrome(sb, ws.id, path);
+  const staff = useIsStaff(sb);
+  const setupNav = staff ? [...SETUP_NAV, STAFF_NAV] : SETUP_NAV;
+  const moreNav = staff ? [...MORE_NAV, STAFF_NAV] : MORE_NAV;
   const name = String(session.user.user_metadata?.name ?? "").trim();
   const email = session.user.email ?? "";
   const [palette, setPalette] = useState(false);
@@ -349,7 +367,7 @@ function Frame2({
           {MAIN_NAV.map(navLink)}
           <div className="grp">
             <h6>Setup</h6>
-            {SETUP_NAV.map(navLink)}
+            {setupNav.map(navLink)}
           </div>
         </nav>
         <div className="grp">
@@ -390,7 +408,7 @@ function Frame2({
           </a>
         </header>
         <main className="mainp">
-          <div className={`view on${narrow ? " narrow" : ""}`} key={route.page === "thread" ? "thread" : path}>
+          <div className={`view on${narrow ? " narrow" : ""}`} key={route.page === "thread" ? "thread" : route.page === "staff" ? "staff" : path}>
             {notice ? (
               <div className="note-box mb-4 flex items-start justify-between gap-3" role="status">
                 <span>{notice}</span>
@@ -424,6 +442,8 @@ function Frame2({
               <MemoryPage sb={sb} ws={ws} />
             ) : route.page === "billing" ? (
               <BillingPage sb={sb} ws={ws} onChanged={onChanged} />
+            ) : route.page === "staff" ? (
+              <StaffPage sb={sb} id={route.id} />
             ) : route.page === "approvals" ? (
               <ApprovalsPage sb={sb} ws={ws} id={route.id} onDecided={reload} />
             ) : (
@@ -444,7 +464,7 @@ function Frame2({
             {n.count && chrome.pending ? <span className="count">{chrome.pending}</span> : null}
           </a>
         ))}
-        <button type="button" className={MORE_NAV.some((n) => n.page === active) ? "on" : ""} onClick={() => setMore(true)}>
+        <button type="button" className={moreNav.some((n) => n.page === active) ? "on" : ""} onClick={() => setMore(true)}>
           <Icon name="more" />
           More
         </button>
@@ -452,7 +472,7 @@ function Frame2({
 
       <Drawer open={more} title="More" onClose={() => setMore(false)}>
         <div className="card list">
-          {MORE_NAV.map((n) => (
+          {moreNav.map((n) => (
             <a
               key={n.page}
               className="row"
@@ -490,12 +510,12 @@ function Frame2({
         </div>
       </Drawer>
 
-      {palette ? <Palette ws={ws} threads={chrome.threads} onClose={() => setPalette(false)} onNew={newChat} /> : null}
+      {palette ? <Palette ws={ws} staff={staff} threads={chrome.threads} onClose={() => setPalette(false)} onNew={newChat} /> : null}
     </div>
   );
 }
 
-const TITLES: Record<string, string> = { home: "Home", thread: "Chat", team: "Team", knowledge: "Knowledge", routines: "Routines", memory: "Memory", approvals: "Approvals", settings: "Settings", billing: "Billing", invite: "Invite" };
+const TITLES: Record<string, string> = { home: "Home", thread: "Chat", team: "Team", knowledge: "Knowledge", routines: "Routines", memory: "Memory", approvals: "Approvals", settings: "Settings", billing: "Billing", invite: "Invite", staff: "Staff" };
 const pageTitle = (r: Route) => (r.page === "agent" ? AGENTS[r.key].god : TITLES[r.page]);
 
 /** Put the cursor in Home's message box once Home is on screen. */
@@ -576,12 +596,13 @@ const PAGES: PaletteItem[] = [
 ];
 
 /** Search or jump to: pages, teammates and chats, like the current app's palette. Arrows move, Enter opens. */
-function Palette({ ws, threads, onClose, onNew }: { ws: Workspace; threads: Chrome["threads"]; onClose: () => void; onNew: () => void }) {
+function Palette({ ws, staff, threads, onClose, onNew }: { ws: Workspace; staff: boolean; threads: Chrome["threads"]; onClose: () => void; onNew: () => void }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const items: PaletteItem[] = [
     ...(can(ws.role, "chat") ? [{ label: "New chat", group: "Actions" as const, path: "/" }] : []),
     ...PAGES,
+    ...(staff ? [{ label: "Staff", group: "Pages" as const, path: "/staff", keywords: "admin workspaces customers" }] : []),
     ...ORDER.map((k) => ({ label: `${AGENTS[k].god} · ${AGENTS[k].name}`, group: "Teammates" as const, path: `/team/${k}` })),
     ...threads.map((t) => ({ label: t.title || "Chat", group: "Chats" as const, path: `/chat/${t.id}` })),
   ];

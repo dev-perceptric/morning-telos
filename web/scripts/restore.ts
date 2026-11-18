@@ -7,16 +7,21 @@
 //
 // Settings, from the environment (the same R2 settings as the backup; a read-only R2 token is enough):
 //   R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET (morningtelos-backups)
+//   BACKUP_PREFIX          the bucket folder (db/daily/). Production: morningtelos/db/daily/
 //   BACKUP_PRIVATE_KEY     the private key from keygen
 //   RESTORE_DATABASE_URL   postgres:// URL of the database to load into (load only)
 //   RESTORE_DIR            where files are saved (./restore). Decrypted dumps hold customer data: delete them after.
 //
 // Commands:
 //   npm run restore -- list                   backups in the bucket, newest first
+//   npm run restore -- check [NAME|latest]    with no private key: the backup is there, under 26 hours old, matches its
+//                                             manifest's size and checksum, isn't much smaller than the one before, and
+//                                             its key tables have rows. The server runs it every Sunday.
 //   npm run restore -- fetch [NAME|latest]    download, check the checksum, decrypt to RESTORE_DIR/NAME.dump
 //   npm run restore -- decrypt FILE.dump.mtb  decrypt a file you downloaded from the R2 dashboard
 //   npm run restore -- load [NAME|latest]     fetch, then pg_restore into RESTORE_DATABASE_URL and compare row
-//                                             counts with the backup's manifest. Needs CONFIRM=yes.
+//                                             counts with the backup's manifest. The key tables (workspaces,
+//                                             members, jobs, auth.users) must have rows. Needs CONFIRM=yes.
 // NAME looks like morningtelos-2026-11-17T0317Z. "latest" (the default) is the newest one.
 //
 // To restore production after a disaster:
@@ -27,7 +32,7 @@
 //      public table and auth.users must match, or the command fails.
 //   3. Point the app's Supabase keys at the new database and restart it.
 //
-// Test a restore once a month, so we know backups work (the plan's "restore test"):
+// GitHub Actions runs check and load every Sunday (.github/workflows/restore-test.yml). By hand:
 //   docker run -d --name mt-restore-test -e POSTGRES_PASSWORD=test -p 54329:5432 postgres:17
 //   CONFIRM=yes RESTORE_DATABASE_URL=postgres://postgres:test@localhost:54329/postgres npm run restore -- load
 //   docker rm -f mt-restore-test && rm -rf restore
@@ -35,7 +40,7 @@
 // and auth.users still load and their row counts are checked.
 import fs from "node:fs";
 import path from "node:path";
-import { BACKUP_PREFIX, compareRows, completeBackups, decryptBackup, dumpKey, generateBackupKeys, type Manifest, manifestKey, parseRowCounts, pgEnv, publicKeyOf, r2Creds, ROW_COUNTS_SQL, s3Client, sha256Hex } from "../src/lib/backup.ts";
+import { backupPrefix, backupProblems, compareRows, completeBackups, decryptBackup, dumpKey, emptyKeyTables, generateBackupKeys, type Manifest, manifestKey, parseRowCounts, pgEnv, publicKeyOf, r2Creds, ROW_COUNTS_SQL, s3Client, sha256Hex } from "../src/lib/backup.ts";
 import { log, mustRun, run } from "./shell.ts";
 
 const say = (msg: string) => log("restore", msg);
@@ -53,11 +58,39 @@ function bucket() {
   return s3Client(creds);
 }
 
+const prefix = () => backupPrefix(process.env);
+
 async function pick(r2: ReturnType<typeof s3Client>, want = "latest"): Promise<string> {
   if (want !== "latest") return want;
-  const names = completeBackups(await r2.list(BACKUP_PREFIX));
-  if (!names.length) throw new Error(`no backups in ${BACKUP_PREFIX}`);
+  const names = completeBackups(await r2.list(prefix()), prefix());
+  if (!names.length) throw new Error(`no backups in ${prefix()}`);
   return names[0];
+}
+
+/** Checks a backup without decrypting it, so it runs on the server, which has no private key. */
+async function check(want = "latest") {
+  const r2 = bucket();
+  const p = prefix();
+  const names = completeBackups(await r2.list(p), p);
+  const name = want === "latest" ? (names[0] ?? null) : names.includes(want) ? want : null;
+  if (want !== "latest" && !name) throw new Error(`${want} is not a complete backup in ${p}`);
+  const readManifest = async (n: string) => {
+    try {
+      return JSON.parse((await r2.get(manifestKey(n, p))).toString()) as Partial<Manifest>;
+    } catch {
+      return null;
+    }
+  };
+  const manifest = name ? await readManifest(name) : null;
+  const file = name ? await r2.get(dumpKey(name, p)) : null;
+  const before = name ? names[names.indexOf(name) + 1] : undefined;
+  const previousBytes = before ? ((await readManifest(before))?.dump_bytes ?? null) : null;
+  const problems = backupProblems({ name, now: new Date(), manifest, file, previousBytes });
+  if (problems.length) {
+    for (const l of problems) console.error(`  ${l}`);
+    throw new Error(`the check of ${name ?? p} found ${problems.length} problem${problems.length > 1 ? "s" : ""}`);
+  }
+  say(`ok: ${name}, ${file!.byteLength} bytes, checksum matches, ${Object.keys(manifest!.rows ?? {}).length} tables`);
 }
 
 /** Downloads a backup, checks it against its manifest, decrypts it. Returns the dump's path and the manifest. */
@@ -66,9 +99,9 @@ async function fetchBackup(want?: string): Promise<{ dumpPath: string; manifest:
   const r2 = bucket();
   const name = await pick(r2, want);
   say(`downloading ${name}`);
-  const manifest = JSON.parse((await r2.get(manifestKey(name))).toString()) as Manifest;
+  const manifest = JSON.parse((await r2.get(manifestKey(name, prefix()))).toString()) as Manifest;
   if (manifest.public_key && manifest.public_key !== publicKeyOf(privateKey)) throw new Error("BACKUP_PRIVATE_KEY does not match the key this backup was made for");
-  const file = await r2.get(dumpKey(name));
+  const file = await r2.get(dumpKey(name, prefix()));
   if (sha256Hex(file) !== manifest.dump_sha256) throw new Error("the checksum does not match the manifest: the file is damaged or incomplete");
   const dump = decryptBackup(file, privateKey);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -98,6 +131,8 @@ async function load(want?: string) {
     for (const l of bad) console.error(`  ${l}`);
     throw new Error(`row counts differ for ${bad.length} of our tables`);
   }
+  const empty = emptyKeyTables(restored);
+  if (empty.length) throw new Error(`no rows restored in ${empty.join(", ")}`);
   say(`restored ${manifest.name}: row counts match for ${Object.keys(manifest.rows).length - other.length} tables`);
 }
 
@@ -111,11 +146,14 @@ async function main() {
       return;
     }
     case "list": {
-      const names = completeBackups(await bucket().list(BACKUP_PREFIX));
+      const names = completeBackups(await bucket().list(prefix()), prefix());
       for (const n of names) console.log(n);
       if (!names.length) say("no backups yet");
       return;
     }
+    case "check":
+      await check(arg);
+      return;
     case "fetch":
       await fetchBackup(arg);
       return;

@@ -3,6 +3,13 @@ import test from "node:test";
 import {
   BACKUP_PREFIX,
   backupName,
+  backupPrefix,
+  backupProblems,
+  emptyKeyTables,
+  isCheckDay,
+  KEY_TABLES,
+  MAX_AGE_HOURS,
+  nextBackupAt,
   backupNameOf,
   backupsToDelete,
   backupTime,
@@ -277,4 +284,166 @@ test("a restore fails only when our tables or auth.users differ", () => {
   assert.deepEqual(r.bad, ["auth.users: 12 in the backup, 11 restored"]);
   assert.equal(r.other.length, 1);
   assert.deepEqual(compareRows(expected, { "auth.users": 12, "auth.schema_migrations": 50 }).bad, ["public.workspaces: 3 in the backup, missing restored"]);
+});
+
+// ---- The bucket folder (BACKUP_PREFIX), for a bucket shared with another product ----
+
+const SHARED = "morningtelos/db/daily/";
+
+test("reads BACKUP_PREFIX, adds the closing slash, and falls back to db/daily/", () => {
+  assert.equal(backupPrefix({}), "db/daily/");
+  assert.equal(backupPrefix({ BACKUP_PREFIX: "  " }), "db/daily/");
+  assert.equal(backupPrefix({ BACKUP_PREFIX: SHARED }), SHARED);
+  assert.equal(backupPrefix({ BACKUP_PREFIX: " morningtelos/db/daily " }), SHARED);
+});
+
+test("refuses a BACKUP_PREFIX that could reach outside its own folder", () => {
+  for (const p of ["/", "/morningtelos/db/", "morningtelos//daily/", "../omniscient/", "morningtelos/../x/", "./", "a b/", "morningtelos/*/"]) {
+    assert.throws(() => backupPrefix({ BACKUP_PREFIX: p }), /BACKUP_PREFIX should be a folder/, p);
+  }
+});
+
+test("keys follow the prefix", () => {
+  assert.equal(dumpKey("morningtelos-2026-11-17T0317Z", SHARED), "morningtelos/db/daily/morningtelos-2026-11-17T0317Z.dump.mtb");
+  assert.equal(manifestKey("morningtelos-2026-11-17T0317Z", SHARED), "morningtelos/db/daily/morningtelos-2026-11-17T0317Z.manifest.json");
+});
+
+test("in a shared bucket, pruning only ever picks our own backups directly in the prefix", () => {
+  const now = new Date("2026-11-17T03:17:00Z");
+  const old = backupName(new Date(now.getTime() - 90 * DAY));
+  const ours = [dumpKey(old, SHARED), manifestKey(old, SHARED)];
+  const others = [
+    // The default folder and other products' folders, with names that look like ours.
+    dumpKey(old),
+    manifestKey(old),
+    `omniscient/db/daily/${old}.dump.mtb`,
+    `omniscient/${old}.manifest.json`,
+    `x${SHARED}${old}.dump.mtb`,
+    `${SHARED.slice(0, -1)}${old}.dump.mtb`,
+    // A folder inside ours, and other files in ours.
+    `${SHARED}old/${old}.dump.mtb`,
+    `${SHARED}${old}.dump.mtb.bak`,
+    `${SHARED}capybaroar-2026-01-01T0317Z.dump.mtb`,
+    `${SHARED}notes.txt`,
+    `${old}.dump.mtb`,
+    `content/uploads/${old}.dump.mtb`,
+  ];
+  assert.deepEqual(backupsToDelete([...ours, ...others], now, 30, 0, SHARED), [...ours].sort());
+  assert.deepEqual(backupsToDelete(others, now, 30, 0, SHARED), []);
+  // With the default folder, the shared folder's files are just as safe.
+  assert.deepEqual(backupsToDelete(ours, now, 30, 0), []);
+});
+
+test("listing in a shared bucket only counts our own backups in the prefix", () => {
+  const a = "morningtelos-2026-11-16T0317Z";
+  const b = "morningtelos-2026-11-17T0317Z";
+  const keys = [dumpKey(a, SHARED), manifestKey(a, SHARED), dumpKey(b), manifestKey(b), `${SHARED}sub/${b}.dump.mtb`, `${SHARED}sub/${b}.manifest.json`];
+  assert.deepEqual(completeBackups(keys, SHARED), [a]);
+  assert.deepEqual(completeBackups(keys), [b]);
+});
+
+// ---- Schedule ----
+
+test("the next backup is the next 03:17 UTC, strictly after now", () => {
+  const next = (t: string) => nextBackupAt(new Date(t)).toISOString();
+  assert.equal(next("2026-11-17T03:16:59.999Z"), "2026-11-17T03:17:00.000Z");
+  assert.equal(next("2026-11-17T03:17:00.000Z"), "2026-11-18T03:17:00.000Z");
+  assert.equal(next("2026-11-17T03:40:00.000Z"), "2026-11-18T03:17:00.000Z");
+  assert.equal(next("2026-11-17T00:00:00.000Z"), "2026-11-17T03:17:00.000Z");
+  assert.equal(next("2026-11-30T23:59:00.000Z"), "2026-12-01T03:17:00.000Z");
+  assert.equal(next("2026-12-31T22:00:00.000Z"), "2027-01-01T03:17:00.000Z");
+  assert.equal(next("2028-02-28T04:00:00.000Z"), "2028-02-29T03:17:00.000Z");
+  assert.equal(nextBackupAt(new Date("2026-11-17T05:00:00Z"), { hour: 5, minute: 43 }).toISOString(), "2026-11-17T05:43:00.000Z");
+});
+
+test("a night of backups runs every day, never twice in one", () => {
+  let t = new Date("2026-11-01T12:00:00Z");
+  const runs: string[] = [];
+  for (let i = 0; i < 40; i++) {
+    t = nextBackupAt(t);
+    runs.push(t.toISOString().slice(0, 10));
+    t = new Date(t.getTime() + 20 * 60_000); // the backup takes a while
+  }
+  assert.equal(new Set(runs).size, 40);
+  assert.equal(runs[0], "2026-11-02");
+  assert.equal(runs[39], "2026-12-11");
+});
+
+test("the weekly check runs on Sundays, UTC", () => {
+  assert.equal(isCheckDay(new Date("2026-11-22T03:17:00Z")), true);
+  assert.equal(isCheckDay(new Date("2026-11-21T03:17:00Z")), false);
+  assert.equal(isCheckDay(new Date("2026-11-23T03:17:00Z")), false);
+  let t = new Date("2026-11-01T00:00:00Z");
+  let sundays = 0;
+  for (let i = 0; i < 28; i++) {
+    t = nextBackupAt(t);
+    if (isCheckDay(t)) sundays++;
+  }
+  assert.equal(sundays, 4);
+});
+
+// ---- The weekly check of the newest backup ----
+
+const ROWS = { "public.workspaces": 3, "public.workspace_members": 4, "public.jobs": 9, "auth.users": 5, "public.threads": 0 };
+
+function goodCheck(overrides: Partial<Parameters<typeof backupProblems>[0]> = {}) {
+  const name = "morningtelos-2026-11-22T0317Z";
+  const file = encryptBackup(Buffer.from("PGDMP ".repeat(500)), generateBackupKeys().publicKey);
+  const manifest = { name, dump_bytes: file.length, dump_sha256: sha256Hex(file), rows: ROWS };
+  return { name, now: new Date("2026-11-22T03:40:00Z"), manifest, file, previousBytes: file.length - 10, ...overrides };
+}
+
+test("a fresh, whole backup passes the check", () => {
+  assert.deepEqual(backupProblems(goodCheck()), []);
+  assert.deepEqual(backupProblems(goodCheck({ previousBytes: null })), []);
+});
+
+test("the check fails when there is no backup or it is too old", () => {
+  assert.deepEqual(backupProblems(goodCheck({ name: null })), ["there are no complete backups"]);
+  const at = new Date("2026-11-22T03:17:00Z").getTime();
+  assert.deepEqual(backupProblems(goodCheck({ now: new Date(at + MAX_AGE_HOURS * 3_600_000) })), []);
+  const late = backupProblems(goodCheck({ now: new Date(at + (MAX_AGE_HOURS * 60 + 1) * 60_000) }));
+  assert.deepEqual(late, ["the newest backup, morningtelos-2026-11-22T0317Z, is 26 hours old (the limit is 26)"]);
+  assert.match(backupProblems(goodCheck({ now: new Date(at + 3 * DAY) }))[0], /72 hours old/);
+});
+
+test("the check fails when the file doesn't match its manifest", () => {
+  const c = goodCheck();
+  const bad = Buffer.from(c.file);
+  bad[bad.length - 1] ^= 1;
+  assert.deepEqual(backupProblems({ ...c, file: bad }), ["the checksum does not match the manifest"]);
+  const cut = c.file.subarray(0, c.file.length - 100);
+  const cutProblems = backupProblems({ ...c, file: cut });
+  assert.ok(cutProblems.some((p) => p.includes("but the manifest says")));
+  assert.ok(cutProblems.includes("the checksum does not match the manifest"));
+  assert.deepEqual(backupProblems({ ...c, manifest: { ...c.manifest, name: "morningtelos-2026-11-21T0317Z" } }), [
+    "the manifest is for morningtelos-2026-11-21T0317Z, not morningtelos-2026-11-22T0317Z",
+  ]);
+  assert.deepEqual(backupProblems({ ...c, manifest: null }), ["the manifest could not be read"]);
+  assert.deepEqual(backupProblems({ ...c, file: null }), ["the backup file could not be read"]);
+});
+
+test("the check fails on a file that is tiny, not encrypted, or far smaller than the last one", () => {
+  const tiny = Buffer.from("MTB2 short");
+  const tinyProblems = backupProblems(goodCheck({ file: tiny, manifest: { name: "morningtelos-2026-11-22T0317Z", dump_bytes: tiny.length, dump_sha256: sha256Hex(tiny), rows: ROWS }, previousBytes: null }));
+  assert.deepEqual(tinyProblems, [`the file is only ${tiny.length} bytes`]);
+  const plain = Buffer.from("PGDMP ".repeat(500));
+  assert.deepEqual(backupProblems(goodCheck({ file: plain, manifest: { name: "morningtelos-2026-11-22T0317Z", dump_bytes: plain.length, dump_sha256: sha256Hex(plain), rows: ROWS }, previousBytes: null })), [
+    "the file is not an encrypted Morning Telos backup (MTB2)",
+  ]);
+  const c = goodCheck();
+  assert.deepEqual(backupProblems({ ...c, previousBytes: c.file.length * 2 }), []);
+  assert.match(backupProblems({ ...c, previousBytes: c.file.length * 2 + 1 })[0], /less than half of the one before/);
+});
+
+test("the check fails when a key table has no rows", () => {
+  const c = goodCheck();
+  assert.deepEqual(backupProblems({ ...c, manifest: { ...c.manifest, rows: { ...ROWS, "public.workspaces": 0 } } }), ["no rows in public.workspaces"]);
+  assert.deepEqual(backupProblems({ ...c, manifest: { ...c.manifest, rows: {} } }), [`no rows in ${KEY_TABLES.join(", ")}`]);
+});
+
+test("key tables: workspaces, members, jobs and sign-ins must have rows", () => {
+  assert.deepEqual(KEY_TABLES, ["public.workspaces", "public.workspace_members", "public.jobs", "auth.users"]);
+  assert.deepEqual(emptyKeyTables(ROWS), []);
+  assert.deepEqual(emptyKeyTables({ ...ROWS, "public.jobs": 0, "auth.users": undefined as unknown as number }), ["public.jobs", "auth.users"]);
 });

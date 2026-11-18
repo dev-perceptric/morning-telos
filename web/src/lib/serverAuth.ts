@@ -33,6 +33,17 @@ export async function requireRole(request: Request, workspaceId: unknown, min: M
   return { sb, user: user.user, userId: user.user.id, email: user.user.email ?? null };
 }
 
+/** The signed-in person, checked with Supabase, or null. For routes that aren't about one workspace (the staff console). */
+export async function signedInUser(request: Request): Promise<User | null> {
+  const url = supabaseUrl();
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY?.trim();
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!url || !key || !token) return null;
+  const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data } = await sb.auth.getUser(token);
+  return data?.user ?? null;
+}
+
 /** True when the signed-in person can make changes (and spend) in the workspace. */
 export async function isEditor(sb: SupabaseClient, workspaceId: string): Promise<boolean> {
   const { data } = await sb.rpc("has_role", { ws: workspaceId, min: "editor" });
