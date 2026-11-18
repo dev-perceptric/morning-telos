@@ -21,7 +21,7 @@ import { adminClient } from "@/lib/serverAuth";
 //   1. Put the header in a file only root can read:
 //        printf 'Authorization: Bearer %s\n' "<CRON_SECRET>" > /root/.morningtelos-worker && chmod 600 /root/.morningtelos-worker
 //   2. crontab -e, and add:
-//        * * * * * curl -fsS -m 280 -X POST -H @/root/.morningtelos-worker https://new.morningtelos.com/api/worker >/dev/null
+//        * * * * * curl -fsS -m 280 -X POST -H @/root/.morningtelos-worker https://chat.morningtelos.com/api/worker >/dev/null
 // CRON_SECRET is the same value in the web container's settings. A wrong or missing secret gets 401 and runs nothing.
 // Ticks may overlap: claim_jobs skips jobs another tick holds, and a job's lease brings it back if a tick dies.
 // Daily jobs need no cron line of their own: each tick calls queue_daily_jobs() (supabase/010_expire_trials.sql),

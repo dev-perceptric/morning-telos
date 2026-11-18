@@ -156,3 +156,10 @@ test("web-compose.yml sends the app's database calls straight to this VPS", () =
   assert.match(compose, /extra_hosts:\n\s+- "db\.morningtelos\.com:host-gateway"/);
 });
 
+
+test("the app answers at chat.morningtelos.com only, ahead of the old app's router", () => {
+  const web = service("web-new");
+  assert.match(web, /routers\.morningtelos-web\.rule=Host\(`chat\.morningtelos\.com`\)\n/);
+  assert.match(web, /routers\.morningtelos-web\.priority=\d{3,}/);
+  assert.doesNotMatch(compose, /new\.morningtelos\.com/);
+});

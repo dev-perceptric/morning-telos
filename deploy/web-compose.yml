@@ -1,4 +1,5 @@
-# The new Morning Telos app at new.morningtelos.com. A separate project from docker-compose.yml, so the old app keeps running.
+# The Morning Telos app at chat.morningtelos.com. A separate project from docker-compose.yml. The old app still runs
+# there with its data, but this router has a higher priority, so chat.morningtelos.com always reaches this app.
 # GitHub Actions builds the image (.github/workflows/build-images.yml). To update: docker compose -f deploy/web-compose.yml pull && docker compose -f deploy/web-compose.yml up -d
 # Keys come from the server's environment, with the names in web/.env.example. Never put a value in this file.
 services:
@@ -55,10 +56,11 @@ services:
       NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
     labels:
       - traefik.enable=true
-      - traefik.http.routers.morningtelos-new.rule=Host(`new.morningtelos.com`)
-      - traefik.http.routers.morningtelos-new.entrypoints=websecure
-      - traefik.http.routers.morningtelos-new.tls.certresolver=letsencrypt
-      - traefik.http.routers.morningtelos-new.service=morningtelos-web-new
+      - traefik.http.routers.morningtelos-web.rule=Host(`chat.morningtelos.com`)
+      - traefik.http.routers.morningtelos-web.priority=1000
+      - traefik.http.routers.morningtelos-web.entrypoints=websecure
+      - traefik.http.routers.morningtelos-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.morningtelos-web.service=morningtelos-web-new
       - traefik.http.services.morningtelos-web-new.loadbalancer.server.port=3000
 
   # Runs the job worker every minute (sign-up setup, key revokes, brand removal, the daily trial check).

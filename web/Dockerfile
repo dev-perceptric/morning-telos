@@ -1,4 +1,4 @@
-# The Morning Telos web app (new.morningtelos.com, later chat.morningtelos.com): build Next.js, then serve it.
+# The Morning Telos web app (chat.morningtelos.com): build Next.js, then serve it.
 # Copied from Arrowsterr's Dockerfile. The build context is web/.
 # At runtime it only needs the build (.next), public/, next.config.ts and the packages. Nothing reads files from src/, tests/ or supabase/.
 FROM node:22-bookworm-slim AS build
