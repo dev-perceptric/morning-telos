@@ -13,6 +13,7 @@ import { PLANS, type PaidPlan } from "@/lib/plans";
 import { insertSkill, matchSkills, menuAgent, skillsFor, slashQuery, type SkillRow } from "@/lib/skills";
 import { agentFace, AGENTS, agentByGod, insertMention, isAgentKey, LEAD, mentionMatches, mentionQuery, ORDER, type AgentKey } from "@/lib/team";
 import { can } from "@/lib/workspace";
+import { ApprovalCard } from "./Approvals";
 import { callApi, message, navigate } from "./nav";
 import type { Workspace } from "./Settings";
 import { btnPrimary, btnSmall, card, ErrorText, Notice } from "./ui";
@@ -20,8 +21,9 @@ import { btnPrimary, btnSmall, card, ErrorText, Notice } from "./ui";
 type Item =
   | { kind: "user"; text: string }
   | { kind: "agent"; agent: AgentKey; text: string; error?: boolean; blocked?: string }
-  | { kind: "note"; agent: AgentKey; text: string }
-  | { kind: "tool"; agent: AgentKey; text: string };
+  | { kind: "note"; agent: AgentKey; text: string; full?: boolean }
+  | { kind: "tool"; agent: AgentKey; text: string }
+  | { kind: "approval"; id: number; title: string };
 
 type ThreadRow = { id: string; title: string; updated_at: string };
 type MessageRow = { id: number; role: "user" | "agent" | "note"; agent: string | null; content: string; meta: Record<string, unknown> | null };
@@ -348,11 +350,18 @@ function useThreads(sb: SupabaseClient, workspaceId: string, limit: number) {
 
 // ─────────────── a thread ───────────────
 
-const toItem = (m: MessageRow): Item | null => {
+/** The approvals an agent's reply prepared (meta.approvals, saved by the agent loop), as cards under it. */
+const approvalsIn = (meta: Record<string, unknown> | null): Item[] =>
+  (Array.isArray(meta?.approvals) ? (meta.approvals as { id?: unknown; title?: unknown }[]) : [])
+    .filter((a) => typeof a?.id === "number")
+    .map((a) => ({ kind: "approval" as const, id: a.id as number, title: typeof a.title === "string" ? a.title : "A change" }));
+
+const toItems = (m: MessageRow): Item[] => {
   const agent = isAgentKey(m.agent) ? m.agent : "chief";
-  if (m.role === "user") return { kind: "user", text: m.content };
-  if (m.role === "note") return { kind: "note", agent, text: m.content };
-  return { kind: "agent", agent, text: m.content, error: Boolean(m.meta?.error), blocked: typeof m.meta?.blocked === "string" ? m.meta.blocked : undefined };
+  if (m.role === "user") return [{ kind: "user", text: m.content }];
+  // A note about an approval ("Approved and done: ...") is shown whole. A handoff note shows who handed it to whom.
+  if (m.role === "note") return [{ kind: "note", agent, text: m.content, full: m.meta?.approval !== undefined }];
+  return [{ kind: "agent", agent, text: m.content, error: Boolean(m.meta?.error), blocked: typeof m.meta?.blocked === "string" ? m.meta.blocked : undefined }, ...approvalsIn(m.meta)];
 };
 
 /** POST /api/chat and read its NDJSON stream. Calls onEvent for each line. Throws the route's error message. */
@@ -432,7 +441,7 @@ export function ThreadPage({
       if (t.error || m.error) return setError((t.error ?? m.error)!.message);
       if (!t.data) return setError("That chat was not found.");
       setTitle((t.data as { title: string }).title);
-      setItems(((m.data ?? []) as MessageRow[]).map(toItem).filter((x): x is Item => Boolean(x)));
+      setItems(((m.data ?? []) as MessageRow[]).flatMap(toItems));
     });
     return () => {
       live = false;
@@ -448,6 +457,8 @@ export function ThreadPage({
       setDraft("");
       setItems((xs) => [...xs, { kind: "user", text }]);
       if (!thread.current) setTitle(routine ? `Routine: ${routine.title}` : text.replace(/\s+/g, " ").trim());
+      // Approval cards wait for the reply that prepared them, so they show under it, as they do after a reload.
+      let waiting: Item[] = [];
       try {
         await streamChat(sb, { workspaceId: ws.id, threadId: thread.current, text, ...(routine ? { routineId: routine.id } : {}) }, (e) => {
           if (e.type === "thread") {
@@ -458,17 +469,21 @@ export function ThreadPage({
             }
           } else if (e.type === "status") setStatus({ agent: e.agent, text: e.text });
           else if (e.type === "tool") setItems((xs) => [...xs, { kind: "tool", agent: e.agent, text: e.text }]);
+          else if (e.type === "approval") waiting.push({ kind: "approval", id: e.id, title: e.title });
           else if (e.type === "handoff") {
             setStatus(null);
             setItems((xs) => [...xs, { kind: "note", agent: e.from, text: `${AGENTS[e.from].god} handed this to ${AGENTS[e.to].god}: ${e.note}` }]);
           } else if (e.type === "message") {
             setStatus(null);
-            setItems((xs) => [...xs, { kind: "agent", agent: e.agent, text: e.text, error: e.error, blocked: e.blocked }]);
+            const cards = waiting;
+            waiting = [];
+            setItems((xs) => [...xs, { kind: "agent", agent: e.agent, text: e.text, error: e.error, blocked: e.blocked }, ...cards]);
           }
         });
       } catch (err) {
         setError(message(err));
       }
+      if (waiting.length) setItems((xs) => [...xs, ...waiting]);
       setStatus(null);
       setBusy(false);
     },
@@ -526,6 +541,12 @@ export function ThreadPage({
 }
 
 function ItemView({ item, sb, ws }: { item: Item; sb: SupabaseClient; ws: Workspace }) {
+  if (item.kind === "approval")
+    return (
+      <div className="pl-11">
+        <ApprovalCard sb={sb} ws={ws} id={item.id} title={item.title} />
+      </div>
+    );
   if (item.kind === "user")
     return (
       <div className="flex justify-end">
@@ -538,7 +559,7 @@ function ItemView({ item, sb, ws }: { item: Item; sb: SupabaseClient; ws: Worksp
     return (
       <div className="flex items-center gap-2 pl-1 text-[13px] text-ink-3">
         <Face agent={item.agent} size={20} />
-        <span className="min-w-0 break-words">{item.kind === "note" ? item.text.split(":")[0] : item.text}</span>
+        <span className="min-w-0 break-words">{item.kind === "note" && !item.full ? item.text.split(":")[0] : item.text}</span>
       </div>
     );
   const a = AGENTS[item.agent];
@@ -598,16 +619,19 @@ export function TeamPage({ sb, ws, onAsk }: { sb: SupabaseClient; ws: Workspace;
   const admin = can(ws.role, "changeTeam");
   const editor = can(ws.role, "chat");
   const [paused, setPaused] = useState<Set<AgentKey>>(new Set());
+  const [autopilot, setAutopilot] = useState<Set<AgentKey>>(new Set());
   const [error, setError] = useState("");
   useEffect(() => {
     let live = true;
     sb.from("agent_prefs")
-      .select("agent, enabled")
+      .select("agent, enabled, trust")
       .eq("workspace_id", ws.id)
       .then(({ data, error }) => {
         if (!live) return;
         if (error) return setError(/agent_prefs/.test(error.message) ? "" : error.message);
-        setPaused(new Set(((data ?? []) as { agent: string; enabled: boolean }[]).filter((r) => !r.enabled && isAgentKey(r.agent)).map((r) => r.agent as AgentKey)));
+        const rows = ((data ?? []) as { agent: string; enabled: boolean; trust: number }[]).filter((r) => isAgentKey(r.agent));
+        setPaused(new Set(rows.filter((r) => !r.enabled).map((r) => r.agent as AgentKey)));
+        setAutopilot(new Set(rows.filter((r) => r.trust >= 2).map((r) => r.agent as AgentKey)));
       });
     return () => {
       live = false;
@@ -623,6 +647,19 @@ export function TeamPage({ sb, ws, onAsk }: { sb: SupabaseClient; ws: Workspace;
       const n = new Set(s);
       if (on) n.delete(k);
       else n.add(k);
+      return n;
+    });
+  };
+
+  // Ask me first (0): every change waits in Approvals. Autopilot (2): changes run right away and are logged.
+  const setTrust = async (k: AgentKey, on: boolean) => {
+    setError("");
+    const { error } = await sb.from("agent_prefs").upsert({ workspace_id: ws.id, agent: k, trust: on ? 2 : 0, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,agent" });
+    if (error) return setError(error.message);
+    setAutopilot((s) => {
+      const n = new Set(s);
+      if (on) n.add(k);
+      else n.delete(k);
       return n;
     });
   };
@@ -657,6 +694,7 @@ export function TeamPage({ sb, ws, onAsk }: { sb: SupabaseClient; ws: Workspace;
                   <li key={o}>{o}</li>
                 ))}
               </ul>
+              {makesChanges(k) ? <TrustSetting agent={k} on={autopilot.has(k)} admin={admin} onChange={(on) => setTrust(k, on)} /> : null}
               {!a.soon && (editor || admin) ? (
                 <div className="flex flex-wrap gap-2">
                   {editor && !off ? (
@@ -676,5 +714,40 @@ export function TeamPage({ sb, ws, onAsk }: { sb: SupabaseClient; ws: Workspace;
         })}
       </ul>
     </section>
+  );
+}
+
+/** Teammates whose tools can change something (not Athena, who only reads, and not the ones coming soon). */
+const makesChanges = (k: AgentKey) => !AGENTS[k].soon && !AGENTS[k].readOnly && AGENTS[k].apps.length > 0;
+
+/** Ask me first or Autopilot, for one teammate. Admins and the owner change it; everyone else sees it. */
+function TrustSetting({ agent, on, admin, onChange }: { agent: AgentKey; on: boolean; admin: boolean; onChange: (on: boolean) => void }) {
+  const options = [
+    { on: false, label: "Ask me first" },
+    { on: true, label: "Autopilot" },
+  ];
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-line pt-3">
+      <p className="text-[13px] font-medium text-ink-3">Changes</p>
+      {admin ? (
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={`How ${AGENTS[agent].god} makes changes`}>
+          {options.map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              role="radio"
+              aria-checked={on === o.on}
+              className={`rounded-full px-3 py-1.5 text-[14px] ${on === o.on ? "bg-ink text-white" : "border border-line bg-surface text-ink-2 hover:bg-sunk"}`}
+              onClick={() => on !== o.on && onChange(o.on)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[14px] text-ink-2">{on ? "Autopilot" : "Ask me first"}</p>
+      )}
+      <p className="text-[13px] text-ink-4">{on ? "Changes run right away. You see them in Recent work on Home." : "Every change waits for your OK in Approvals."}</p>
+    </div>
   );
 }

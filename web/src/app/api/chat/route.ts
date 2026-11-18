@@ -5,10 +5,10 @@ import { CHAT_MESSAGES, ndjsonLine, rateLimiter, readChat } from "@/lib/chat";
 import { brainTools, teamContext } from "@/lib/brainServer";
 import { teamClient } from "@/lib/claude";
 import { loadRoutine, startRoutineThread } from "@/lib/routinesServer";
-import type { AgentKey } from "@/lib/team";
 import { adminClient, roleGate } from "@/lib/serverAuth";
 import { loadWorkspace, teamStore, threadInWorkspace, threadTitle } from "@/lib/teamStore";
-import { LEAD } from "@/lib/team";
+import { teamTools } from "@/lib/teamTools";
+import { LEAD, type AgentKey } from "@/lib/team";
 import { NEEDS } from "@/lib/workspace";
 
 // Chat with the AI team (editors and up). Saves the person's message, then streams the turn as NDJSON, one event
@@ -95,10 +95,11 @@ export async function POST(request: Request) {
         await runTurn({ workspace: team, threadId: thread, text: words, forced, model }, {
           client: teamClient(),
           store: teamStore(db, ws),
+          // Arrowsterr and Capybaroar through this workspace's brand keys (changes wait for approval), Knowledge
+          // search, and use_skill and remember (src/lib/brainServer.ts).
+          tools: teamTools(db, { log, extra: [brainTools(db, ws)] }),
           emit,
           log,
-          // use_skill and remember. The product tools join these (src/lib/brainServer.ts joinTools).
-          tools: brainTools(db, ws),
           // The business brain: Knowledge, Memory and Skills, as a second cached part of the instructions.
           context: teamContext(db, { text: words, log }),
         });

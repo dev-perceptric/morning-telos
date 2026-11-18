@@ -12,6 +12,7 @@ import { inviteTokenFromPath, roleLabel } from "@/lib/workspace";
 import { AuthScreen, NewPassword } from "./AuthScreen";
 import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
 import { SettingsPage, type Workspace } from "./Settings";
+import { ApprovalsPage, NeedsYou, RecentActivity } from "./Approvals";
 import { KnowledgePage } from "./Knowledge";
 import { MemoryPage } from "./Memory";
 import { RoutinesPage } from "./Routines";
@@ -219,6 +220,8 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
             <RoutinesPage key={ws.id} sb={sb} ws={ws} onRun={runRoutine} />
           ) : route.page === "memory" ? (
             <MemoryPage key={ws.id} sb={sb} ws={ws} />
+          ) : route.page === "approvals" ? (
+            <ApprovalsPage key={ws.id} sb={sb} ws={ws} id={route.id} />
           ) : (
             <Home sb={sb} ws={ws} draft={draft} onDraft={setDraft} onStart={startChat} />
           )}
@@ -232,6 +235,8 @@ function Home({ sb, ws, draft, onDraft, onStart }: { sb: SupabaseClient; ws: Wor
   return (
     <div className="flex flex-col gap-6">
       <TeamHome key={ws.id} sb={sb} ws={ws} draft={draft} onDraft={onDraft} onStart={onStart} />
+      <NeedsYou key={`needs-${ws.id}`} sb={sb} ws={ws} />
+      <RecentActivity key={`activity-${ws.id}`} sb={sb} ws={ws} />
       <SetupStatus key={`setup-${ws.id}`} sb={sb} workspaceId={ws.id} />
       <ConnectSocialCard key={`social-${ws.id}`} sb={sb} ws={ws} />
     </div>
@@ -280,6 +285,7 @@ function SetupStatus({ sb, workspaceId }: { sb: SupabaseClient; workspaceId: str
 
 const NAV = [
   { page: "home", label: "Home", path: "/" },
+  { page: "approvals", label: "Approvals", path: "/approvals" },
   { page: "team", label: "Team", path: "/team" },
   { page: "routines", label: "Routines", path: "/routines" },
   { page: "knowledge", label: "Knowledge", path: "/knowledge" },

@@ -154,7 +154,8 @@ export function cleanSkill(input: { agent?: unknown; name?: unknown; description
 const safe = (s: string) => s.replace(/<\/?(skill|skills)\b/gi, (m) => m.replace("<", "&lt;"));
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
 
-const FOLLOW = "Follow its steps and rules. Where a step needs a tool you don't have, say what you'd need and do what you can with the tools you have.";
+const FOLLOW =
+  "Follow its steps and rules. It names product tools without their product: get_ai_visibility is arrowsterr__get_ai_visibility in your tools, and create_posts is capybaroar__create_posts. Where a step needs a tool you don't have, say what you'd need and do what you can with the tools you have.";
 
 /**
  * The list of skills a teammate can pick from, for its system prompt, or "" when there are none. Stable for a

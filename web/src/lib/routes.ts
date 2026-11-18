@@ -9,6 +9,7 @@ export type Route =
   | { page: "knowledge" }
   | { page: "routines" }
   | { page: "memory" }
+  | { page: "approvals"; id: number | null }
   | { page: "settings"; tab: SettingsTab }
   | { page: "invite"; token: string };
 
@@ -37,6 +38,9 @@ export function parseRoute(path: string): Route {
   if (p === "/knowledge") return { page: "knowledge" };
   if (p === "/routines") return { page: "routines" };
   if (p === "/memory") return { page: "memory" };
+  if (p === "/approvals") return { page: "approvals", id: null };
+  const ap = /^\/approvals\/(\d{1,15})$/.exec(p);
+  if (ap && Number(ap[1]) > 0) return { page: "approvals", id: Number(ap[1]) };
   return { page: "home" };
 }
 
@@ -48,5 +52,6 @@ export function routePath(r: Route): string {
   if (r.page === "knowledge") return "/knowledge";
   if (r.page === "routines") return "/routines";
   if (r.page === "memory") return "/memory";
+  if (r.page === "approvals") return r.id ? `/approvals/${r.id}` : "/approvals";
   return "/";
 }

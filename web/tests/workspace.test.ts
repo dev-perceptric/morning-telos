@@ -38,6 +38,7 @@ test("which roles can do which workspace action", () => {
     editRoutines: ["owner", "admin", "editor"],
     editSkills: ["owner", "admin"],
     deleteMemory: ["owner", "admin", "editor", "viewer"],
+    approve: ["owner", "admin", "editor"],
   };
   assert.deepEqual(Object.keys(expected).sort(), Object.keys(NEEDS).sort());
   for (const [action, allowed] of Object.entries(expected) as [Action, Role[]][]) {
@@ -120,7 +121,13 @@ test("page routes", () => {
   assert.deepEqual(parseRoute(`/chat/${thread}`), { page: "thread", id: thread });
   assert.deepEqual(parseRoute(`/chat/${thread.toUpperCase()}/`), { page: "thread", id: thread });
   assert.deepEqual(parseRoute("/chat/not-a-thread"), { page: "home" });
+  assert.deepEqual(parseRoute("/approvals"), { page: "approvals", id: null });
+  assert.deepEqual(parseRoute("/approvals/42"), { page: "approvals", id: 42 });
+  assert.deepEqual(parseRoute("/approvals/0"), { page: "home" });
+  assert.deepEqual(parseRoute("/approvals/abc"), { page: "home" });
   for (const r of [
+    { page: "approvals", id: null },
+    { page: "approvals", id: 42 },
     { page: "home" },
     { page: "team" },
     { page: "thread", id: null },

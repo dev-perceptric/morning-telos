@@ -25,6 +25,7 @@ import {
   USE_SKILL,
   type SkillRow,
 } from "../src/lib/skills.ts";
+import { HIDDEN, toolName } from "../src/lib/productTools.ts";
 import { skillTool } from "../src/lib/skillTool.ts";
 import { AGENTS, workingAgents, type AgentKey } from "../src/lib/team.ts";
 
@@ -72,6 +73,8 @@ test("System skills name only tools their teammate has: its products' tools from
     const allowed = new Set([...TOOLS.morningtelos, ...apps.flatMap((p) => product[p])]);
     for (const t of s.tools) assert.ok(allowed.has(t), `${s.key} names ${t}, which ${a.god} doesn't have`);
     if (a.readOnly) for (const t of s.tools) assert.ok(!writes.has(t), `${s.key}: ${a.god} only reads, but the skill names ${t}`);
+    // Tools Morning Telos never gives an agent (src/lib/productTools.ts HIDDEN).
+    for (const t of s.tools) for (const p of apps) assert.ok(!HIDDEN[p].has(t), `${s.key} names ${t}, which agents never get`);
     // Each tool in the header is used in the steps, and each tool the steps lean on is in the header.
     for (const t of s.tools) assert.ok(s.body.includes(t), `${s.key} lists ${t} but never says how to use it`);
     const known = new Set([...product.arrowsterr, ...product.capybaroar, ...TOOLS.morningtelos]);
@@ -176,6 +179,8 @@ test("the use_skill tool loads the asking teammate's list, and an unknown name i
   assert.equal(bad.isError, true);
   assert.deepEqual(asked, ["social", "social"]);
   assert.equal(tool.definition, USE_SKILL);
+  // Skills name product tools short; the prompt says how they appear in the teammate's tool list.
+  assert.match(ok.content, new RegExp(`create_posts is ${toolName("capybaroar", "create_posts")}`));
 });
 
 test("the / menu: the query after /, whose skills to show, matches best first, and the pick put in place", () => {

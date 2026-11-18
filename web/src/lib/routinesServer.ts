@@ -8,13 +8,14 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { runTurn, type LoopClient, type ToolRegistry } from "./agentLoop.ts";
-import { brainTools, joinTools, teamContext } from "./brainServer.ts";
+import { runTurn, type LoopClient } from "./agentLoop.ts";
+import { brainTools, teamContext } from "./brainServer.ts";
 import type { Handler } from "./jobs.ts";
 import { aiBlock, spendWindowStart } from "./meter.ts";
 import { routineThreadTitle, SKIP_NOTES, type Routine } from "./routines.ts";
 import { isAgentKey, AGENTS } from "./team.ts";
 import { isUuid, loadWorkspace, teamStore } from "./teamStore.ts";
+import { teamTools } from "./teamTools.ts";
 
 export type RoutineRow = Routine & { workspace_id: string; created_by: string | null };
 
@@ -61,8 +62,6 @@ export async function startRoutineThread(db: SupabaseClient, r: RoutineRow, by: 
 export type RoutineDeps = {
   client: () => LoopClient | null;
   log: (message: string) => void;
-  /** More tools for the teammate (the product tools), joined with use_skill and remember. */
-  tools?: (db: SupabaseClient, workspaceId: string) => ToolRegistry;
   now?: () => number;
 };
 
@@ -100,8 +99,6 @@ export function routineJobHandlers(db: SupabaseClient, deps: RoutineDeps): Recor
       }
 
       const threadId = await startRoutineThread(db, r, { userId: r.created_by });
-      const extra = deps.tools?.(db, ws);
-      const mine = brainTools(db, ws);
       await runTurn(
         { workspace, threadId, text: r.instruction, forced: r.agent },
         {
@@ -111,7 +108,8 @@ export function routineJobHandlers(db: SupabaseClient, deps: RoutineDeps): Recor
           emit: () => {},
           log: deps.log,
           now: deps.now,
-          tools: extra ? joinTools(mine, extra) : mine,
+          // The same tools as a chat: the products (changes wait for approval), Knowledge search, use_skill and remember.
+          tools: teamTools(db, { log: deps.log, extra: [brainTools(db, ws)] }),
           context: teamContext(db, { text: r.instruction, log: deps.log }),
         },
       );

@@ -380,7 +380,40 @@ test("tools from the registry: run in parallel, labels shown, all results in one
     r.events.filter((e) => e.type === "tool").map((e) => (e as { text: string }).text),
     ["Label zeta_read", "Label alpha_read", "Label broken"],
   );
-  assert.match(calls[0].params.system![0].text as string, /saved for the owner's approval/);
+  // None of these tools change anything, so the prompt says the agent only reads.
+  assert.match(calls[0].params.system![0].text as string, /Your tools only read/);
+});
+
+test("a tool that changes something: the prompt says it waits for approval, or runs on autopilot", () => {
+  const ask = systemPrompt(WS, "social", { tools: true, writes: "ask", missing: [], teammates: [] });
+  assert.match(ask, /saved for the owner's approval instead of running/);
+  const auto = systemPrompt(WS, "social", { tools: true, writes: "autopilot", missing: [], teammates: [] });
+  assert.match(auto, /The owner put you on autopilot/);
+  assert.doesNotMatch(auto, /saved for the owner's approval/);
+  assert.match(systemPrompt(WS, "chief", { tools: true, writes: "none", missing: [], teammates: [] }), /Your tools only read/);
+});
+
+test("a call saved for approval: the chat gets an approval event, and the reply keeps its id for the card", async () => {
+  const tools: AgentTool[] = [
+    {
+      definition: { name: "capybaroar__create_posts", input_schema: { type: "object", properties: {} } },
+      label: "Social media: create posts",
+      write: true,
+      run: async () => ({ content: "Saved for the owner's approval as #7. It has not run yet. Do not call it again.", approval: { id: 7, title: "Create posts (Social media)" } }),
+    },
+  ];
+  const { client, calls } = fakeClaude({ social: [{ content: [toolUse("1", "capybaroar__create_posts", { posts: [] })], stop_reason: "tool_use" }, say("I drafted 3 posts for you to approve.")] });
+  const r = await turn("@Aphrodite draft 3 posts", { client, tools });
+  assert.match(calls[0].params.system![0].text as string, /saved for the owner's approval instead of running/);
+  const ev = r.events.filter((e) => e.type === "approval" || e.type === "message");
+  assert.deepEqual(ev, [
+    { type: "approval", agent: "social", id: 7, title: "Create posts (Social media)" },
+    { type: "message", agent: "social", text: "I drafted 3 posts for you to approve." },
+  ]);
+  const reply = r.messages.at(-1)!;
+  assert.deepEqual(reply.meta.approvals, [{ id: 7, title: "Create posts (Social media)" }]);
+  const results = calls[1].params.messages.at(-1)!.content as Anthropic.Beta.BetaToolResultBlockParam[];
+  assert.equal(results[0].content, "Saved for the owner's approval as #7. It has not run yet. Do not call it again.");
 });
 
 test("prompt context (knowledge, skills, memory) goes in a second cached system block", async () => {

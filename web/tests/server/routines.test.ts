@@ -127,7 +127,7 @@ test("run_routine: a new chat called Routine: <title>, the instruction as the me
   assert.match(extra, /The person picked the skill "plan-weekly-posts"/);
   assert.deepEqual(
     requests[0].tools?.map((x) => x.name),
-    ["remember", "use_skill", "handoff"],
+    ["remember", "search_knowledge", "use_skill", "handoff"],
   );
   assert.equal(routine().last_thread_id, t.id);
   assert.equal(routine().last_note, null);

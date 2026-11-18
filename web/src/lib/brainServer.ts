@@ -1,12 +1,13 @@
 // What every teammate knows and can do beyond its product tools, for POST /api/chat and the routine worker:
 //   teamContext  the cached system sections: Knowledge, Memory and the Skills list, plus a skill picked with /.
-//   brainTools   the use_skill and remember tools (src/lib/skillTool.ts, src/lib/rememberTool.ts).
+//   brainTools   the use_skill and remember tools (src/lib/skillTool.ts, src/lib/rememberTool.ts), a tool source
+//                that teamTools (src/lib/teamTools.ts) puts with the product tools.
 // Both read one workspace with the server's client, so every query names the workspace (CLAUDE.md: server code checks
 // the workspace too). A part that can't load (a table before its migration runs, a hiccup) is left out, so the
 // teammate still answers.
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PromptContext, ToolRegistry, ToolSet } from "./agentLoop.ts";
+import type { PromptContext } from "./agentLoop.ts";
 import { knowledgeSection } from "./knowledge.ts";
 import { knowledgeForPrompt } from "./knowledgeServer.ts";
 import { MAX_MEMORIES, memorySection, type Memory } from "./memory.ts";
@@ -14,6 +15,7 @@ import { rememberTool, type MemoryStore } from "./rememberTool.ts";
 import { pickedSkill, pickedSkillPrompt, skillCatalog, skillsFor, type SkillRow } from "./skills.ts";
 import { skillTool } from "./skillTool.ts";
 import { isAgentKey, type AgentKey } from "./team.ts";
+import type { ToolSource } from "./toolRegistry.ts";
 
 /** How much of the prompt Knowledge may use (the same as before memory and skills came). */
 export const KNOWLEDGE_BUDGET = 24_000;
@@ -83,8 +85,8 @@ export function teamContext(db: SupabaseClient, o: { text?: string; log?: Log } 
   };
 }
 
-/** use_skill (when the teammate has skills) and remember, for one workspace. */
-export function brainTools(db: SupabaseClient, workspaceId: string): ToolRegistry {
+/** use_skill (when the teammate has skills) and remember, for one workspace. A tool source for teamTools (src/lib/teamTools.ts). */
+export function brainTools(db: SupabaseClient, workspaceId: string): ToolSource {
   let rows: Promise<SkillRow[]> | null = null;
   const load = (agent: AgentKey) => {
     rows ??= skillRows(db, workspaceId);
@@ -94,18 +96,5 @@ export function brainTools(db: SupabaseClient, workspaceId: string): ToolRegistr
     if (ctx.workspace.id !== workspaceId) throw new Error("These tools are for another workspace.");
     const has = await load(ctx.agent).then((s) => s.length > 0).catch(() => false);
     return { tools: [...(has ? [skillTool(load)] : []), rememberTool(memoryStore(db, workspaceId))], missing: [] };
-  };
-}
-
-/**
- * Several registries as one: every tool from each, the first of any two with the same name, and all the missing
- * services. One that fails to load is left out, so the others still work.
- */
-export function joinTools(...registries: ToolRegistry[]): ToolRegistry {
-  return async (ctx) => {
-    const sets: ToolSet[] = (await Promise.allSettled(registries.map((r) => r(ctx)))).flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
-    const seen = new Set<string>();
-    const tools = sets.flatMap((s) => s.tools).filter((t) => !seen.has(t.definition.name) && Boolean(seen.add(t.definition.name)));
-    return { tools, missing: [...new Set(sets.flatMap((s) => s.missing))] };
   };
 }
