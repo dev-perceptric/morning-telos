@@ -1,11 +1,13 @@
 import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { brandJobHandlers, expireTrialsHandler } from "@/lib/closeoutDb";
+import { teamClient } from "@/lib/claude";
 import { cronAllowed } from "@/lib/cronAuth";
 import { STALE_AFTER } from "@/lib/approvals";
 import { runJob, type Handler, type Job } from "@/lib/jobs";
 import { partnerFor, type Product } from "@/lib/partner";
 import { provision, type ServicePatch, type ServiceStatus } from "@/lib/provision";
+import { routineJobHandlers } from "@/lib/routinesServer";
 import { seal } from "@/lib/sealing";
 import { knowledgeJobHandlers } from "@/lib/siteScanDb";
 import { adminClient } from "@/lib/serverAuth";
@@ -22,7 +24,7 @@ import { adminClient } from "@/lib/serverAuth";
 // CRON_SECRET is the same value in the web container's settings. A wrong or missing secret gets 401 and runs nothing.
 // Ticks may overlap: claim_jobs skips jobs another tick holds, and a job's lease brings it back if a tick dies.
 // Daily jobs need no cron line of their own: each tick calls queue_daily_jobs() (supabase/010_expire_trials.sql),
-// which queues each one once per UTC day.
+// which queues each one once per UTC day. Routines the same way: queue_routine_runs() queues each due one once.
 // When the worker image (plan: Deploy, morningtelos-worker) lands, it calls this in a loop instead of cron.
 
 export const maxDuration = 300;
@@ -44,6 +46,8 @@ function handlers(db: SupabaseClient): Record<string, Handler> {
     expire_trials: expireTrialsHandler(db),
     // Reading the customer's website into Knowledge (src/lib/siteScan.ts).
     ...knowledgeJobHandlers(db),
+    // A routine's scheduled run: its teammate does the job in a new chat (src/lib/routinesServer.ts).
+    ...routineJobHandlers(db, { client: teamClient, log: (m) => warn(m, "run_routine") }),
     provision: async (job) => {
       const ws = job.workspace_id;
       if (!ws) return { status: "failed", error: "A provision job needs a workspace." };
@@ -82,10 +86,10 @@ function alert(message: string, job: Job) {
   Sentry.captureMessage(message, { level: "error", tags: { job_kind: job.kind }, extra: { job_id: job.id, workspace_id: job.workspace_id } });
 }
 
-/** A problem outside any job (the daily jobs couldn't be queued). Sentry groups repeats of the same line. */
-function warn(message: string) {
+/** A problem outside any job (the daily jobs couldn't be queued), or inside a routine's turn. Sentry groups repeats of the same line. */
+function warn(message: string, kind = "daily") {
   console.error(message);
-  Sentry.captureMessage(message, { level: "error", tags: { job_kind: "daily" } });
+  Sentry.captureMessage(message, { level: kind === "daily" ? "error" : "warning", tags: { job_kind: kind } });
 }
 
 async function pool<T>(items: T[], n: number, fn: (item: T) => Promise<void>) {
@@ -103,6 +107,9 @@ export async function POST(request: Request) {
   // A missing daily job must not stop the jobs that are due, so a problem here is only logged.
   const daily = await db.rpc("queue_daily_jobs");
   if (daily.error) warn(/queue_daily_jobs/.test(daily.error.message) ? "Run supabase/010_expire_trials.sql in Supabase." : `Daily jobs: ${daily.error.message}`);
+  // Routines due this minute in each workspace's time zone, queued once each (supabase/014_routines_skills_memory.sql).
+  const routines = await db.rpc("queue_routine_runs");
+  if (routines.error) warn(/queue_routine_runs/.test(routines.error.message) ? "Run supabase/014_routines_skills_memory.sql in Supabase." : `Routines: ${routines.error.message}`, "routines");
 
   // An approved change whose call never finished (the server restarted mid-call) is failed, so a person checks it.
   const stale = await db.rpc("fail_stale_approvals", { p_older: STALE_AFTER });

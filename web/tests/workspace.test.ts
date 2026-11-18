@@ -35,6 +35,9 @@ test("which roles can do which workspace action", () => {
     chat: ["owner", "admin", "editor"],
     changeTeam: ["owner", "admin"],
     editKnowledge: ["owner", "admin", "editor"],
+    editRoutines: ["owner", "admin", "editor"],
+    editSkills: ["owner", "admin"],
+    deleteMemory: ["owner", "admin", "editor", "viewer"],
     approve: ["owner", "admin", "editor"],
   };
   assert.deepEqual(Object.keys(expected).sort(), Object.keys(NEEDS).sort());
@@ -106,6 +109,9 @@ test("page routes", () => {
   assert.deepEqual(parseRoute("/settings/social"), { page: "settings", tab: "social" });
   assert.deepEqual(parseRoute("/knowledge"), { page: "knowledge" });
   assert.deepEqual(parseRoute("/knowledge/"), { page: "knowledge" });
+  assert.deepEqual(parseRoute("/routines"), { page: "routines" });
+  assert.deepEqual(parseRoute("/memory/"), { page: "memory" });
+  assert.deepEqual(parseRoute("/settings/skills"), { page: "settings", tab: "skills" });
   assert.deepEqual(parseRoute("/nope"), { page: "home" });
   const token = "b".repeat(64);
   assert.deepEqual(parseRoute(`/invite/${token}`), { page: "invite", token });
@@ -130,6 +136,9 @@ test("page routes", () => {
     { page: "settings", tab: "members" },
     { page: "settings", tab: "social" },
     { page: "knowledge" },
+    { page: "routines" },
+    { page: "memory" },
+    { page: "settings", tab: "skills" },
     { page: "invite", token },
   ] as const) {
     assert.deepEqual(parseRoute(routePath(r)), r);

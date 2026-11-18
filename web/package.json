@@ -11,7 +11,8 @@
     "test": "node --test tests/*.test.ts && node --conditions=react-server --test tests/server/*.test.ts",
     "stripe:setup": "node scripts/stripe-setup.mjs",
     "backup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/backup.ts",
-    "restore": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/restore.ts"
+    "restore": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/restore.ts",
+    "skills": "node scripts/skills.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.10.0",

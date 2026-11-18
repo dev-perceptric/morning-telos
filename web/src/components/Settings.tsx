@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/routes";
 import { ASSIGNABLE, can, cleanSettings, deleteConfirmMatches, inviteLink, memberActions, roleLabel, ROLES, type MemberRow, type Role } from "@/lib/workspace";
 import { callApi, message, navigate } from "./nav";
+import { SkillsSettings } from "./Skills";
 import { SocialSettings } from "./Social";
 import { btnDanger, btnPrimary, btnSmall, card, ErrorText, input, label, Notice } from "./ui";
 
@@ -63,6 +64,8 @@ export function SettingsPage({
           </>
         ) : tab === "members" ? (
           <MembersSettings key={ws.id} sb={sb} ws={ws} userId={userId} onGone={onGone} />
+        ) : tab === "skills" ? (
+          <SkillsSettings key={`skills-${ws.id}`} sb={sb} ws={ws} />
         ) : (
           <SocialSettings key={`social-${ws.id}`} sb={sb} ws={ws} />
         )}
@@ -156,7 +159,7 @@ function GeneralSettings({ sb, ws, onChanged }: { sb: SupabaseClient; ws: Worksp
 }
 
 /** A button that asks "are you sure" in place before it acts. */
-function ConfirmButton({ label: text, confirm, onConfirm }: { label: string; confirm: string; onConfirm: () => void }) {
+export function ConfirmButton({ label: text, confirm, onConfirm }: { label: string; confirm: string; onConfirm: () => void }) {
   const [asking, setAsking] = useState(false);
   if (!asking)
     return (

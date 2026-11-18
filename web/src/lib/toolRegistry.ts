@@ -1,7 +1,7 @@
 // The AI team's tool registry: a list of tool sources, put together for one agent in one workspace.
 // A tool source is anything that, given the agent and workspace (ToolContext), returns that agent's tools and the
 // services it should have but can't use right now. Sources: Arrowsterr and Capybaroar through the workspace's brand
-// keys (productTools.ts), search_knowledge (knowledgeTools.ts), and later skills, memory and routines.
+// keys (productTools.ts), search_knowledge (knowledgeTools.ts), and use_skill and remember (brainServer.ts).
 // The server's list of sources is in teamTools.ts. Pure, so tests compose fake sources.
 import type { ToolContext, ToolDef, ToolRegistry, ToolResult, ToolSet } from "./agentLoop.ts";
 

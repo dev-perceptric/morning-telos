@@ -78,6 +78,8 @@ beforeEach(() => {
   };
   // supabase/010_expire_trials.sql: today's daily job is already queued, so these tests see only their own jobs.
   db.rpcs.queue_daily_jobs = () => 0;
+  // supabase/014_routines_skills_memory.sql: no routine is due.
+  db.rpcs.queue_routine_runs = () => 0;
   stale = [];
   db.rpcs.fail_stale_approvals = (args) => (stale.push(args), 0);
   auth.db = db;

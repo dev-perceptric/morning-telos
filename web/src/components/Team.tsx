@@ -10,7 +10,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatEvent } from "@/lib/agentLoop";
 import { inlineParts, readLines } from "@/lib/chat";
 import { PLANS, type PaidPlan } from "@/lib/plans";
-import { agentFace, AGENTS, agentByGod, insertMention, isAgentKey, mentionMatches, mentionQuery, ORDER, type AgentKey } from "@/lib/team";
+import { insertSkill, matchSkills, menuAgent, skillsFor, slashQuery, type SkillRow } from "@/lib/skills";
+import { agentFace, AGENTS, agentByGod, insertMention, isAgentKey, LEAD, mentionMatches, mentionQuery, ORDER, type AgentKey } from "@/lib/team";
 import { can } from "@/lib/workspace";
 import { ApprovalCard } from "./Approvals";
 import { callApi, message, navigate } from "./nav";
@@ -62,7 +63,10 @@ function Reply({ text }: { text: string }) {
 
 // ─────────────── the composer ───────────────
 
-/** A message box. Typing @ opens a menu of teammates; Enter sends and Shift+Enter starts a new line. */
+/**
+ * A message box. Typing @ opens a menu of teammates, and / a menu of the tagged teammate's skills (Athena's, or
+ * `agent`'s, when nobody is tagged). Enter sends and Shift+Enter starts a new line.
+ */
 export function Composer({
   value,
   onChange,
@@ -71,6 +75,8 @@ export function Composer({
   busy,
   placeholder,
   autoFocus,
+  skills = [],
+  agent = LEAD,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -79,27 +85,47 @@ export function Composer({
   busy?: boolean;
   placeholder: string;
   autoFocus?: boolean;
+  /** The workspace's own skills. The System skills are always there. */
+  skills?: SkillRow[];
+  /** Whose skills / shows when the message tags nobody. */
+  agent?: AgentKey;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [query, setQuery] = useState<string | null>(null);
+  const [query, setQuery] = useState<{ kind: "mention" | "skill"; q: string } | null>(null);
   const [pick, setPick] = useState(0);
-  const matches = query === null ? [] : mentionMatches(query);
-  const open = matches.length > 0;
+  const skillAgent = menuAgent(value, agent);
+  const people = query?.kind === "mention" ? mentionMatches(query.q) : [];
+  const found = query?.kind === "skill" ? matchSkills(skillsFor(skillAgent, skills), query.q).slice(0, 8) : [];
+  const count = people.length || found.length;
+  const open = count > 0;
 
   const look = (ta: HTMLTextAreaElement) => {
-    setQuery(mentionQuery(ta.value.slice(0, ta.selectionStart)));
+    const before = ta.value.slice(0, ta.selectionStart);
+    const m = mentionQuery(before);
+    const k = m === null ? slashQuery(before) : null;
+    setQuery(m !== null ? { kind: "mention", q: m } : k !== null ? { kind: "skill", q: k } : null);
     setPick(0);
   };
-  const choose = (k: AgentKey) => {
+  const place = (next: { text: string; cursor: number }) => {
     const ta = ref.current;
-    if (!ta) return;
-    const next = insertMention(ta.value, ta.selectionStart, k);
     onChange(next.text);
     setQuery(null);
     requestAnimationFrame(() => {
-      ta.focus();
-      ta.setSelectionRange(next.cursor, next.cursor);
+      ta?.focus();
+      ta?.setSelectionRange(next.cursor, next.cursor);
     });
+  };
+  const choose = (k: AgentKey) => {
+    const ta = ref.current;
+    if (ta) place(insertMention(ta.value, ta.selectionStart, k));
+  };
+  const chooseSkill = (name: string) => {
+    const ta = ref.current;
+    if (ta) place(insertSkill(ta.value, ta.selectionStart, name));
+  };
+  const chooseAt = (i: number) => {
+    if (people.length) choose(people[Math.min(i, people.length - 1)]);
+    else if (found.length) chooseSkill(found[Math.min(i, found.length - 1)].name);
   };
   const send = () => {
     const t = value.trim();
@@ -110,7 +136,7 @@ export function Composer({
   const tag = () => {
     const v = value && !value.endsWith(" ") ? `${value} @` : `${value}@`;
     onChange(v);
-    setQuery("");
+    setQuery({ kind: "mention", q: "" });
     requestAnimationFrame(() => {
       ref.current?.focus();
       ref.current?.setSelectionRange(v.length, v.length);
@@ -125,9 +151,9 @@ export function Composer({
         send();
       }}
     >
-      {open ? (
+      {open && people.length ? (
         <div role="listbox" aria-label="AI team" className="absolute bottom-full left-0 z-10 mb-2 flex w-full max-w-sm flex-col gap-0.5 rounded-[12px] border border-line bg-surface p-1.5 shadow-lg">
-          {matches.map((k, i) => (
+          {people.map((k, i) => (
             <button
               key={k}
               type="button"
@@ -147,6 +173,27 @@ export function Composer({
                   {AGENTS[k].soon ? ". Coming soon" : ""}
                 </span>
               </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {open && found.length ? (
+        <div role="listbox" aria-label={`${AGENTS[skillAgent].god}'s skills`} className="absolute bottom-full left-0 z-10 mb-2 flex w-full max-w-md flex-col gap-0.5 rounded-[12px] border border-line bg-surface p-1.5 shadow-lg">
+          <p className="px-2 pt-1 text-[12px] font-semibold text-ink-4">{AGENTS[skillAgent].god}&apos;s skills</p>
+          {found.map((x, i) => (
+            <button
+              key={x.key}
+              type="button"
+              role="option"
+              aria-selected={i === pick}
+              className={`flex flex-col rounded-[9px] px-2 py-1.5 text-left ${i === pick ? "bg-sunk" : "hover:bg-sunk"}`}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                chooseSkill(x.name);
+              }}
+            >
+              <span className="text-[14px] font-semibold">/{x.name}</span>
+              <span className="break-words text-[13px] text-ink-3">{x.description.split(". ")[0].replace(/\.$/, "")}.</span>
             </button>
           ))}
         </div>
@@ -173,12 +220,12 @@ export function Composer({
           if (open) {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
               e.preventDefault();
-              setPick((p) => (p + (e.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
+              setPick((p) => (p + (e.key === "ArrowDown" ? 1 : count - 1)) % count);
               return;
             }
             if (e.key === "Enter" || e.key === "Tab") {
               e.preventDefault();
-              choose(matches[Math.min(pick, matches.length - 1)]);
+              chooseAt(pick);
               return;
             }
             if (e.key === "Escape") {
@@ -205,6 +252,27 @@ export function Composer({
   );
 }
 
+/** The workspace's own skills, for the / menu. Empty until 014_routines_skills_memory.sql runs. */
+export function useSkillRows(sb: SupabaseClient, workspaceId: string): SkillRow[] {
+  const [rows, setRows] = useState<SkillRow[]>([]);
+  useEffect(() => {
+    let live = true;
+    sb.from("skills")
+      .select("id, agent, name, description, body")
+      .eq("workspace_id", workspaceId)
+      .then(({ data, error }) => {
+        if (live && !error) setRows((data ?? []) as SkillRow[]);
+      });
+    return () => {
+      live = false;
+    };
+  }, [sb, workspaceId]);
+  return rows;
+}
+
+/** The first message of a new chat: typed on Home, or a routine started with Run now. */
+export type StartChat = { text: string; routineId?: string; title?: string };
+
 // ─────────────── Home ───────────────
 
 const IDEAS = ["@Artemis how is our AI visibility this week?", "@Aphrodite plan next week's posts", "@Hephaestus outline a homepage for my business", "What can my AI team do for me?"];
@@ -213,13 +281,14 @@ const IDEAS = ["@Artemis how is our AI visibility this week?", "@Aphrodite plan 
 export function TeamHome({ sb, ws, draft, onDraft, onStart }: { sb: SupabaseClient; ws: Workspace; draft: string; onDraft: (v: string) => void; onStart: (text: string) => void }) {
   const editor = can(ws.role, "chat");
   const threads = useThreads(sb, ws.id, 8);
+  const skills = useSkillRows(sb, ws.id);
   return (
     <section className="flex flex-col gap-6 py-4">
       <div>
         <p className="mb-1 text-[14px] text-ink-3">{ws.name}</p>
         <h1 className="font-serif text-[34px] leading-tight">What should your team do today?</h1>
       </div>
-      <Composer value={draft} onChange={onDraft} onSend={onStart} disabled={!editor} placeholder={editor ? "Ask your team anything. Type @ to tag a teammate." : "Viewers can read chats but can't send messages."} autoFocus={editor} />
+      <Composer value={draft} onChange={onDraft} onSend={onStart} disabled={!editor} placeholder={editor ? "Ask your team anything. Type @ to tag a teammate, or / for a skill." : "Viewers can read chats but can't send messages."} autoFocus={editor} skills={skills} />
       {editor ? (
         <div className="flex flex-wrap gap-2">
           {IDEAS.map((t) => (
@@ -334,7 +403,7 @@ export function ThreadPage({
   sb: SupabaseClient;
   ws: Workspace;
   id: string | null;
-  start: string | null;
+  start: StartChat | null;
   onStarted: () => void;
   /** Tells the app which thread this page started, so the address can change to it without a new page. */
   onThread: (id: string) => void;
@@ -350,6 +419,9 @@ export function ThreadPage({
   // The thread this page is showing. A new chat learns its id from the stream, and the address changes without a reload.
   const thread = useRef<string | null>(id);
   const bottom = useRef<HTMLDivElement>(null);
+  const skills = useSkillRows(sb, ws.id);
+  // The / menu shows the skills of whoever answered last, when the reply tags nobody.
+  const lastAgent = [...items].reverse().find((x): x is Extract<Item, { kind: "agent" }> => x.kind === "agent")?.agent ?? LEAD;
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end", behavior: "smooth" });
@@ -379,16 +451,16 @@ export function ThreadPage({
   }, [sb, ws.id, id]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, routine?: { id: string; title: string }) => {
       setBusy(true);
       setError("");
       setDraft("");
       setItems((xs) => [...xs, { kind: "user", text }]);
-      if (!thread.current) setTitle(text.replace(/\s+/g, " ").trim());
+      if (!thread.current) setTitle(routine ? `Routine: ${routine.title}` : text.replace(/\s+/g, " ").trim());
       // Approval cards wait for the reply that prepared them, so they show under it, as they do after a reload.
       let waiting: Item[] = [];
       try {
-        await streamChat(sb, { workspaceId: ws.id, threadId: thread.current, text }, (e) => {
+        await streamChat(sb, { workspaceId: ws.id, threadId: thread.current, text, ...(routine ? { routineId: routine.id } : {}) }, (e) => {
           if (e.type === "thread") {
             if (thread.current !== e.id) {
               thread.current = e.id;
@@ -424,7 +496,7 @@ export function ThreadPage({
     if (id || !start || started.current) return;
     started.current = true;
     onStarted();
-    send(start);
+    send(start.text, start.routineId ? { id: start.routineId, title: start.title ?? "" } : undefined);
   }, [id, start, onStarted, send]);
 
   return (
@@ -453,7 +525,16 @@ export function ThreadPage({
         <div ref={bottom} />
       </div>
       <div className="sticky bottom-4">
-        <Composer value={draft} onChange={setDraft} onSend={send} busy={busy} disabled={!editor} placeholder={editor ? "Reply, or type @ to tag a teammate." : "Viewers can read chats but can't send messages."} />
+        <Composer
+          value={draft}
+          onChange={setDraft}
+          onSend={(t) => send(t)}
+          busy={busy}
+          disabled={!editor}
+          placeholder={editor ? "Reply, type @ to tag a teammate, or / for a skill." : "Viewers can read chats but can't send messages."}
+          skills={skills}
+          agent={lastAgent}
+        />
       </div>
     </section>
   );

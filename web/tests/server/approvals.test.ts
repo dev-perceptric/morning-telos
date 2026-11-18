@@ -220,7 +220,7 @@ test("chat: Aphrodite gets Capybaroar's tools through the brand key, and a chang
     .map((l) => JSON.parse(l));
   assert.deepEqual(
     requests[0].tools!.map((t) => t.name),
-    ["capybaroar__create_posts", "capybaroar__generate_media", "capybaroar__list_channels", "search_knowledge", "handoff"],
+    ["capybaroar__create_posts", "capybaroar__generate_media", "capybaroar__list_channels", "remember", "search_knowledge", "use_skill", "handoff"],
   );
   const saved = db.tables.approvals.find((a) => a.id !== 1 && a.id !== 2)!;
   assert.deepEqual([saved.workspace_id, saved.thread_id, saved.agent, saved.product, saved.tool, saved.title], [WS, THREAD, "social", "capybaroar", "create_posts", "Create posts (Social media)"]);
