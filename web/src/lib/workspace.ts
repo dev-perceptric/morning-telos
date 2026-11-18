@@ -29,6 +29,9 @@ export const NEEDS = {
   removeMember: "admin",
   deleteWorkspace: "owner",
   connectSocial: "editor",
+  readChats: "viewer",
+  chat: "editor",
+  changeTeam: "admin",
 } as const satisfies Record<string, Role>;
 export type Action = keyof typeof NEEDS;
 

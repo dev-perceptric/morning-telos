@@ -31,6 +31,9 @@ test("which roles can do which workspace action", () => {
     removeMember: ["owner", "admin"],
     deleteWorkspace: ["owner"],
     connectSocial: ["owner", "admin", "editor"],
+    readChats: ["owner", "admin", "editor", "viewer"],
+    chat: ["owner", "admin", "editor"],
+    changeTeam: ["owner", "admin"],
   };
   assert.deepEqual(Object.keys(expected).sort(), Object.keys(NEEDS).sort());
   for (const [action, allowed] of Object.entries(expected) as [Action, Role[]][]) {
@@ -102,7 +105,22 @@ test("page routes", () => {
   assert.deepEqual(parseRoute("/nope"), { page: "home" });
   const token = "b".repeat(64);
   assert.deepEqual(parseRoute(`/invite/${token}`), { page: "invite", token });
-  for (const r of [{ page: "home" }, { page: "settings", tab: "general" }, { page: "settings", tab: "members" }, { page: "settings", tab: "social" }, { page: "invite", token }] as const) {
+  const thread = "11111111-2222-4333-8444-555555555555";
+  assert.deepEqual(parseRoute("/team"), { page: "team" });
+  assert.deepEqual(parseRoute("/chat"), { page: "thread", id: null });
+  assert.deepEqual(parseRoute(`/chat/${thread}`), { page: "thread", id: thread });
+  assert.deepEqual(parseRoute(`/chat/${thread.toUpperCase()}/`), { page: "thread", id: thread });
+  assert.deepEqual(parseRoute("/chat/not-a-thread"), { page: "home" });
+  for (const r of [
+    { page: "home" },
+    { page: "team" },
+    { page: "thread", id: null },
+    { page: "thread", id: thread },
+    { page: "settings", tab: "general" },
+    { page: "settings", tab: "members" },
+    { page: "settings", tab: "social" },
+    { page: "invite", token },
+  ] as const) {
     assert.deepEqual(parseRoute(routePath(r)), r);
   }
 });
