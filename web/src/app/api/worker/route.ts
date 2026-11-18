@@ -5,6 +5,7 @@ import { teamClient } from "@/lib/claude";
 import { cronAllowed } from "@/lib/cronAuth";
 import { STALE_AFTER } from "@/lib/approvals";
 import { runJob, type Handler, type Job } from "@/lib/jobs";
+import { lifecycleEmailsHandler } from "@/lib/lifecycleDb";
 import { partnerFor, type Product } from "@/lib/partner";
 import { provision, type ServicePatch, type ServiceStatus } from "@/lib/provision";
 import { routineJobHandlers } from "@/lib/routinesServer";
@@ -24,7 +25,8 @@ import { adminClient } from "@/lib/serverAuth";
 // CRON_SECRET is the same value in the web container's settings. A wrong or missing secret gets 401 and runs nothing.
 // Ticks may overlap: claim_jobs skips jobs another tick holds, and a job's lease brings it back if a tick dies.
 // Daily jobs need no cron line of their own: each tick calls queue_daily_jobs() (supabase/010_expire_trials.sql),
-// which queues each one once per UTC day. Routines the same way: queue_routine_runs() queues each due one once.
+// which queues each one once per UTC day. Hourly jobs the same way with queue_hourly_jobs() (018_email_log.sql).
+// Routines the same way: queue_routine_runs() queues each due one once.
 // When the worker image (plan: Deploy, morningtelos-worker) lands, it calls this in a loop instead of cron.
 
 export const maxDuration = 300;
@@ -44,6 +46,8 @@ function handlers(db: SupabaseClient): Record<string, Handler> {
     ...brandJobHandlers(db),
     // Once a day: close the brands of trials that ended without a plan, which Stripe tells us nothing about.
     expire_trials: expireTrialsHandler(db),
+    // Once an hour: trial and lifecycle emails to each owner, each one once (src/lib/lifecycleSend.ts).
+    lifecycle_emails: lifecycleEmailsHandler(db, { log: (m) => warn(m, "lifecycle_emails") }),
     // Reading the customer's website into Knowledge (src/lib/siteScan.ts).
     ...knowledgeJobHandlers(db),
     // A routine's scheduled run: its teammate does the job in a new chat (src/lib/routinesServer.ts).
@@ -107,6 +111,8 @@ export async function POST(request: Request) {
   // A missing daily job must not stop the jobs that are due, so a problem here is only logged.
   const daily = await db.rpc("queue_daily_jobs");
   if (daily.error) warn(/queue_daily_jobs/.test(daily.error.message) ? "Run supabase/010_expire_trials.sql in Supabase." : `Daily jobs: ${daily.error.message}`);
+  const hourly = await db.rpc("queue_hourly_jobs");
+  if (hourly.error) warn(/queue_hourly_jobs/.test(hourly.error.message) ? "Run supabase/018_email_log.sql in Supabase." : `Hourly jobs: ${hourly.error.message}`);
   // Routines due this minute in each workspace's time zone, queued once each (supabase/014_routines_skills_memory.sql).
   const routines = await db.rpc("queue_routine_runs");
   if (routines.error) warn(/queue_routine_runs/.test(routines.error.message) ? "Run supabase/014_routines_skills_memory.sql in Supabase." : `Routines: ${routines.error.message}`, "routines");

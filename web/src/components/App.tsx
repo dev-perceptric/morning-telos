@@ -6,6 +6,7 @@
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { identify, inWorkspace, isRecent, pageView, resetAnalytics, trackOnce } from "@/lib/analytics";
 import { initial, paletteMatch, type PaletteItem } from "@/lib/home";
 import type { ModelChoice } from "@/lib/models";
 import { routePath, type Route } from "@/lib/routes";
@@ -37,6 +38,9 @@ const NOTICE_KEY = "mt.notice";
 export function App({ supabase, turnstileSiteKey, google = false }: { supabase: SupaConfig; turnstileSiteKey: string | null; google?: boolean }) {
   const sb = getSupabase(supabase);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  // One page view per page, signed in or not (src/lib/analytics.ts; does nothing while PostHog is off).
+  const viewed = routePath(useRoute());
+  useEffect(() => pageView(), [viewed]);
   const [recovering, setRecovering] = useState(false);
   // Read once on load: an /invite/<token> link, or one saved before a sign-in redirect.
   const [invite, setInvite] = useState<string | null>(() => {
@@ -50,6 +54,7 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
     const { data } = sb.auth.onAuthStateChange((event, s) => {
       setSession(s);
       if (event === "PASSWORD_RECOVERY") setRecovering(true);
+      if (event === "SIGNED_OUT") resetAnalytics();
     });
     return () => data.subscription.unsubscribe();
   }, [sb]);
@@ -129,13 +134,18 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
   // A message left by the screen before (like "You joined the team"). Shown once.
   const [notice, setNotice] = useState(() => readLocal(NOTICE_KEY) ?? "");
   useEffect(() => writeLocal(NOTICE_KEY, null), []);
+  // The person, by user id only. A new account counts as signed_up once (any sign-up way: password, code, Google).
+  useEffect(() => {
+    identify(session.user.id);
+    if (isRecent(session.user.created_at, Date.now())) trackOnce(`signup.${session.user.id}`, "signed_up");
+  }, [session.user.id, session.user.created_at]);
   // Bump to load the list again (after a change).
   const [version, setVersion] = useState(0);
   const load = useCallback(() => setVersion((v) => v + 1), []);
   useEffect(() => {
     let live = true;
     sb.from("workspace_members")
-      .select("role, created_at, workspace:workspaces(id, name, website, timezone, plan, status, trial_ends_at)")
+      .select("role, created_at, workspace:workspaces(id, name, website, timezone, plan, status, trial_ends_at, created_at)")
       .eq("user_id", session.user.id)
       .order("created_at")
       .then(({ data, error }) => {
@@ -252,12 +262,21 @@ function Frame2({
   const [start, setStart] = useState<StartChat | null>(null);
   const [ownThread, setOwnThread] = useState<string | null>(null);
   const reload = chrome.reload;
+  // Every event from here on belongs to this workspace. A trial workspace its owner just made counts as trial_started.
+  useEffect(() => {
+    inWorkspace(ws.id, { plan: ws.plan });
+    if (ws.role === "owner" && ws.plan === "trial" && isRecent(ws.created_at, Date.now())) trackOnce(`trial.${ws.id}`, "trial_started");
+  }, [ws.id, ws.plan, ws.role, ws.created_at]);
+  // The workspace's first chat, once (the chat list may still be loading, so the mark keeps it from counting twice).
+  const firstChat = chrome.threads.length === 0;
+  const wsId = ws.id;
   const startChat = useCallback((text: string) => {
+    if (firstChat) trackOnce(`firstchat.${wsId}`, "first_chat_sent");
     setDraft("");
     setOwnThread(null);
     setStart({ text });
     navigate("/chat");
-  }, []);
+  }, [firstChat, wsId]);
   // Run now on the Routines page: a new chat that streams the routine.
   const runRoutine = useCallback((r: { id: string; title: string; instruction: string }) => {
     setOwnThread(null);
