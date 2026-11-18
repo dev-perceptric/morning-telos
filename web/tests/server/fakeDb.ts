@@ -76,6 +76,9 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
       delete: () => ((op = "delete"), q),
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
       is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), q),
+      // Compares as strings, which is right for ISO times and same-length ids.
+      gte: (c: string, v: unknown) => (filters.push((r) => r[c] != null && String(r[c]) >= String(v)), q),
+      lt: (c: string, v: unknown) => (filters.push((r) => r[c] != null && String(r[c]) < String(v)), q),
       // PostgREST's or=(a.is.null,a.eq.x): only "is.null" and "eq" are understood.
       or: (expr: string) => {
         const parts = expr.split(",").map((p) => p.split("."));
