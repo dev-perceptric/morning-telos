@@ -11,6 +11,7 @@ import { inviteTokenFromPath, roleLabel } from "@/lib/workspace";
 import { AuthScreen, NewPassword } from "./AuthScreen";
 import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
 import { SettingsPage, type Workspace } from "./Settings";
+import { KnowledgePage } from "./Knowledge";
 import { ConnectSocialCard } from "./Social";
 import { btnPrimary, btnSecondary, ErrorText, Frame, input, label, Logo, Notice } from "./ui";
 
@@ -169,6 +170,8 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
           ) : null}
           {route.page === "settings" ? (
             <SettingsPage sb={sb} ws={ws} userId={session.user.id} tab={route.tab} onChanged={load} onGone={gone} />
+          ) : route.page === "knowledge" ? (
+            <KnowledgePage key={ws.id} sb={sb} ws={ws} />
           ) : (
             <Home sb={sb} ws={ws} />
           )}
@@ -234,6 +237,7 @@ function SetupStatus({ sb, workspaceId }: { sb: SupabaseClient; workspaceId: str
 
 const NAV = [
   { page: "home", label: "Home", path: "/" },
+  { page: "knowledge", label: "Knowledge", path: "/knowledge" },
   { page: "settings", label: "Settings", path: "/settings" },
 ] as const;
 

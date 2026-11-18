@@ -6,6 +6,7 @@ import { runJob, type Handler, type Job } from "@/lib/jobs";
 import { partnerFor, type Product } from "@/lib/partner";
 import { provision, type ServicePatch, type ServiceStatus } from "@/lib/provision";
 import { seal } from "@/lib/sealing";
+import { knowledgeJobHandlers } from "@/lib/siteScanDb";
 import { adminClient } from "@/lib/serverAuth";
 
 // One worker tick: claim the jobs that are due (supabase/006_jobs.sql) and run them a few at a time.
@@ -40,6 +41,8 @@ function handlers(db: SupabaseClient): Record<string, Handler> {
     ...brandJobHandlers(db),
     // Once a day: close the brands of trials that ended without a plan, which Stripe tells us nothing about.
     expire_trials: expireTrialsHandler(db),
+    // Reading the customer's website into Knowledge (src/lib/siteScan.ts).
+    ...knowledgeJobHandlers(db),
     provision: async (job) => {
       const ws = job.workspace_id;
       if (!ws) return { status: "failed", error: "A provision job needs a workspace." };
