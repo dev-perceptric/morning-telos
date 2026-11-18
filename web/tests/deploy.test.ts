@@ -40,11 +40,13 @@ test(".env.example lists keys with empty values only", () => {
 // The web app must never hold the database superuser URL, so these stay out of the web-new service on purpose.
 const BACKUP_ONLY = new Set(["BACKUP_DATABASE_URL", "BACKUP_PUBLIC_KEY", "BACKUP_PING_URL", "BACKUP_PREFIX"]);
 const R2_KEYS = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"];
+// The storage keys can read and delete backups, and the web app never uses them, so only the backup service gets them.
+const BACKUP_SERVICE_ONLY = new Set([...BACKUP_ONLY, ...R2_KEYS]);
 
 test("web-compose.yml passes every key in .env.example from the server environment", () => {
   const web = service("web-new");
   for (const key of exampleKeys) {
-    if (BACKUP_ONLY.has(key)) continue;
+    if (BACKUP_SERVICE_ONLY.has(key)) continue;
     assert.ok(web.includes(`${key}: \${${key}:-}`), `the web-new service is missing ${key}: \${${key}:-}`);
   }
 });
@@ -68,7 +70,7 @@ test("build workflow reads browser keys from repo variables, not literal values"
 
 test("web-compose.yml never gives the web app or the cron the backup job's keys", () => {
   for (const name of ["web-new", "cron"]) {
-    for (const key of BACKUP_ONLY) assert.ok(!service(name).includes(key), `${key} must not be in the ${name} service`);
+    for (const key of BACKUP_SERVICE_ONLY) assert.ok(!service(name).includes(key), `${key} must not be in the ${name} service`);
   }
 });
 
