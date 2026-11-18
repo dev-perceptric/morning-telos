@@ -9,14 +9,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { passwordProblem, strength } from "@/lib/passwordCheck";
 import { signupMeta } from "@/lib/signup";
 import { Turnstile } from "./Turnstile";
-import { btnPrimary, btnSecondary, ErrorText, Frame, input, label, Logo, Notice, textLink } from "./ui";
+import { Mark } from "./icons";
+import { btnPrimary, btnSecondary, ErrorText, Frame, input, label, Notice, textLink } from "./ui";
 
 type Mode = "signin" | "signup" | "forgot" | "code";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const TITLES: Record<Mode, [string, string]> = {
-  signin: ["Welcome back", "Log in to your AI team."],
+  signin: ["Log in", "Welcome back to your AI team."],
   signup: ["Start your free trial", "14 days free. No card needed."],
   forgot: ["Reset your password", "We'll email you a link to choose a new one."],
   code: ["Log in with a code", "We'll email you a 6-digit code. No password needed."],
@@ -198,23 +199,13 @@ export function AuthScreen({ sb, invited, turnstileSiteKey = null, google: googl
 
   const [title, sub] = TITLES[mode];
   return (
-    <main className="grid min-h-screen lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <aside className="hidden flex-col justify-between bg-side p-12 lg:flex">
-        <Logo />
-        <div className="flex max-w-md flex-col gap-4">
-          <h2 className="font-serif text-[40px] leading-[1.1] text-ink">Your AI team, ready every morning.</h2>
-          <p className="text-[16px] leading-relaxed text-ink-2">Chat with named AI employees who handle your SEO, social posts and follow-ups. Nothing goes out until you approve it.</p>
-        </div>
-        <p className="text-[13px] text-ink-4">Built for small businesses.</p>
-      </aside>
-      <section className="flex items-center justify-center bg-bg px-5 py-10 sm:px-8">
-        <div className="flex w-full max-w-[400px] flex-col gap-6">
-          <div className="lg:hidden">
-            <Logo />
-          </div>
+    <div className="auth">
+      <section className="auth-card">
+        <div className="flex w-full flex-col gap-5">
+          <Mark />
           <div className="flex flex-col gap-1.5">
-            <h1 className="font-serif text-[32px] leading-tight text-ink">{title}</h1>
-            <p className="text-[15px] text-ink-3">{sub}</p>
+            <h1>{title}</h1>
+            <p className="text-[14px] text-ink-3">{sub}</p>
           </div>
           {invited ? <Notice>You were invited to a team. Use the email address the invite was sent to.</Notice> : null}
           {googleOn && (mode === "signin" || mode === "signup") ? (
@@ -342,7 +333,7 @@ export function AuthScreen({ sb, invited, turnstileSiteKey = null, google: googl
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 

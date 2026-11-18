@@ -289,3 +289,36 @@ test("portal: only the owner, and only after a plan was picked", async () => {
   assert.equal(session.get("customer"), "cus_1");
   assert.equal(session.get("return_url"), "https://app.test/billing");
 });
+
+// ─────────────── usage ───────────────
+
+const usage = await import("../../src/app/api/billing/usage/route.ts");
+
+test("usage: anyone in the workspace sees this period's AI use, never the Stripe ids", async () => {
+  auth.roles.set("viewer1:ws1", "viewer");
+  const asked: Record<string, unknown>[] = [];
+  db.rpcs.ai_spend = (args) => (asked.push(args), 1.234);
+  Object.assign(ws(), { trial_ends_at: new Date(Date.now() + 10 * 864e5).toISOString(), stripe_customer_id: "cus_1" });
+  const res = await post(usage, "viewer1", { workspaceId: "ws1" });
+  assert.equal(res.status, 200);
+  const out = await res.json();
+  assert.equal(out.plan, "trial");
+  assert.equal(out.used, 1.23);
+  assert.equal(out.allowance, 5);
+  assert.equal(out.percent, 25);
+  assert.equal(out.hasBilling, true);
+  assert.equal(JSON.stringify(out).includes("cus_1"), false);
+  assert.equal(asked[0].p_ws, "ws1");
+  assert.equal(db.writes.length, 0);
+  assert.equal(calls.length, 0);
+});
+
+test("usage: strangers and signed-out people get nothing; the internal plan has no meter", async () => {
+  db.rpcs.ai_spend = () => 3;
+  assert.equal((await post(usage, null, { workspaceId: "ws1" })).status, 401);
+  assert.equal((await post(usage, "stranger", { workspaceId: "ws1" })).status, 403);
+  Object.assign(ws(), { plan: "internal" });
+  const out = await (await post(usage, "owner1", { workspaceId: "ws1" })).json();
+  assert.equal(out.allowance, null);
+  assert.equal(out.percent, 0);
+});
