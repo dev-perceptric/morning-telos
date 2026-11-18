@@ -134,6 +134,32 @@ test("run_routine: a new chat called Routine: <title>, the instruction as the me
   assert.equal(db.tables.ai_usage[0].workspace_id, WS);
 });
 
+test("run_routine: Iris, Hora, Hermes and Hestia take routines, with their own skills and the line on connecting apps", async () => {
+  const gods = { email: "Iris", forms: "Hora", sales: "Hermes", support: "Hestia" } as const;
+  const skill = { email: "write-a-campaign", forms: "reminder-emails", sales: "follow-up-new-leads", support: "daily-inbox-triage" } as const;
+  for (const agent of Object.keys(gods) as (keyof typeof gods)[]) {
+    requests = [];
+    db.tables.threads = [];
+    db.tables.messages = [];
+    Object.assign(routine(), { agent, instruction: `Do the morning work with /${skill[agent]}`, last_note: "x" });
+    db.tables.jobs = [routineJob()];
+    await tick();
+    assert.equal(requests.length, 1, agent);
+    assert.match(requests[0].system[0].text, new RegExp(`^You are ${gods[agent]},`));
+    // No Composio key in tests: the teammate is told apps aren't ready, so it works in chat.
+    assert.match(requests[0].system[0].text, /connecting apps isn't ready yet, so do the work here in chat/, agent);
+    assert.match(requests[0].system[0].text, /If the app you need isn't connected, say which one to connect in Settings, Apps\./, agent);
+    assert.match(requests[0].system[1].text, new RegExp(`The person picked the skill "${skill[agent]}"`), agent);
+    assert.deepEqual(
+      requests[0].tools?.map((x) => x.name),
+      ["remember", "search_knowledge", "use_skill", "handoff"],
+      agent,
+    );
+    assert.equal(routine().last_note, null, agent);
+    assert.deepEqual(db.tables.messages.map((m) => m.agent), [null, agent]);
+  }
+});
+
 test("run_routine skips, with a note and no chat or AI, when the teammate is paused", async () => {
   db.tables.agent_prefs = [{ workspace_id: WS, agent: "social", enabled: false, trust: 0, model: "auto" }];
   db.tables.jobs = [routineJob()];

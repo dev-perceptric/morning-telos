@@ -4,12 +4,17 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CAP_MESSAGES } from "../src/lib/meter.ts";
 import { cleanRoutine, daysText, MAX_INSTRUCTION, routineThreadTitle, SKIP_NOTES, timeText } from "../src/lib/routines.ts";
+import { withSoon } from "./soon.ts";
 
 const ok = { agent: "social", title: "  Plan   the week ", instruction: " Draft 5 posts.\r\nUse photos. ", days: [5, 1, "3", 1], at_time: "08:30" };
 
+test("cleanRoutine: a teammate marked coming soon can't take a routine", async () => {
+  await withSoon("sales", () => assert.deepEqual(cleanRoutine({ ...ok, agent: "sales" }), { ok: false, error: "Pick a teammate." }));
+});
+
 test("cleanRoutine: a working teammate, a name, what to do, at least one day and a time", () => {
   assert.deepEqual(cleanRoutine(ok), { ok: true, value: { agent: "social", title: "Plan the week", instruction: "Draft 5 posts.\nUse photos.", days: [1, 3, 5], at_time: "08:30" } });
-  assert.deepEqual(cleanRoutine({ ...ok, agent: "sales" }), { ok: false, error: "Pick a teammate." }, "coming soon");
+  for (const agent of ["sales", "support", "forms", "email"]) assert.equal(cleanRoutine({ ...ok, agent }).ok, true, `${agent} takes routines now`);
   assert.deepEqual(cleanRoutine({ ...ok, agent: "zeus" }), { ok: false, error: "Pick a teammate." });
   assert.deepEqual(cleanRoutine({ ...ok, title: " " }), { ok: false, error: "Give the routine a name." });
   assert.equal(cleanRoutine({ ...ok, title: "x".repeat(121) }).ok, false);

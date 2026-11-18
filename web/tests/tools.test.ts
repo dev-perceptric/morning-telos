@@ -14,6 +14,7 @@ import { MCP_DEFAULTS, mcpUrls, missingReason, productsFor, productToolSource, r
 import { openWith, sealWith, type Keyring } from "../src/lib/sealing.ts";
 import { clipResult, composeTools, MAX_TOOL_RESULT, staticSource } from "../src/lib/toolRegistry.ts";
 import { AGENTS, type AgentKey } from "../src/lib/team.ts";
+import { withSoon } from "./soon.ts";
 import { ARROWSTERR_TOOLS, CAPYBAROAR_TOOLS, fakeMcp } from "./fakeMcp.ts";
 
 const NOW = Date.parse("2026-11-18T12:00:00Z");
@@ -86,12 +87,13 @@ test("composeTools: sources run together, a failing source is left out, the firs
 
 // ─────────────── which agent gets what ───────────────
 
-test("productsFor: social on Capybaroar, seo and web on Arrowsterr, Athena on both, coming soon on none", () => {
+test("productsFor: social on Capybaroar, seo and web on Arrowsterr, Athena on both; Iris, Hora, Hermes and Hestia work through the customer's own apps instead", async () => {
   assert.deepEqual(productsFor("social"), ["capybaroar"]);
   assert.deepEqual(productsFor("seo"), ["arrowsterr"]);
   assert.deepEqual(productsFor("web"), ["arrowsterr"]);
   assert.deepEqual(productsFor("chief"), ["arrowsterr", "capybaroar"]);
   for (const k of ["sales", "support", "forms", "email"] as AgentKey[]) assert.deepEqual(productsFor(k), [], k);
+  await withSoon("social", () => assert.deepEqual(productsFor("social"), [], "coming soon teammates get none"));
 });
 
 test("each agent gets its own apps' tools, namespaced; Athena gets reads only; hidden tools never show", async () => {
@@ -301,8 +303,8 @@ test("search_knowledge searches the agent's own workspace and says when nothing 
   assert.equal(t.write, undefined);
   const src = knowledgeToolSource(async () => []);
   assert.equal((await src(ctx("chief"))).tools.length, 1);
-  assert.equal((await src(ctx("sales"))).tools.length, 0, "coming soon teammates get none");
-  assert.ok(AGENTS.sales.soon);
+  for (const k of ["sales", "support", "forms", "email"] as AgentKey[]) assert.equal((await src(ctx(k))).tools.length, 1, `${AGENTS[k].god} searches Knowledge`);
+  await withSoon("sales", async () => assert.equal((await src(ctx("sales"))).tools.length, 0, "coming soon teammates get none"));
 });
 
 test("mcpUrls: the live servers by default, the settings when given", () => {

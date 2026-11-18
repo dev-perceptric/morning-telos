@@ -14,7 +14,7 @@ import type { ActivityRow } from "../productTools.ts";
 import type { ToolSource } from "../toolRegistry.ts";
 import { AGENTS, type AgentKey } from "../team.ts";
 import { AppSetupError, needsReconnect, runTool, toolsOf, type ActionOpts, type Conn, type JsonSchema, type Sorted } from "./actions.ts";
-import { appName, appsFor, isToolkit, TOOLKITS } from "./catalog.ts";
+import { appName, appsFor, GROUPS, isToolkit, TOOLKITS } from "./catalog.ts";
 import { composioUser } from "./composio.ts";
 import type { ConnRow } from "./store.ts";
 
@@ -53,6 +53,21 @@ export function access(agent: AgentKey): { toolkits: string[]; reads: boolean } 
 /** Why a connected app can't be used right now, for the agent's prompt ("Not available right now: ..."). */
 export const missingApp = (toolkit: string) => `${appName(toolkit)} (it needs to be connected again in Settings, Apps)`;
 
+/**
+ * For a teammate who works through its apps: each kind of app it has none of yet, with the apps to connect, for the
+ * prompt ("Email (connect Gmail or Outlook in Settings, Apps)"). Without Composio on the server, one line saying the
+ * apps aren't ready, so the teammate does the work in chat instead of sending people to a page that can't connect.
+ */
+export function notConnected(toolkits: string[], have: string[], on: boolean): string[] {
+  const or = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`);
+  if (!toolkits.length) return [];
+  if (!on) return [`${or(toolkits.map(appName))} (connecting apps isn't ready yet, so do the work here in chat)`];
+  return GROUPS.flatMap((g) => {
+    const kit = toolkits.filter((t) => TOOLKITS[t]?.group === g.id);
+    return kit.length && !kit.some((t) => have.includes(t)) ? [`${g.label} (connect ${or(kit.map(appName))} in Settings, Apps)`] : [];
+  });
+}
+
 const WHY = (toolkit: string) => `This changes something in your ${appName(toolkit)} account.`;
 
 /** An app the model named: its toolkit slug or its name. */
@@ -78,12 +93,15 @@ const fail = (text: string): ToolResult => ({ content: text, isError: true });
 /** What the teammate can use now: allowed apps the workspace connected and that still work. */
 async function usable(ctx: ToolContext, deps: AppToolDeps) {
   const { toolkits, reads } = (deps.access ?? access)(ctx.agent);
-  if (!deps.on || !toolkits.length) return { conns: [] as Conn[], gone: [] as string[], reads };
+  // Only a teammate that changes things is told what to connect: Athena just reads whatever is there.
+  const unset = (have: string[]) => (reads ? [] : notConnected(toolkits, have, deps.on));
+  if (!deps.on || !toolkits.length) return { conns: [] as Conn[], gone: [] as string[], unset: unset([]), reads };
   const rows = (await deps.connections(ctx.workspace.id)).filter((r) => r.workspace_id === ctx.workspace.id && toolkits.includes(r.toolkit));
   const user = composioUser(ctx.workspace.id);
   return {
     conns: rows.filter((r) => r.status === "active").map((r): Conn => ({ toolkit: r.toolkit, account: r.composio_account, user })),
     gone: rows.filter((r) => r.status !== "active").map((r) => r.toolkit),
+    unset: unset(rows.map((r) => r.toolkit)),
     reads,
   };
 }
@@ -210,12 +228,13 @@ function appTools(ctx: ToolContext, conns: Conn[], reads: boolean, deps: AppTool
 
 /**
  * The tool source for teamTools(): the app tools when the server has a Composio key, the teammate may use apps, and
- * the workspace connected at least one of them. A connection that needs signing in again is in `missing`.
+ * the workspace connected at least one of them. A connection that needs signing in again is in `missing`, and so is
+ * each kind of app a teammate who changes things has none of yet (notConnected).
  */
 export function appToolSource(deps: AppToolDeps): ToolSource {
   return async (ctx) => {
-    const { conns, gone, reads } = await usable(ctx, deps);
-    return { tools: conns.length ? appTools(ctx, conns, reads, deps) : [], missing: gone.map(missingApp) };
+    const { conns, gone, unset, reads } = await usable(ctx, deps);
+    return { tools: conns.length ? appTools(ctx, conns, reads, deps) : [], missing: [...gone.map(missingApp), ...unset] };
   };
 }
 

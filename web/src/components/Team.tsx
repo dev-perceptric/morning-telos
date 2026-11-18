@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatEvent } from "@/lib/agentLoop";
 import { inlineParts, readLines } from "@/lib/chat";
+import { changesApps } from "@/lib/composio/catalog";
 import { PLANS, type PaidPlan } from "@/lib/plans";
 import { insertSkill, matchSkills, menuAgent, skillsFor, slashQuery, type SkillRow } from "@/lib/skills";
 import { agentFace, AGENTS, agentByGod, insertMention, isAgentKey, LEAD, mentionMatches, mentionQuery, ORDER, type AgentKey } from "@/lib/team";
@@ -275,7 +276,15 @@ export type StartChat = { text: string; routineId?: string; title?: string };
 
 // ─────────────── Home ───────────────
 
-const IDEAS = ["@Artemis how is our AI visibility this week?", "@Aphrodite plan next week's posts", "@Hephaestus outline a homepage for my business", "What can my AI team do for me?"];
+const IDEAS = [
+  "@Artemis how is our AI visibility this week?",
+  "@Aphrodite plan next week's posts",
+  "@Iris write a welcome email for new customers",
+  "@Hermes follow up on this week's new leads",
+  "@Hora find times for a call next week",
+  "@Hestia answer the customer emails waiting for us",
+  "What can my AI team do for me?",
+];
 
 /** Home: what should the team do today, and the latest chats. */
 export function TeamHome({ sb, ws, draft, onDraft, onStart }: { sb: SupabaseClient; ws: Workspace; draft: string; onDraft: (v: string) => void; onStart: (text: string) => void }) {
@@ -717,8 +726,8 @@ export function TeamPage({ sb, ws, onAsk }: { sb: SupabaseClient; ws: Workspace;
   );
 }
 
-/** Teammates whose tools can change something (not Athena, who only reads, and not the ones coming soon). */
-const makesChanges = (k: AgentKey) => !AGENTS[k].soon && !AGENTS[k].readOnly && AGENTS[k].apps.length > 0;
+/** Teammates whose tools can change something, in our products or the business's own apps (not Athena, who only reads, and not the ones coming soon). */
+const makesChanges = (k: AgentKey) => !AGENTS[k].soon && !AGENTS[k].readOnly && (AGENTS[k].apps.length > 0 || changesApps(k));
 
 /** Ask me first or Autopilot, for one teammate. Admins and the owner change it; everyone else sees it. */
 function TrustSetting({ agent, on, admin, onChange }: { agent: AgentKey; on: boolean; admin: boolean; onChange: (on: boolean) => void }) {

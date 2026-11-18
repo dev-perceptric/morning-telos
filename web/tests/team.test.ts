@@ -5,24 +5,43 @@ import { test } from "node:test";
 import { MODEL_CHOICES, MODELS, modelFor } from "../src/lib/models.ts";
 import { agentByGod, agentFace, agentPicture, AGENTS, insertMention, LEAD, mentionMatches, mentionQuery, ORDER, parseMentions, workingAgents } from "../src/lib/team.ts";
 
-test("the same 8 agents, gods and order as the old app", () => {
+test("the same 8 agents, gods, job titles and order as the old app; every one works now", () => {
   assert.deepEqual(ORDER, ["chief", "sales", "support", "forms", "email", "social", "seo", "web"]);
   assert.deepEqual(
     ORDER.map((k) => AGENTS[k].god),
     ["Athena", "Hermes", "Hestia", "Hora", "Iris", "Aphrodite", "Artemis", "Hephaestus"],
   );
-  assert.deepEqual(workingAgents(), ["chief", "social", "seo", "web"]);
+  // Plan phase 4 gate: Iris, Hora, Hermes and Hestia left Coming soon.
+  assert.deepEqual(workingAgents(), ORDER);
+  for (const k of ORDER) assert.equal(AGENTS[k].soon, undefined, k);
   assert.equal(LEAD, "chief");
   assert.ok(AGENTS.chief.readOnly);
-  // Same text as app/lib/agents.js, so the old and new app describe the team the same way.
+  // The old app (app/lib/agents.js) still lists the same names and job titles. Its jobs match for the four teammates
+  // that worked there; Iris, Hora, Hermes and Hestia are still "coming soon" in the old app, and here they work
+  // through the customer's own apps, so their jobs say that instead (an intended difference until launch).
   const old = readFileSync(new URL("../../app/lib/agents.js", import.meta.url), "utf8");
   for (const k of ORDER) {
     const a = AGENTS[k];
     assert.equal(a.key, k);
     assert.ok(old.includes(`god: "${a.god}", name: "${a.name}"`), `${k} name`);
-    assert.ok(old.includes(a.job), `${k} job`);
-    assert.equal(old.includes(`${k}: { god: "${a.god}", name: "${a.name}", apps: [], soon: true`), Boolean(a.soon), `${k} soon`);
-    assert.doesNotMatch(a.job + a.out.join(" "), /[—–]/);
+    const appsTeammate = ["sales", "support", "forms", "email"].includes(k);
+    assert.equal(old.includes(`${k}: { god: "${a.god}", name: "${a.name}", apps: [], soon: true`), appsTeammate, `${k} is coming soon only in the old app`);
+    if (!appsTeammate) assert.ok(old.includes(a.job), `${k} job`);
+    assert.doesNotMatch(a.job + a.out.join(" ") + (a.rules ?? []).join(" "), /[—–]/);
+  }
+});
+
+test("Iris, Hora, Hermes and Hestia: honest jobs that name their apps and the owner's OK", () => {
+  assert.match(AGENTS.email.job, /Gmail or Outlook after you approve/);
+  assert.match(AGENTS.forms.job, /Google Calendar or Calendly/);
+  assert.match(AGENTS.sales.job, /Nothing goes out until you approve it/);
+  assert.match(AGENTS.support.job, /hands refunds, legal questions and upset customers to you/);
+  for (const k of ["sales", "support", "forms", "email"] as const) {
+    const a = AGENTS[k];
+    assert.equal(a.out.length, 3, k);
+    assert.ok(a.rules && a.rules.length >= 4, k);
+    // Short sentences for the Team page.
+    for (const s of a.job.split(/\. /)) assert.ok(s.split(" ").length <= 25, `${k}: ${s}`);
   }
 });
 

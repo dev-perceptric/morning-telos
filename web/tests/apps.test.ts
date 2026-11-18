@@ -8,8 +8,8 @@ import { test } from "node:test";
 import type { TeamWorkspace, ToolContext, ToolDef, Trust } from "../src/lib/agentLoop.ts";
 import type { Approval, NewApproval } from "../src/lib/approvals.ts";
 import { AppSetupError, forgetTools, kindOf, runTool, toolsOf, verbOf } from "../src/lib/composio/actions.ts";
-import { access, ACTION_TOOL, appToolSource, isAppApproval, missingApp, runApproval, SEARCH_TOOL, toolkitOf, type AppToolDeps } from "../src/lib/composio/appAction.ts";
-import { APP_ACCESS, APPS, appsFor, TOOLKITS } from "../src/lib/composio/catalog.ts";
+import { access, ACTION_TOOL, appToolSource, isAppApproval, missingApp, notConnected, runApproval, SEARCH_TOOL, toolkitOf, type AppToolDeps } from "../src/lib/composio/appAction.ts";
+import { APP_ACCESS, APPS, appsFor, changesApps, TOOLKITS } from "../src/lib/composio/catalog.ts";
 import { composioOn, composioUser, connectable } from "../src/lib/composio/composio.ts";
 import { accountLabel, activeAccount, authConfigFor, connectLink, dropAccount, forgetConfigs, readState, signState, STATE_TTL_MS } from "../src/lib/composio/connect.ts";
 import { closeApps, type ConnRow } from "../src/lib/composio/store.ts";
@@ -18,6 +18,7 @@ import type { Keyring } from "../src/lib/sealing.ts";
 import { AGENTS, ORDER, type AgentKey } from "../src/lib/team.ts";
 import { BASE, fakeComposio, KEY } from "./fakeComposio.ts";
 import { fakeDb } from "./server/fakeDb.ts";
+import { withSoon } from "./soon.ts";
 
 const ENV = { COMPOSIO_API_KEY: KEY, COMPOSIO_BASE_URL: BASE };
 const WS_ID = "11111111-2222-4333-8444-555555555555";
@@ -50,13 +51,29 @@ test("catalog: each app's own auth config can be set in .env.example (and so in 
   for (const k of ["COMPOSIO_API_KEY", "COMPOSIO_BASE_URL", ...APPS.map((a) => `COMPOSIO_AUTH_CONFIG_${a.toolkit.toUpperCase()}`)]) assert.match(example, new RegExp(`^${k}=$`, "m"), k);
 });
 
-test("access: only Athena may use apps for now, and only to read; coming soon teammates get nothing", () => {
-  assert.deepEqual(Object.keys(APP_ACCESS), ["chief"]);
+test("access: Athena reads every app; Iris, Hora, Hermes and Hestia use their own apps and may change things; the rest get none", () => {
+  assert.deepEqual(Object.keys(APP_ACCESS).sort(), ["chief", "email", "forms", "sales", "support"]);
   assert.deepEqual(access("chief"), { toolkits: APPS.map((a) => a.toolkit), reads: true });
-  for (const k of ORDER.filter((k) => k !== "chief")) assert.deepEqual(access(k).toolkits, [], k);
-  // A teammate given apps while still coming soon gets nothing (P4.2 drops soon and sets APP_ACCESS together).
+  assert.deepEqual(access("email"), { toolkits: ["gmail", "outlook"], reads: false });
+  assert.deepEqual(access("forms"), { toolkits: ["googlecalendar", "calendly", "gmail", "outlook"], reads: false });
+  assert.deepEqual(access("sales"), { toolkits: ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce"], reads: false });
+  assert.deepEqual(access("support"), { toolkits: ["gmail", "outlook", "slack", "zendesk", "help_scout"], reads: false });
+  for (const k of ["social", "seo", "web"] as AgentKey[]) assert.deepEqual(access(k), { toolkits: [], reads: true }, k);
+  // The Apps page's "for" list says the same as the access map.
+  for (const a of APPS) assert.deepEqual([...a.forAgents].sort(), ORDER.filter((k) => k !== "chief" && access(k).toolkits.includes(a.toolkit)).sort(), a.toolkit);
+  // Every toolkit named is a real one.
+  for (const v of Object.values(APP_ACCESS)) if (Array.isArray(v.toolkits)) for (const t of v.toolkits) assert.ok(TOOLKITS[t], t);
+  // Who gets the Ask me first or Autopilot setting for apps.
+  assert.deepEqual(ORDER.filter((k) => changesApps(k)), ["sales", "support", "forms", "email"]);
+  // A teammate that is coming soon gets nothing, whatever the map says.
   assert.deepEqual(appsFor("sales", true), { toolkits: [], reads: true });
+  assert.equal(changesApps("sales", true), false);
   assert.equal(AGENTS.chief.readOnly, true);
+});
+
+test("access: a teammate marked coming soon loses its apps", async () => {
+  await withSoon("support", () => assert.deepEqual(access("support"), { toolkits: [], reads: true }));
+  assert.equal(access("support").reads, false);
 });
 
 test("connectable: needs the server key; Pipedrive and Help Scout also need our own auth config", () => {
@@ -284,9 +301,10 @@ test("app tools: a read runs at once on the workspace's own account; a change is
   assert.equal(s.approvals.length, 0);
 });
 
-test("app tools: nothing without the Composio key, for coming soon teammates, for apps not connected or not allowed", async () => {
+test("app tools: nothing without the Composio key, for teammates with no apps, for apps not connected or not allowed", async () => {
   assert.deepEqual(await setup({ on: false }).source(ctx("chief")), { tools: [], missing: [] });
-  for (const k of ["sales", "support", "forms", "email", "social", "seo", "web"] as AgentKey[]) assert.deepEqual(await setup().source(ctx(k)), { tools: [], missing: [] }, k);
+  for (const k of ["social", "seo", "web"] as AgentKey[]) assert.deepEqual(await setup().source(ctx(k)), { tools: [], missing: [] }, k);
+  await withSoon("sales", async () => assert.deepEqual(await setup().source(ctx("sales")), { tools: [], missing: [] }));
   assert.deepEqual(await setup({ rows: [] }).source(ctx("chief")), { tools: [], missing: [] });
   // An app that needs signing in again is said in the prompt, not offered.
   const gone = setup({ rows: [{ id: "r1", workspace_id: WS_ID, toolkit: "gmail", composio_account: "ca_x", status: "reconnect", account_label: null }] });
@@ -296,6 +314,74 @@ test("app tools: nothing without the Composio key, for coming soon teammates, fo
   const hubOnly = setup({ access: { sales: { toolkits: ["hubspot"], reads: false } } });
   const set = await hubOnly.source(ctx("sales"));
   assert.deepEqual((tool(set.tools, ACTION_TOOL).definition.input_schema as { properties: { app: { enum: string[] } } }).properties.app.enum, ["hubspot"]);
+});
+
+test("app tools with the real map: each teammate gets app_action only for connected apps it may use, and is told what to connect", async () => {
+  // The workspace has Gmail and HubSpot (and another workspace has Slack).
+  const s = setup();
+  const enumOf = (tools: ToolDef[]) => (tool(tools, ACTION_TOOL).definition.input_schema as { properties: { app: { enum: string[] } } }).properties.app.enum;
+  const iris = await s.source(ctx("email"));
+  assert.deepEqual(enumOf(iris.tools), ["gmail"], "Iris never gets HubSpot");
+  assert.equal(tool(iris.tools, ACTION_TOOL).write, true);
+  assert.deepEqual(iris.missing, []);
+  const hermes = await s.source(ctx("sales"));
+  assert.deepEqual(enumOf(hermes.tools), ["gmail", "hubspot"]);
+  assert.deepEqual(hermes.missing, ["Calendar and booking (connect Google Calendar or Calendly in Settings, Apps)"]);
+  const hora = await s.source(ctx("forms"));
+  assert.deepEqual(enumOf(hora.tools), ["gmail"]);
+  assert.deepEqual(hora.missing, ["Calendar and booking (connect Google Calendar or Calendly in Settings, Apps)"]);
+  const hestia = await s.source(ctx("support"));
+  assert.deepEqual(enumOf(hestia.tools), ["gmail"], "another workspace's Slack is never offered");
+  assert.deepEqual(hestia.missing, ["Team chat (connect Slack in Settings, Apps)", "Customer support (connect Zendesk or Help Scout in Settings, Apps)"]);
+  // Nothing connected: no app tools, and the prompt says which apps to connect.
+  const none = setup({ rows: [] });
+  assert.deepEqual(await none.source(ctx("email")), { tools: [], missing: ["Email (connect Gmail or Outlook in Settings, Apps)"] });
+  assert.deepEqual((await none.source(ctx("sales"))).missing, [
+    "Email (connect Gmail or Outlook in Settings, Apps)",
+    "Calendar and booking (connect Google Calendar or Calendly in Settings, Apps)",
+    "CRM (connect HubSpot, Pipedrive or Salesforce in Settings, Apps)",
+  ]);
+  // A lost sign-in says connect it again, not connect another app.
+  const lost = setup({ rows: [{ id: "r1", workspace_id: WS_ID, toolkit: "gmail", composio_account: "ca_x", status: "reconnect", account_label: null }] });
+  assert.deepEqual(await lost.source(ctx("email")), { tools: [], missing: [missingApp("gmail")] });
+  // Apps not set up on the server: one line, so the teammate does the work in chat.
+  assert.deepEqual(await setup({ on: false }).source(ctx("email")), { tools: [], missing: ["Gmail or Outlook (connecting apps isn't ready yet, so do the work here in chat)"] });
+  assert.deepEqual(notConnected([], [], true), []);
+  for (const m of [...hermes.missing, ...hestia.missing]) assert.doesNotMatch(m, /[—–]/);
+});
+
+test("app tools with the real map: a send by Iris, a CRM change by Hermes and a reply by Hestia wait for approval", async () => {
+  const s = setup();
+  const send = { recipient_email: "bob@x.com", subject: "Hi", body: "Hello Bob" };
+  for (const k of ["email", "forms", "sales", "support"] as AgentKey[]) {
+    const set = await s.source(ctx(k));
+    const r = await run(set.tools, ACTION_TOOL, { app: "gmail", action: "GMAIL_SEND_EMAIL", arguments: send }, ctx(k));
+    assert.ok(r.approval, `${k}'s send waits`);
+    // A read runs at once.
+    assert.equal((await run(set.tools, ACTION_TOOL, { app: "gmail", action: "GMAIL_FETCH_EMAILS" }, ctx(k))).isError, undefined, k);
+    // Deleting never runs, even on autopilot.
+    assert.equal((await run(set.tools, ACTION_TOOL, { app: "gmail", action: "GMAIL_DELETE_MESSAGE" }, ctx(k, 2))).isError, true, k);
+  }
+  const hermes = await s.source(ctx("sales"));
+  assert.ok((await run(hermes.tools, ACTION_TOOL, { app: "hubspot", action: "HUBSPOT_UPDATE_DEAL", arguments: { id: "9" } }, ctx("sales"))).approval);
+  // Iris can't reach HubSpot even if she names it.
+  const iris = await s.source(ctx("email"));
+  assert.equal((await run(iris.tools, ACTION_TOOL, { app: "hubspot", action: "HUBSPOT_UPDATE_DEAL", arguments: { id: "9" } }, ctx("email"))).isError, true);
+  assert.deepEqual(
+    s.approvals.map((a) => [a.agent, a.product, a.tool]),
+    [
+      ["email", "gmail", "GMAIL_SEND_EMAIL"],
+      ["forms", "gmail", "GMAIL_SEND_EMAIL"],
+      ["sales", "gmail", "GMAIL_SEND_EMAIL"],
+      ["support", "gmail", "GMAIL_SEND_EMAIL"],
+      ["sales", "hubspot", "HUBSPOT_UPDATE_DEAL"],
+    ],
+  );
+  // Only the reads ran.
+  assert.deepEqual(s.c.ran.map((x) => x.slug), ["GMAIL_FETCH_EMAILS", "GMAIL_FETCH_EMAILS", "GMAIL_FETCH_EMAILS", "GMAIL_FETCH_EMAILS"]);
+  // The approved send runs for Hermes; a HubSpot change saved by Iris (somehow) never would.
+  assert.equal((await runApproval({ workspace_id: WS_ID, agent: "sales", product: "gmail", tool: "GMAIL_SEND_EMAIL", input: send }, s.deps)).ok, true);
+  assert.deepEqual(await runApproval({ workspace_id: WS_ID, agent: "email", product: "hubspot", tool: "HUBSPOT_UPDATE_DEAL", input: { id: "9" } }, s.deps), { ok: false, text: "This teammate can't make this change any more." });
 });
 
 test("app tools: a change waits for approval below autopilot, with the app as the product; on autopilot it runs and is logged", async () => {
@@ -359,7 +445,8 @@ test("runApproval checks again: a disconnected app, a lost sign-in, a teammate n
   const theirs = setup({ rows: [{ id: "r9", workspace_id: OTHER_ID, toolkit: "gmail", composio_account: "ca_9", status: "active", account_label: null }], access: { sales: { toolkits: ["gmail"], reads: false } } });
   assert.equal((await runApproval(approved(), theirs.deps)).ok, false);
   assert.deepEqual(await runApproval(approved({ agent: "chief" }), setup().deps), { ok: false, text: "This teammate can't make this change any more." });
-  assert.deepEqual(await runApproval(approved(), setup().deps), { ok: false, text: "This teammate can't make this change any more." }, "the real map gives sales nothing yet");
+  assert.deepEqual(await runApproval(approved({ agent: "social" }), setup().deps), { ok: false, text: "This teammate can't make this change any more." }, "the real map gives Aphrodite no apps");
+  await withSoon("sales", async () => assert.deepEqual(await runApproval(approved(), setup().deps), { ok: false, text: "This teammate can't make this change any more." }, "a coming soon teammate"));
   assert.deepEqual(await runApproval(approved(), { ...s.deps, on: false }), { ok: false, text: "Apps aren't set up on the server yet." });
   assert.deepEqual(await runApproval(approved({ tool: "GMAIL_DELETE_MESSAGE" }), s.deps), { ok: false, text: "This change isn't allowed." });
   assert.deepEqual(await runApproval(approved({ tool: "GMAIL_FETCH_EMAILS" }), s.deps), { ok: false, text: "This change isn't allowed." });
