@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
+import { track } from "@/lib/analytics";
 import { effectivePlan, PAID_PLANS, PLANS, type PaidPlan } from "@/lib/plans";
 import { callApi, message } from "./nav";
 import type { Workspace } from "./Settings";
@@ -43,6 +44,7 @@ export function BillingPage({ sb, ws, onChanged }: { sb: SupabaseClient; ws: Wor
     setError("");
     try {
       const out = await callApi<{ url?: string; changed?: boolean }>(sb, "/api/billing/checkout", { workspaceId: ws.id, plan: p });
+      track("plan_chosen", { plan: p });
       if (out.url) return window.location.assign(out.url);
       if (out.changed) {
         setDone(`You're on ${PLANS[p].name} now.`);

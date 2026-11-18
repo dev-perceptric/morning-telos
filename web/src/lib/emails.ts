@@ -2,6 +2,7 @@
 // Copied from Arrowsterr's src/lib/emails.ts (authEmail, securityNoticeEmail). Look and parts: ./emailKit.ts.
 
 import { renderEmail, type Block, type Email, type EmailParts } from "./emailKit.ts";
+import { PAID_PLANS, PLANS } from "./plans.ts";
 
 type Footer = EmailParts["footer"];
 
@@ -147,5 +148,151 @@ export function securityNoticeEmail(kind: string, a: { email: string; detail?: s
     link: { label: "Open settings", url: a.settingsUrl },
     paste: false,
     footer: { text: `Sent by Morning Telos to ${a.email} to keep your account safe.` },
+  });
+}
+
+// ─────────────── trial and lifecycle emails ───────────────
+// Sent to the workspace's owner by the hourly lifecycle_emails job (src/lib/lifecycleSend.ts). Which one is due
+// when: src/lib/lifecycle.ts. Copied from Arrowsterr's trialEmail and tasksEmail.
+
+/** What the team did in a stretch of time, read from chats, approvals and routine runs. */
+export type TeamStats = { chats: number; approvals: number; routines: number };
+
+export type OwnerMail = {
+  /** The owner's address. */
+  email: string;
+  /** The workspace's name. */
+  workspace: string;
+  /** The app's address, like https://chat.morningtelos.com. */
+  appUrl: string;
+  /** The workspace's time zone, for dates. */
+  timezone: string;
+};
+
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const statLines = (s: TeamStats) => [count(s.chats, "chat"), count(s.approvals, "approval done", "approvals done"), count(s.routines, "routine run", "routines run")];
+const dayOf = (at: Date, timezone: string) => at.toLocaleDateString("en-US", { timeZone: timezone, weekday: "long", month: "long", day: "numeric" });
+const timeOf = (at: Date, timezone: string) => at.toLocaleTimeString("en-US", { timeZone: timezone, hour: "numeric", minute: "2-digit" });
+const shortDay = (at: Date, timezone: string) => at.toLocaleDateString("en-US", { timeZone: timezone, month: "short", day: "numeric" });
+const billingUrl = (o: OwnerMail) => `${o.appUrl}/billing`;
+const ownerFooter = (o: OwnerMail): Footer => ({ text: `Sent to ${o.email} because you own ${clip(o.workspace)} on Morning Telos. Trial and billing emails always go to the owner.` });
+
+/** Day 7 of the trial: what the team did so far, and how to get more out of it. */
+export function trialDay7Email(o: OwnerMail, stats: TeamStats): Email {
+  const quiet = !stats.chats && !stats.approvals && !stats.routines;
+  return renderEmail({
+    subject: "Your first week with your AI team",
+    preview: quiet ? "Your team is ready for its first job." : `${statLines(stats).join(", ")} so far.`,
+    title: "One week in",
+    blocks: [
+      { t: "p", text: quiet ? `Your team at ${clip(o.workspace)} is ready, but it has no work yet. Give it a first job today.` : `Here is what your team at ${clip(o.workspace)} did in the first week of your free trial.` },
+      ...(quiet ? [] : [{ t: "list" as const, items: statLines(stats) }]),
+      { t: "p", text: "Ways to get more out of your team:" },
+      {
+        t: "list",
+        items: [
+          "Tag a teammate with @ to give them a job.",
+          "Set up a routine so work gets done on a schedule.",
+          "Add your services and prices to Knowledge so answers are right.",
+          "Connect your email and calendar in Settings, under Apps.",
+        ],
+      },
+    ],
+    button: { label: "Open your team", url: o.appUrl },
+    footer: ownerFooter(o),
+  });
+}
+
+const PLAN_LINES = PAID_PLANS.map((p) => `${PLANS[p].name}: $${PLANS[p].price} a month`);
+
+/** 2 days before the trial's last day: pick a plan. */
+export function trialDay12Email(o: OwnerMail, ends: Date, plans: string[] = PLAN_LINES): Email {
+  return renderEmail({
+    subject: "Your free trial ends in 2 days",
+    preview: "Pick a plan to keep your team working.",
+    title: "2 days left in your trial",
+    blocks: [
+      { t: "p", text: `Your free trial for ${clip(o.workspace)} ends on ${dayOf(ends, o.timezone)} at ${timeOf(ends, o.timezone)}.` },
+      { t: "p", text: "Pick a plan before then to keep your team working. Your chats, knowledge and routines stay as they are." },
+      { t: "list", items: plans },
+    ],
+    button: { label: "Pick a plan", url: billingUrl(o) },
+    footer: ownerFooter(o),
+  });
+}
+
+/** The trial's last day. When the trial ends early in the morning, this goes the day before and says tomorrow. */
+export function trialLastDayEmail(o: OwnerMail, ends: Date, now: Date): Email {
+  const today = shortDay(ends, o.timezone) === shortDay(now, o.timezone);
+  const when = today ? "today" : "tomorrow";
+  return renderEmail({
+    subject: `Your free trial ends ${when}`,
+    preview: "Pick a plan so your team keeps working.",
+    title: "Last day of your trial",
+    blocks: [
+      { t: "p", text: `Your free trial for ${clip(o.workspace)} ends ${when} at ${timeOf(ends, o.timezone)}.` },
+      { t: "p", text: "After that, your team stops working until you pick a plan. It only takes a minute." },
+    ],
+    button: { label: "Pick a plan", url: billingUrl(o) },
+    footer: ownerFooter(o),
+  });
+}
+
+/** The morning after a trial ended with no plan. */
+export function trialEndedEmail(o: OwnerMail): Email {
+  return renderEmail({
+    subject: "Your AI team is paused",
+    preview: "Pick a plan to wake them up.",
+    title: "Your team is paused",
+    blocks: [
+      { t: "p", text: `Your free trial for ${clip(o.workspace)} has ended. Your team is paused, so they can't chat or run routines.` },
+      { t: "p", text: "Pick a plan to wake them up. Your chats and knowledge are still here." },
+    ],
+    button: { label: "Pick a plan", url: billingUrl(o) },
+    footer: ownerFooter(o),
+  });
+}
+
+/** 80% of this period's AI allowance is used. */
+export function aiAllowanceEmail(o: OwnerMail, u: { percent: number; trial: boolean; top: boolean }): Email {
+  const pct = Math.max(0, Math.min(100, Math.round(u.percent)));
+  const what = u.trial ? "the AI allowance for your free trial" : "this month's AI allowance";
+  const next = u.trial
+    ? "When it runs out, your team stops until you pick a plan."
+    : u.top
+      ? "When it runs out, your team stops until next month."
+      : "When it runs out, your team stops until next month. Upgrade your plan for more.";
+  return renderEmail({
+    subject: `Your team used ${pct}% of its AI allowance`,
+    preview: next,
+    title: "Your AI allowance is running low",
+    blocks: [
+      { t: "p", text: `Your team at ${clip(o.workspace)} used ${pct}% of ${what}.` },
+      { t: "p", text: next },
+    ],
+    button: { label: u.trial ? "Pick a plan" : "See your plan", url: billingUrl(o) },
+    footer: ownerFooter(o),
+  });
+}
+
+/** Monday morning: what the team did last week. People can turn it off, so it carries an unsubscribe link. */
+export function weeklyDigestEmail(o: OwnerMail, stats: TeamStats, week: { from: Date; to: Date }, unsubscribeUrl: string): Email {
+  const quiet = !stats.chats && !stats.approvals && !stats.routines;
+  // The week runs to midnight on Monday, so its last day is the Sunday before.
+  const last = new Date(week.to.getTime() - 1);
+  return renderEmail({
+    subject: `Your team's week at ${clip(o.workspace, 60)}`,
+    preview: quiet ? "A quiet week. Give your team a job." : `${statLines(stats).join(", ")}.`,
+    title: "Your team's week",
+    blocks: [
+      { t: "p", text: `Here is what your team did from ${shortDay(week.from, o.timezone)} to ${shortDay(last, o.timezone)}.` },
+      { t: "list", items: statLines(stats) },
+      ...(quiet ? [{ t: "p" as const, text: "It was a quiet week. Tag a teammate with @ or set up a routine to put them to work." }] : []),
+    ],
+    button: { label: "Open your team", url: o.appUrl },
+    footer: {
+      text: `Sent to ${o.email} because you own ${clip(o.workspace)} on Morning Telos. You can turn off the weekly digest and tips in Settings.`,
+      links: [{ label: "Unsubscribe", url: unsubscribeUrl }],
+    },
   });
 }

@@ -7,8 +7,11 @@ export const RESEND_URL = "https://api.resend.com/emails";
 
 export type ResendDeps = { key: string; from: string; fetch: typeof fetch };
 
-/** More for one email: who replies go to, and a key so a retry never sends twice. */
-export type EmailExtra = { replyTo?: string | null; idempotencyKey?: string };
+/**
+ * More for one email: who replies go to, a key so a retry never sends twice, and extra headers on the email itself
+ * (List-Unsubscribe for emails people can turn off).
+ */
+export type EmailExtra = { replyTo?: string | null; idempotencyKey?: string; headers?: Record<string, string> };
 
 /** Send an email built with the kit (./emailKit.ts): its HTML and its plain-text copy. Throws when Resend says no. */
 export async function sendBuilt(to: string[], mail: Email, d: ResendDeps, extra: EmailExtra = {}): Promise<boolean> {
@@ -27,6 +30,7 @@ export async function sendBuilt(to: string[], mail: Email, d: ResendDeps, extra:
       html: mail.html,
       text: mail.text,
       ...(extra.replyTo ? { reply_to: extra.replyTo } : {}),
+      ...(extra.headers && Object.keys(extra.headers).length ? { headers: extra.headers } : {}),
     }),
     signal: AbortSignal.timeout(15_000),
   });

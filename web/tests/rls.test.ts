@@ -1883,6 +1883,121 @@ test("app_connections: known apps only, one connection per app in a workspace, g
   assert.equal((await db.query("select count(*)::int n from app_connections where workspace_id = $1", [ws])).rows[0].n, 0);
 });
 
+// ─────────────── lifecycle emails (018_email_log.sql) ───────────────
+
+test("email_log: server only, and each email once per person, kind and period", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, viewer } = await team("maillog");
+  await db.query("insert into email_log (workspace_id, user_id, kind, period_key) values ($1, $2, 'trial_day7', '2026-11-30')", [ws, owner.id]);
+  // The claim: a second insert of the same email fails, so two worker runs never send it twice.
+  await assert.rejects(db.query("insert into email_log (workspace_id, user_id, kind, period_key) values ($1, $2, 'trial_day7', '2026-11-30')", [ws, owner.id]), /duplicate key/);
+  await db.query("insert into email_log (workspace_id, user_id, kind, period_key) values ($1, $2, 'trial_day7', '2026-12-31')", [ws, owner.id]);
+  await db.query("insert into email_log (workspace_id, user_id, kind, period_key) values ($1, $2, 'trial_day7', '2026-11-30')", [ws, admin.id]);
+  await assert.rejects(db.query("insert into email_log (workspace_id, user_id, kind, period_key) values ($1, $2, 'Bad Kind', 'x')", [ws, owner.id]), /email_log_kind_check/);
+  await assert.rejects(db.query("insert into email_log (workspace_id, user_id, kind, period_key) values ($1, $2, 'x', '')", [ws, owner.id]), /email_log_period_key_check/);
+  for (const u of [owner, viewer, null]) {
+    for (const sql of [
+      ["select * from email_log", []],
+      ["insert into email_log (workspace_id, user_id, kind, period_key) values ($1, $2, 'ai_80', 'p')", [ws, owner.id]],
+      ["delete from email_log", []],
+    ] as const) {
+      await as(u, async (q) => {
+        await assert.rejects(q(sql[0], [...sql[1]]), /permission denied/, sql[0]);
+      });
+    }
+  }
+  // The worker's role can claim and take back a claim.
+  await db.query("begin");
+  try {
+    await db.query("set local role service_role");
+    await db.query("insert into email_log (workspace_id, user_id, kind, period_key) values ($1, $2, 'ai_80', 'trial:2026-11-16')", [ws, owner.id]);
+    assert.equal((await db.query("delete from email_log where workspace_id = $1 and kind = 'ai_80'", [ws])).rowCount, 1);
+  } finally {
+    await db.query("rollback");
+  }
+  // Gone with the workspace.
+  await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
+  assert.equal((await db.query("select count(*)::int n from email_log where workspace_id = $1", [ws])).rows[0].n, 0);
+});
+
+test("email_prefs: each person reads and changes only their own, through set_email_digest", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, viewer } = await team("mailprefs");
+  const other = await team("mailprefs2");
+  // No row means on.
+  await as(owner, async (q) => assert.equal((await q("select * from email_prefs")).rowCount, 0));
+  await asCommit(owner, (q) => q("select set_email_digest($1, false)", [ws]));
+  await asCommit(viewer, (q) => q("select set_email_digest($1, false)", [ws]));
+  await asCommit(viewer, (q) => q("select set_email_digest($1, true)", [ws]));
+  await as(owner, async (q) => {
+    assert.deepEqual((await q("select workspace_id, user_id, digest from email_prefs")).rows, [{ workspace_id: ws, user_id: owner.id, digest: false }]);
+  });
+  await as(viewer, async (q) => {
+    assert.deepEqual((await q("select user_id, digest from email_prefs")).rows, [{ user_id: viewer.id, digest: true }]);
+  });
+  // Another workspace's owner sees none of it and can't set prefs in a workspace they're not in.
+  await as(other.owner, async (q) => {
+    assert.equal((await q("select * from email_prefs")).rowCount, 0);
+    await assert.rejects(q("select set_email_digest($1, false)", [ws]), /You are not in that workspace/);
+  });
+  // No direct writes: not even to one's own row, so nobody turns off someone else's emails.
+  for (const sql of [
+    ["insert into email_prefs (workspace_id, user_id, digest) values ($1, $2, false)", [ws, owner.id]],
+    ["update email_prefs set digest = true", []],
+    ["delete from email_prefs", []],
+  ] as const) {
+    await as(owner, async (q) => {
+      await assert.rejects(q(sql[0], [...sql[1]]), /permission denied/, sql[0]);
+    });
+  }
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from email_prefs"), /permission denied/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select set_email_digest($1, false)", [ws]), /permission denied for function set_email_digest/);
+  });
+  // The unsubscribe route writes with the server key.
+  await db.query("begin");
+  try {
+    await db.query("set local role service_role");
+    await db.query("insert into email_prefs (workspace_id, user_id, digest) values ($1, $2, true) on conflict (workspace_id, user_id) do update set digest = excluded.digest", [ws, owner.id]);
+    assert.equal((await db.query("select digest from email_prefs where workspace_id = $1 and user_id = $2", [ws, owner.id])).rows[0].digest, true);
+  } finally {
+    await db.query("rollback");
+  }
+});
+
+test("queue_hourly_jobs: one lifecycle_emails job per UTC hour, even from many calls at once", async (t) => {
+  if (!db) return t.skip("no test database");
+  const asServer = async (c: pg.Client) => {
+    await c.query("begin");
+    await c.query("set local role service_role");
+    const n = (await c.query("select queue_hourly_jobs() n")).rows[0].n as number;
+    await c.query("commit");
+    return n;
+  };
+  const conns = await Promise.all([connect(dbUrl), connect(dbUrl), connect(dbUrl)]);
+  try {
+    const made = await Promise.all(conns.map(asServer));
+    for (let i = 0; i < 3; i++) made.push(await asServer(conns[0]));
+    assert.equal(made.reduce((a, b) => a + b, 0), 1);
+  } finally {
+    await Promise.all(conns.map((c) => c.end()));
+  }
+  const hour = (await db.query(`select to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24') h`)).rows[0].h;
+  const rows = (await db.query("select workspace_id, payload, max_attempts from jobs where kind = 'lifecycle_emails'")).rows;
+  assert.deepEqual(rows, [{ workspace_id: null, payload: { hour }, max_attempts: 3 }]);
+  await assert.rejects(db.query("insert into jobs (kind, payload) values ('lifecycle_emails', $1)", [{ hour }]), /jobs_hourly_idx/);
+  await db.query("update jobs set payload = '{\"hour\": \"2000-01-01T00\"}' where kind = 'lifecycle_emails'");
+  assert.equal((await db.query("select queue_hourly_jobs() n")).rows[0].n, 1);
+  await db.query("delete from jobs where kind = 'lifecycle_emails'");
+  for (const u of [(await team("hourly")).owner, null]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select queue_hourly_jobs()"), /permission denied for function queue_hourly_jobs/);
+    });
+  }
+});
+
 // ─────────────── staff console (017_staff.sql) ───────────────
 
 // asService (above) runs as the server, the way the staff routes call Supabase.

@@ -7,7 +7,7 @@
 
 export type Link = { label: string; url: string };
 
-export type Block = { t: "p"; text: string } | { t: "small"; text: string } | { t: "code"; label: string; code: string };
+export type Block = { t: "p"; text: string } | { t: "small"; text: string } | { t: "code"; label: string; code: string } | { t: "list"; items: string[] };
 
 export type EmailParts = {
   subject: string;
@@ -22,8 +22,8 @@ export type EmailParts = {
   after?: Block[];
   /** Show the button's link as text too, for clients that block buttons. On unless false. */
   paste?: boolean;
-  /** Why the person gets this email. */
-  footer: { text: string };
+  /** Why the person gets this email, and links like Unsubscribe. */
+  footer: { text: string; links?: Link[] };
 };
 
 export type Email = { subject: string; preview: string; html: string; text: string };
@@ -49,6 +49,10 @@ function blockHtml(b: Block): string {
       return `<tr><td style="padding:22px 0 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="background:${C.box};border:1px solid ${C.line};border-radius:10px;padding:16px">
 <div style="font-family:${SANS};font-size:13px;line-height:18px;color:${C.quiet};padding-bottom:6px">${esc(b.label)}</div>
 <div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:30px;line-height:36px;font-weight:600;letter-spacing:0.3em;padding-left:0.3em;color:${C.ink}">${esc(b.code)}</div></td></tr></table></td></tr>`;
+    case "list":
+      return `<tr><td style="padding:0 0 14px"><table role="presentation" cellpadding="0" cellspacing="0">${b.items
+        .map((i) => `<tr><td valign="top" style="font-family:${SANS};font-size:16px;line-height:25px;color:${C.body};padding:0 10px 4px 0">&bull;</td><td style="font-family:${SANS};font-size:16px;line-height:25px;color:${C.body};padding:0 0 4px">${esc(i)}</td></tr>`)
+        .join("")}</table></td></tr>`;
   }
 }
 
@@ -59,6 +63,8 @@ function blockText(b: Block): string[] {
       return [b.text, ""];
     case "code":
       return [`${b.label}: ${b.code}`, ""];
+    case "list":
+      return [...b.items.map((i) => `- ${i}`), ""];
   }
 }
 
@@ -75,6 +81,7 @@ export function renderEmail(e: EmailParts): Email {
   const paste = e.button && e.paste !== false
     ?`<tr><td style="font-family:${SANS};font-size:12px;line-height:18px;color:${C.faint};padding:28px 0 0;word-break:break-all">Or paste this link: ${esc(safeUrl(e.button.url))}</td></tr>`
     : "";
+  const footLinks = (e.footer.links ?? []).map((l) => `&nbsp; <a href="${esc(safeUrl(l.url))}" style="color:${C.faint};text-decoration:underline">${esc(l.label)}</a>`).join("");
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${esc(subject)}</title></head>
 <body style="margin:0;padding:0;background:${C.page};font-family:${SANS};color:${C.ink};-webkit-font-smoothing:antialiased">
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${esc(preview)}${"&#8199;&#65279;&#847; ".repeat(30)}</div>
@@ -85,7 +92,7 @@ export function renderEmail(e: EmailParts): Email {
 ${e.blocks.map(blockHtml).join("\n")}
 ${btn}${link}${(e.after ?? []).map(blockHtml).join("\n")}${paste}
 <tr><td style="padding:28px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
-<tr><td style="font-family:${SANS};font-size:12px;line-height:18px;color:${C.faint};padding:20px 0 0;border-top:1px solid ${C.line}">${esc(e.footer.text)}</td></tr>
+<tr><td style="font-family:${SANS};font-size:12px;line-height:18px;color:${C.faint};padding:20px 0 0;border-top:1px solid ${C.line}">${esc(e.footer.text)}${footLinks}</td></tr>
 <tr><td style="font-family:${SANS};font-size:12px;line-height:18px;color:${C.faint};padding:8px 0 0">Morning Telos, an AI team for small businesses.&nbsp; <a href="https://morningtelos.com/privacy" style="color:${C.faint};text-decoration:underline">Privacy</a></td></tr>
 </table></td></tr></table></body></html>`;
 
@@ -100,6 +107,7 @@ ${btn}${link}${(e.after ?? []).map(blockHtml).join("\n")}${paste}
     ...(e.after ?? []).flatMap(blockText),
     "--",
     e.footer.text,
+    ...(e.footer.links ?? []).map((l) => `${l.label}: ${l.url}`),
   ];
   const text = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   return { subject, preview, html, text };

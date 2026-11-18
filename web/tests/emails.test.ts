@@ -109,3 +109,77 @@ test("links that aren't http, https or mailto are dropped, and subjects stay on 
   assert.match(m.html, /href="#"/);
   assert.equal(m.subject, "Hi Bcc: x@y.z");
 });
+
+// ─────────────── trial and lifecycle emails ───────────────
+import { aiAllowanceEmail, trialDay12Email, trialDay7Email, trialEndedEmail, trialLastDayEmail, weeklyDigestEmail } from "../src/lib/emails.ts";
+
+const owner = { email: "ana@example.com", workspace: "Ana's <Bakery>", appUrl: "https://chat.example.test", timezone: "America/Chicago" };
+const ends = new Date("2026-11-30T21:30:00Z");
+const stats = { chats: 1, approvals: 2, routines: 0 };
+const unsub = "https://chat.example.test/api/email/unsubscribe?t=abc";
+const life: [string, Email][] = [
+  ["day7", trialDay7Email(owner, stats)],
+  ["day7 quiet", trialDay7Email(owner, { chats: 0, approvals: 0, routines: 0 })],
+  ["day12", trialDay12Email(owner, ends)],
+  ["last", trialLastDayEmail(owner, ends, new Date("2026-11-30T15:00:00Z"))],
+  ["ended", trialEndedEmail(owner)],
+  ["ai trial", aiAllowanceEmail(owner, { percent: 82.4, trial: true, top: false })],
+  ["ai paid", aiAllowanceEmail(owner, { percent: 90, trial: false, top: false })],
+  ["digest", weeklyDigestEmail(owner, stats, { from: new Date("2026-11-16T06:00:00Z"), to: new Date("2026-11-23T06:00:00Z") }, unsub)],
+];
+
+test("lifecycle emails have the look, a footer for the owner, no dashes and the workspace name escaped", () => {
+  for (const [name, m] of life) {
+    assert.match(m.html, /background:#faf9f5/, name);
+    assert.ok(m.text.startsWith("Morning Telos\n"), name);
+    assert.match(m.text, /\n--\nSent to ana@example\.com because you own Ana's <Bakery> on Morning Telos\./, name);
+    assert.ok(m.html.includes("Ana&#39;s &lt;Bakery&gt;"), name);
+    assert.doesNotMatch(m.html, /<Bakery>/, name);
+    assert.doesNotMatch(m.subject + m.preview + m.html + m.text, /[—–]/, name);
+  }
+});
+
+test("trial emails say when the trial ends in the workspace's time zone and link to Billing", () => {
+  const d12 = trialDay12Email(owner, ends);
+  assert.equal(d12.subject, "Your free trial ends in 2 days");
+  assert.match(d12.text, /ends on Monday, November 30 at 3:30 PM\./);
+  assert.match(d12.text, /Starter: \$49 a month/);
+  assert.match(d12.text, /Pick a plan: https:\/\/chat\.example\.test\/billing/);
+  assert.equal(trialLastDayEmail(owner, ends, new Date("2026-11-30T15:00:00Z")).subject, "Your free trial ends today");
+  // A trial ending at 7 AM gets its last-day email the morning before.
+  const early = trialLastDayEmail(owner, new Date("2026-11-30T13:00:00Z"), new Date("2026-11-29T15:00:00Z"));
+  assert.equal(early.subject, "Your free trial ends tomorrow");
+  assert.match(early.text, /ends tomorrow at 7:00 AM\./);
+  assert.equal(trialEndedEmail(owner).subject, "Your AI team is paused");
+});
+
+test("day 7 shows the stats, or a nudge when the team has done nothing yet", () => {
+  const [, d7] = life[0];
+  assert.match(d7.text, /- 1 chat\n- 2 approvals done\n- 0 routines run/);
+  assert.match(d7.text, /Tag a teammate with @/);
+  assert.match(life[1][1].text, /no work yet/);
+  assert.doesNotMatch(life[1][1].text, /0 chats/);
+});
+
+test("the AI allowance email rounds the percent and says what happens next", () => {
+  assert.equal(life[5][1].subject, "Your team used 82% of its AI allowance");
+  assert.match(life[5][1].text, /free trial/);
+  assert.match(life[6][1].text, /Upgrade your plan for more/);
+  assert.doesNotMatch(aiAllowanceEmail(owner, { percent: 85, trial: false, top: true }).text, /Upgrade/);
+});
+
+test("only the digest has an unsubscribe link, and it covers Monday to Sunday", () => {
+  const d = weeklyDigestEmail(owner, stats, { from: new Date("2026-11-16T06:00:00Z"), to: new Date("2026-11-23T06:00:00Z") }, unsub);
+  assert.ok(d.html.includes(`href="${esc(unsub)}"`));
+  assert.ok(d.text.endsWith(`Unsubscribe: ${unsub}`));
+  assert.match(d.text, /from Nov 16 to Nov 22\./);
+  for (const [name, m] of life.filter(([n]) => n !== "digest")) assert.doesNotMatch(m.text, /Unsubscribe/, name);
+});
+
+test("a list block renders as bullets in HTML and dashes in text", () => {
+  const m = renderEmail({ subject: "s", preview: "p", title: "t", blocks: [{ t: "list", items: ["one <b>", "two"] }], footer: { text: "f", links: [{ label: "L", url: "https://x.test/" }] } });
+  assert.match(m.html, /&bull;<\/td><td[^>]*>one &lt;b&gt;<\/td>/);
+  assert.match(m.text, /- one <b>\n- two/);
+  assert.match(m.html, /<a href="https:\/\/x\.test\/"[^>]*>L<\/a>/);
+  assert.ok(m.text.endsWith("f\nL: https://x.test/"));
+});

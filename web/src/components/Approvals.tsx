@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useState } from "react";
+import { track } from "@/lib/analytics";
 import { fieldLabel, setPath, STATUS_LABEL, type Approval, type ApprovalStatus, type Path } from "@/lib/approvals";
 import { AGENTS, isAgentKey, type AgentKey } from "@/lib/team";
 import { can } from "@/lib/workspace";
@@ -169,6 +170,7 @@ export function Review({ sb, ws, ap, onDecided, compact }: { sb: SupabaseClient;
       const out = await callApi<{ status?: ApprovalStatus; result?: string }>(sb, `/api/approvals/${ap.id}`, { workspaceId: ws.id, action, ...(action === "approve" && editing ? { input: draft } : {}) });
       setSaid(out.status === "done" ? "Done." : out.status === "denied" ? `Not approved. ${AGENTS[agent].god} won't run it.` : `It didn't work. ${out.result ?? ""}`.trim());
       setEditing(false);
+      track("approval_decided", { action, agent, edited: action === "approve" && editing });
       onDecided();
     } catch (e) {
       setError(message(e));

@@ -13,9 +13,9 @@ import { initial } from "@/lib/home";
 import { callApi, message, navigate } from "./nav";
 import { SkillsSettings } from "./Skills";
 import { SocialSettings } from "./Social";
-import { ErrorText, input, label, Notice, PageHead } from "./ui";
+import { ErrorText, input, label, Notice, PageHead, Switch } from "./ui";
 
-export type Workspace = { id: string; name: string; website: string | null; timezone: string; plan: string; status: string | null; trial_ends_at: string; role: Role };
+export type Workspace = { id: string; name: string; website: string | null; timezone: string; plan: string; status: string | null; trial_ends_at: string; created_at?: string; role: Role };
 type Invite = { id: string; email: string; role: Role; token: string; expires_at: string; expired?: boolean };
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -71,6 +71,7 @@ export function SettingsPage({
             <GeneralSettings key={ws.id} sb={sb} ws={ws} onChanged={onChanged} />
             <Account email={email} name={name} role={ws.role} />
           </div>
+          {ws.role === "owner" ? <EmailSettings key={`mail-${ws.id}`} sb={sb} ws={ws} userId={userId} /> : null}
           {can(ws.role, "deleteWorkspace") ? <DeleteWorkspace key={`del-${ws.id}`} sb={sb} ws={ws} onGone={onGone} /> : null}
           <p className="legal">
             <a className="link" href="https://morningtelos.com/terms/" target="_blank" rel="noopener noreferrer">
@@ -112,6 +113,58 @@ function Account({ email, name, role }: { email: string; name: string; role: Rol
         </span>
       </div>
       <p className="hint-s mt-4">To change your password, log out and pick Forgot password on the log in page.</p>
+    </section>
+  );
+}
+
+/**
+ * The owner's emails: the weekly digest and tips can be turned off (email_prefs, supabase/018_email_log.sql).
+ * Trial and billing emails always go. The same switch as the digest's unsubscribe link.
+ */
+function EmailSettings({ sb, ws, userId }: { sb: SupabaseClient; ws: Workspace; userId: string }) {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    sb.from("email_prefs")
+      .select("digest")
+      .eq("workspace_id", ws.id)
+      .eq("user_id", userId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!live) return;
+        if (error) setError(message(error));
+        setOn((data as { digest: boolean } | null)?.digest !== false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [sb, ws.id, userId]);
+
+  async function change(next: boolean) {
+    setBusy(true);
+    setError("");
+    const { error } = await sb.rpc("set_email_digest", { p_ws: ws.id, p_on: next });
+    setBusy(false);
+    if (error) return setError(message(error));
+    setOn(next);
+  }
+
+  return (
+    <section className="card pad mt-4">
+      <div className="sh">
+        <h2>Emails</h2>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0">
+          <b className="block text-[14px]">Weekly digest and tips</b>
+          <small className="block text-[12.5px] text-ink-4">What your team did each week, sent on Monday morning.</small>
+        </span>
+        <Switch on={Boolean(on)} label="Weekly digest and tips" disabled={on === null || busy} onChange={change} />
+      </div>
+      {error ? <ErrorText>{error}</ErrorText> : null}
+      <p className="hint-s mt-4">Trial and billing emails always go to the owner.</p>
     </section>
   );
 }
