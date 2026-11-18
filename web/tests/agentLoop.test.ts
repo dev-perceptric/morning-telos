@@ -170,8 +170,15 @@ test("Iris, Hora, Hermes and Hestia: their prompts name their apps, where to con
   assert.match(ESCALATE, /refunds, legal questions, medical questions or angry customers/);
   assert.match(ESCALATE, /send nothing to the customer/);
   for (const k of ["email", "forms", "sales", "chief", "social"] as AgentKey[]) assert.ok(!systemPrompt({ name: "B", website: null }, k, { tools: true, missing: [], teammates: [] }).includes(ESCALATE), k);
+  // Hephaestus's prompt names his site builders, where to connect them, and that nothing goes live without the OK.
+  const heph = systemPrompt({ name: "B", website: null }, "web", { tools: true, writes: "ask", missing: [], teammates: [] });
+  for (const t of APP_ACCESS.web!.toolkits as string[]) assert.ok(heph.includes(appName(t)), `Hephaestus's prompt names ${appName(t)}`);
+  assert.match(heph, /If the app you need isn't connected, say which one to connect in Settings, Apps\. Then still do the useful part here in chat: write the page/);
+  assert.match(heph, /Never publish, add or change anything on the website without the owner's OK, unless the owner put you on autopilot\./);
+  assert.doesNotMatch(heph, /[—–]/);
+  assert.ok(!heph.includes(ESCALATE));
   // Athena and the product teammates have no app lines.
-  for (const k of ["chief", "social", "seo", "web"] as AgentKey[]) assert.doesNotMatch(systemPrompt({ name: "B", website: null }, k, { tools: true, missing: [], teammates: [] }), /Settings, Apps/, k);
+  for (const k of ["chief", "social", "seo"] as AgentKey[]) assert.doesNotMatch(systemPrompt({ name: "B", website: null }, k, { tools: true, missing: [], teammates: [] }), /Settings, Apps/, k);
 });
 
 test("the handoff tool lists only the teammates given", () => {

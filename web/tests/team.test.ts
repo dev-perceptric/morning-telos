@@ -26,7 +26,9 @@ test("the same 8 agents, gods, job titles and order as the old app; every one wo
     assert.ok(old.includes(`god: "${a.god}", name: "${a.name}"`), `${k} name`);
     const appsTeammate = ["sales", "support", "forms", "email"].includes(k);
     assert.equal(old.includes(`${k}: { god: "${a.god}", name: "${a.name}", apps: [], soon: true`), appsTeammate, `${k} is coming soon only in the old app`);
-    if (!appsTeammate) assert.ok(old.includes(a.job), `${k} job`);
+    // Hephaestus's job starts with the old app's, then says he also builds on the owner's own site builder.
+    if (k === "web") assert.ok(old.includes(`job: "${a.job.split(". ")[0]}."`), "web job");
+    else if (!appsTeammate) assert.ok(old.includes(a.job), `${k} job`);
     assert.doesNotMatch(a.job + a.out.join(" ") + (a.rules ?? []).join(" "), /[—–]/);
   }
 });
@@ -43,6 +45,20 @@ test("Iris, Hora, Hermes and Hestia: honest jobs that name their apps and the ow
     // Short sentences for the Team page.
     for (const s of a.job.split(/\. /)) assert.ok(s.split(" ").length <= 25, `${k}: ${s}`);
   }
+});
+
+test("Hephaestus: an honest job that names Framer, Webflow and WordPress.com and the owner's OK, and keeps Arrowsterr", () => {
+  const a = AGENTS.web;
+  assert.deepEqual(a.apps, ["arrowsterr"]);
+  assert.match(a.job, /Framer/);
+  assert.match(a.job, /Webflow/);
+  assert.match(a.job, /WordPress\.com/);
+  assert.match(a.job, /Nothing goes live until you approve it/);
+  assert.equal(a.out.length, 3);
+  assert.ok(a.rules && a.rules.length >= 4);
+  assert.match(a.rules.join(" "), /Never publish, add or change anything on the website without the owner's OK, unless the owner put you on autopilot\./);
+  assert.match(a.rules.join(" "), /Never invent/);
+  for (const s of a.job.split(/\. /)) assert.ok(s.split(" ").length <= 25, s);
 });
 
 test("every agent has both pictures in public/img/agents", () => {

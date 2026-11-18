@@ -14,7 +14,8 @@
 --                    and admins connect and disconnect through the server routes (src/app/api/apps), which save with
 --                    the service role.
 --
--- The toolkit list matches TOOLKITS in src/lib/composio/catalog.ts. tests/apps.test.ts fails when they drift.
+-- The toolkit list matched TOOLKITS in src/lib/composio/catalog.ts when this ran; 019_website_builders.sql has the
+-- current list.
 
 -- status: active (works), reconnect (Composio says the sign-in is gone: the person connects it again).
 create table if not exists public.app_connections (
