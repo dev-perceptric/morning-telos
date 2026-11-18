@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AGENTS, ORDER } from "../src/lib/team.ts";
-import { agentStatus, agentToolkits, allSectioned, TEAM_SECTIONS } from "../src/lib/teamView.ts";
+import { agentStatus, agentToolkits } from "../src/lib/teamView.ts";
 
-test("every teammate is in exactly one Team section", () => {
-  const all = TEAM_SECTIONS.flatMap((s) => s.agents);
-  assert.equal(new Set(all).size, all.length);
-  assert.deepEqual([...all].sort(), [...ORDER].sort());
-  assert.ok(allSectioned());
+test("the Team page lists every teammate once", () => {
+  assert.equal(new Set(ORDER).size, ORDER.length);
+  assert.deepEqual([...ORDER].sort(), Object.keys(AGENTS).sort());
 });
 
 test("agentStatus: paused, setting up, connect an app, working", () => {

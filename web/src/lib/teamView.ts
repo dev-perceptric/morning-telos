@@ -2,15 +2,7 @@
 // (app/public/app.js CATS and st()). Pure: the screens and tests share it. Reads src/lib/team.ts, never changes it.
 
 import { appsFor } from "./composio/catalog.ts";
-import { AGENTS, ORDER, type AgentKey } from "./team.ts";
-
-/** The Team page's sections, in the old app's order. Every teammate is in exactly one (tests/team-view.test.ts). */
-export const TEAM_SECTIONS: { title: string; agents: AgentKey[] }[] = [
-  { title: "Marketing", agents: ["social", "seo", "email", "web"] },
-  { title: "Sales and scheduling", agents: ["sales", "forms"] },
-  { title: "Customer service", agents: ["support"] },
-  { title: "Operations", agents: ["chief"] },
-];
+import { AGENTS, type AgentKey } from "./team.ts";
 
 /** The small colored badges for our own products, like the old app's SVC_ICON. */
 export const PRODUCT_BADGE: Record<string, { label: string; color: string; name: string }> = {
@@ -44,4 +36,3 @@ export function agentToolkits(k: AgentKey): string[] {
   return appsFor(k, Boolean(a.soon)).toolkits;
 }
 
-export const allSectioned = () => TEAM_SECTIONS.flatMap((s) => s.agents).sort().join() === [...ORDER].sort().join();
