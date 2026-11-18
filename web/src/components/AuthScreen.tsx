@@ -98,7 +98,7 @@ function GoogleIcon() {
   );
 }
 
-export function AuthScreen({ sb, invited, turnstileSiteKey = null }: { sb: SupabaseClient; invited: boolean; turnstileSiteKey?: string | null }) {
+export function AuthScreen({ sb, invited, turnstileSiteKey = null, google: googleOn = false }: { sb: SupabaseClient; invited: boolean; turnstileSiteKey?: string | null; google?: boolean }) {
   const [mode, setMode] = useState<Mode>(invited ? "signup" : "signin");
   const [name, setName] = useState("");
   const [business, setBusiness] = useState("");
@@ -217,7 +217,7 @@ export function AuthScreen({ sb, invited, turnstileSiteKey = null }: { sb: Supab
             <p className="text-[15px] text-ink-3">{sub}</p>
           </div>
           {invited ? <Notice>You were invited to a team. Use the email address the invite was sent to.</Notice> : null}
-          {mode === "signin" || mode === "signup" ? (
+          {googleOn && (mode === "signin" || mode === "signup") ? (
             <>
               <button type="button" className={btnSecondary} onClick={google} disabled={busy}>
                 <GoogleIcon />
