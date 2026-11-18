@@ -14,7 +14,9 @@ export type Route =
   | { page: "memory" }
   | { page: "approvals"; id: number | null }
   | { page: "settings"; tab: SettingsTab }
-  | { page: "invite"; token: string };
+  | { page: "invite"; token: string }
+  // The staff console. Its routes answer 404 to anyone who isn't staff (src/lib/staff.ts).
+  | { page: "staff"; id: string | null };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -51,6 +53,9 @@ export function parseRoute(path: string): Route {
   if (p === "/approvals") return { page: "approvals", id: null };
   const ap = /^\/approvals\/(\d{1,15})$/.exec(p);
   if (ap && Number(ap[1]) > 0) return { page: "approvals", id: Number(ap[1]) };
+  if (p === "/staff") return { page: "staff", id: null };
+  const staff = /^\/staff\/([^/]+)$/.exec(p);
+  if (staff && UUID.test(staff[1])) return { page: "staff", id: staff[1].toLowerCase() };
   return { page: "home" };
 }
 
@@ -65,5 +70,6 @@ export function routePath(r: Route): string {
   if (r.page === "routines") return "/routines";
   if (r.page === "memory") return "/memory";
   if (r.page === "approvals") return r.id ? `/approvals/${r.id}` : "/approvals";
+  if (r.page === "staff") return r.id ? `/staff/${r.id}` : "/staff";
   return "/";
 }

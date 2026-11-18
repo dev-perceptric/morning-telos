@@ -117,6 +117,14 @@ test("page routes", () => {
   assert.deepEqual(parseRoute("/settings/apps"), { page: "settings", tab: "apps" });
   assert.equal(routePath({ page: "settings", tab: "apps" }), "/settings/apps");
   assert.deepEqual(parseRoute("/nope"), { page: "home" });
+  // The staff console, and one workspace in it.
+  const staffWs = "11111111-2222-4333-8444-555555555555";
+  assert.deepEqual(parseRoute("/staff"), { page: "staff", id: null });
+  assert.deepEqual(parseRoute("/staff/"), { page: "staff", id: null });
+  assert.deepEqual(parseRoute(`/staff/${staffWs.toUpperCase()}`), { page: "staff", id: staffWs });
+  assert.deepEqual(parseRoute("/staff/not-a-workspace"), { page: "home" });
+  assert.equal(routePath({ page: "staff", id: null }), "/staff");
+  assert.equal(routePath({ page: "staff", id: staffWs }), `/staff/${staffWs}`);
   const token = "b".repeat(64);
   assert.deepEqual(parseRoute(`/invite/${token}`), { page: "invite", token });
   const thread = "11111111-2222-4333-8444-555555555555";
