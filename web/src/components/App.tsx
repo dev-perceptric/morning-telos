@@ -20,7 +20,7 @@ const INVITE_KEY = "mt.invite";
 const WS_KEY = "mt.workspace";
 const NOTICE_KEY = "mt.notice";
 
-export function App({ supabase, turnstileSiteKey }: { supabase: SupaConfig; turnstileSiteKey: string | null }) {
+export function App({ supabase, turnstileSiteKey, google = false }: { supabase: SupaConfig; turnstileSiteKey: string | null; google?: boolean }) {
   const sb = getSupabase(supabase);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [recovering, setRecovering] = useState(false);
@@ -47,7 +47,7 @@ export function App({ supabase, turnstileSiteKey }: { supabase: SupaConfig; turn
 
   if (session === undefined) return <Loading />;
   if (recovering && session) return <NewPassword sb={sb} onDone={() => setRecovering(false)} />;
-  if (!session) return <AuthScreen sb={sb} invited={Boolean(invite)} turnstileSiteKey={turnstileSiteKey} />;
+  if (!session) return <AuthScreen sb={sb} invited={Boolean(invite)} turnstileSiteKey={turnstileSiteKey} google={google} />;
   if (invite) return <JoinInvite sb={sb} session={session} token={invite} onDone={clearInvite} />;
   return <Shell sb={sb} session={session} />;
 }

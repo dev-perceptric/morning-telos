@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { ClientApp } from "@/components/ClientApp";
+import { googleEnabled } from "@/lib/authProviders";
 import { checkConfig } from "@/lib/config";
 
 export default async function Home() {
@@ -39,5 +40,10 @@ export default async function Home() {
   const supabase = { url: (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, ""), key: (process.env.SUPABASE_PUBLISHABLE_KEY ?? "").trim() };
   // Cloudflare Turnstile bot check on sign-up and log-in. Turn on bot protection in Supabase's Auth settings with the same keys.
   const turnstileSiteKey = process.env.TURNSTILE_SITE_KEY?.trim() || null;
-  return <ClientApp supabase={supabase} turnstileSiteKey={turnstileSiteKey} />;
+  // Show "Continue with Google" only once Google is on in Supabase Auth. Checked every 5 minutes.
+  const google = await fetch(`${supabase.url}/auth/v1/settings`, { headers: { apikey: supabase.key }, next: { revalidate: 300 }, signal: AbortSignal.timeout(3000) })
+    .then((r) => (r.ok ? r.json() : null))
+    .then(googleEnabled)
+    .catch(() => false);
+  return <ClientApp supabase={supabase} turnstileSiteKey={turnstileSiteKey} google={google} />;
 }
