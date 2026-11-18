@@ -36,6 +36,7 @@ A page ready to paste into the website: it answers what people search, sounds li
    - WordPress.com: a draft with WORDPRESS_COM_CREATE_DRAFT_POST. The owner publishes it in WordPress.
    - None connected: give the page in chat, and say the owner can connect Framer, Webflow or WordPress.com in Settings, Apps.
 7. Offer to mark the piece as in review with update_content_plan.
+8. Run review-the-design on the draft before you ask the owner to publish it.
 
 ## Output
 - The page in Markdown, ready to paste.

@@ -43,12 +43,12 @@ test("src/skills/index.ts is up to date with the SKILL.md files (run npm run ski
   assert.equal(readFileSync(new URL("../src/skills/index.ts", import.meta.url), "utf8"), renderIndex(files), "Run npm run skills after changing a SKILL.md");
 });
 
-test("every working teammate has 2 to 4 System skills, and every skill file is in a working teammate's folder", () => {
+test("every working teammate has 2 to 4 System skills (Hephaestus up to 8, with his design skills), and every skill file is in a working teammate's folder", () => {
   const files = readSkillFiles();
   for (const path of Object.keys(files)) assert.ok(workingAgents().includes(path.split("/")[0] as AgentKey), `${path} is not in a working teammate's folder`);
   for (const k of workingAgents()) {
     const n = SYSTEM_SKILLS.filter((s) => s.agent === k).length;
-    assert.ok(n >= 2 && n <= 4, `${AGENTS[k].god} has ${n} skills`);
+    assert.ok(n >= 2 && n <= (k === "web" ? 8 : 4), `${AGENTS[k].god} has ${n} skills`);
   }
 });
 
@@ -111,13 +111,13 @@ test("Iris, Hora, Hermes and Hestia each have their three skills; app skills say
 
 test("Hephaestus: build-on-framer and the page skills put their work on a connected site builder, never publish on their own, and never delete", () => {
   const web = SYSTEM_SKILLS.filter((s) => s.agent === "web");
-  assert.deepEqual(web.map((s) => s.name), ["build-on-framer", "improve-a-page", "plan-the-site", "write-a-page"]);
-  for (const n of ["build-on-framer", "improve-a-page", "write-a-page"]) {
+  for (const n of ["build-on-framer", "design-a-page", "improve-a-page", "match-the-brand", "plan-the-site", "review-the-design", "write-a-page"]) assert.ok(web.some((s) => s.name === n), n);
+  for (const n of ["build-on-framer", "design-a-page", "improve-a-page", "match-the-brand", "review-the-design", "write-a-page"]) {
     const s = web.find((x) => x.name === n)!;
     assert.ok(s.tools.includes("app_search_actions") && s.tools.includes("app_action"), `${n} works through the site builder`);
     assert.match(s.body, /in Settings, Apps/, `${n} says where to connect a site builder`);
-    assert.match(s.body, /approv/, `${n} says changes wait for the owner's OK`);
-    assert.match(s.body, /Never publish/, n);
+    assert.match(s.body, /approv|agreed/, `${n} says changes wait for the owner's OK`);
+    if (n !== "match-the-brand") assert.match(s.body, /Never publish/, n);
     assert.doesNotMatch(s.body, /\b(FRAMER|WEBFLOW|WORDPRESS_COM)_\w*(DELETE|REMOVE)/, `${n} never names a delete`);
     // Every action a skill names is one Hephaestus may run.
     for (const slug of s.body.match(/\b(?:FRAMER|WEBFLOW|WORDPRESS_COM)_[A-Z0-9_]+\b/g) ?? []) {
@@ -130,6 +130,38 @@ test("Hephaestus: build-on-framer and the page skills put their work on a connec
   assert.match(framer, /FRAMER_DEPLOY/);
   assert.match(framer, /Ask before you publish/);
   for (const n of ["write-a-page", "improve-a-page"]) assert.match(web.find((x) => x.name === n)!.body, /Framer.*\n.*Webflow.*\n.*WordPress\.com/, `${n} covers each builder`);
+});
+
+const body = (n: string) => SYSTEM_SKILLS.find((s) => s.agent === "web" && s.name === n)!.body;
+const steps = (n: string) => body(n).split("## Steps")[1].split("\n## ")[0];
+
+test("Hephaestus runs review-the-design before asking to publish in build-on-framer, write-a-page, improve-a-page and design-a-page", () => {
+  for (const n of ["build-on-framer", "write-a-page", "improve-a-page", "design-a-page"]) {
+    assert.match(steps(n), /^\d+\. Run review-the-design .*before you ask (the owner )?to publish/m, `${n} has a step that runs review-the-design before publishing`);
+  }
+  // In build-on-framer the review comes before the step that publishes.
+  const framer = steps("build-on-framer");
+  assert.ok(framer.indexOf("review-the-design") < framer.indexOf("FRAMER_PUBLISH"), "review before FRAMER_PUBLISH");
+});
+
+test("Hephaestus's design skills: the brand comes from real sources and is saved to memory, the review lists at most 7 problems and works from the page's structure", () => {
+  const brand = body("match-the-brand");
+  for (const t of ["search_knowledge", "remember", "FRAMER_GET_AGENT_CONTEXT"]) assert.ok(brand.includes(t), `match-the-brand uses ${t}`);
+  assert.match(brand, /Never invent a logo, colors or fonts/);
+  assert.match(brand, /Ask the owner/);
+  const design = body("design-a-page");
+  assert.match(design, /match-the-brand/, "design-a-page starts from the brand");
+  for (const w of ["Hero", "Proof", "Services", "How it works", "FAQ", "Book or contact", "phone first", "4.5 to 1", "44px", "gradients", "emoji"]) assert.ok(design.includes(w), `design-a-page covers ${w}`);
+  assert.match(design, /Never invent a logo or brand colors/);
+  const review = body("review-the-design");
+  assert.match(review, /up to 7 problems, biggest first/i);
+  assert.match(review, /one approval/);
+  assert.match(review, /can't see the page as a picture/, "says it has no screenshot");
+  for (const t of ["FRAMER_SERIALIZE_FOR_AGENT", "WEBFLOW_GET_PAGE_DOM", "alt text", "4.5 to 1", "44px", "60 characters", "155"]) assert.ok(review.includes(t), `review-the-design checks ${t}`);
+  // Every skill keeps the two rules: nothing goes live without the owner, and no invented facts.
+  for (const n of ["design-a-page", "match-the-brand", "review-the-design"]) assert.match(body(n), /Never invent facts, (prices, )?reviews/, n);
+  // The Apache 2.0 credit for the parts adapted from Anthropic's frontend-design skill stays in the header.
+  for (const n of ["design-a-page", "review-the-design"]) assert.match(readSkillFiles()[`web/${n}`], /^ {2}source: .*frontend-design.*Apache License 2\.0/m, n);
 });
 
 test("a teammate marked coming soon can't own a skill, and the / menu skips it", async () => {
