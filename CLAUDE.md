@@ -6,10 +6,10 @@ Morning Telos sells an AI team to small businesses. Each customer gets a workspa
 
 ## Layout
 
-- `web/`: **the new app** (being built). Next 16, React 19, Tailwind 4, TypeScript, Supabase (`db.morningtelos.com`), Stripe, Resend, Sentry, PostHog. One client app at `src/app/[[...slug]]`. At launch (phase 5) it replaces `app/`.
+- `web/`: **the app**, live at chat.morningtelos.com. Next 16, React 19, Tailwind 4, TypeScript, Supabase (`db.morningtelos.com`), Stripe, Resend, Sentry, PostHog. One client app at `src/app/[[...slug]]`.
   - `web/supabase/`: `schema.sql` plus numbered migrations (`001_*.sql`, `002_*.sql`, ...). Every customer table has `workspace_id` and RLS through `has_role(workspace_id, '<role>')`. Server-only tables have RLS on and no policies.
   - `web/tests/*.test.ts`: `node --test`.
-- `app/`: **the old app**, still live at chat.morningtelos.com for our own team until launch. Plain Node. Only fix real bugs there. Don't add features.
+- `app/`: **the old app**, replaced by `web/` at launch. It still runs on the server with its own data but has no public address. Plain Node. Don't change it.
 - `site/`: the marketing site (static HTML), built by `scripts/` from `content/`.
 - `docker-compose.yml`, `scripts/deploy.sh`: production for the old app and the site. Containers pull `main` from GitHub when they start, so anything merged to `main` under `app/` or `site/` goes live on the next restart.
 
