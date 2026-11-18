@@ -2,7 +2,7 @@
 // so changing a plan is a change to this file only (and a run of scripts/stripe-setup.mjs for a new price).
 // Shared by the server and the browser. Copied from Arrowsterr's plans.ts and Omniscient's planOf.
 
-export type PlanId = "trial" | "starter" | "pro";
+export type PlanId = "trial" | "starter" | "pro" | "internal";
 /** What a workspace has right now: a plan, or "expired" when the trial ended or the plan was canceled. */
 export type EffectivePlan = PlanId | "expired";
 export type Interval = "month";
@@ -21,10 +21,13 @@ export const PLANS: Record<PlanId, Plan> = {
   trial: { id: "trial", name: "Free trial", price: 0, aiAllowance: 5 },
   starter: { id: "starter", name: "Starter", price: 49, aiAllowance: 12 },
   pro: { id: "pro", name: "Pro", price: 149, aiAllowance: 50 },
+  // Our own workspaces. Never sold and never set by Stripe: staff set it in the database (015_internal_plan.sql).
+  // The allowance is high enough to never stop the team.
+  internal: { id: "internal", name: "Internal", price: 0, aiAllowance: 1_000_000 },
 };
 
 /** Plans sold by card. */
-export type PaidPlan = Exclude<PlanId, "trial">;
+export type PaidPlan = Exclude<PlanId, "trial" | "internal">;
 export const PAID_PLANS: PaidPlan[] = ["starter", "pro"];
 export const isPaidPlan = (p: unknown): p is PaidPlan => typeof p === "string" && (PAID_PLANS as string[]).includes(p);
 
@@ -60,12 +63,14 @@ export type PlanState = {
 /**
  * The plan a workspace is on right now. Same rule as effective_plan() in supabase/002_billing.sql
  * (tests/rls.test.ts checks they agree):
+ *   the internal plan is always internal (our own workspaces, no subscription);
  *   a paid plan with a trialing, active or past_due subscription is that plan;
  *   otherwise the trial, while it lasts;
  *   otherwise expired (the trial ended, or the plan was canceled).
  */
 export function effectivePlan(ws: PlanFields, now = Date.now()): PlanState {
   const status = ws.status ?? null;
+  if (ws.plan === "internal") return { plan: "internal", trial: false, daysLeft: 0, paid: true, status, aiAllowance: PLANS.internal.aiAllowance };
   if (isPaidPlan(ws.plan) && status && PAID_STATUSES.includes(status)) {
     return { plan: ws.plan, trial: false, daysLeft: 0, paid: true, status, aiAllowance: PLANS[ws.plan].aiAllowance };
   }

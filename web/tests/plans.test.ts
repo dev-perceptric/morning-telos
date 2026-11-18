@@ -14,6 +14,7 @@ test("prices and AI allowances match the plan", () => {
       ["trial", "Free trial", 0, 5],
       ["starter", "Starter", 49, 12],
       ["pro", "Pro", 149, 50],
+      ["internal", "Internal", 0, 1_000_000],
     ],
   );
   assert.deepEqual(PAID_PLANS, ["starter", "pro"]);
@@ -65,3 +66,16 @@ test("an unknown plan or missing fields never unlock a paid plan", () => {
   assert.equal(effectivePlan({}, now).plan, "expired");
   assert.equal(effectivePlan({ plan: "pro", status: null, trial_ends_at: null }, now).plan, "expired");
 });
+
+test("the internal plan is always in force, never expires and is never sold", async () => {
+  const { effectivePlan, isPaidPlan, PLANS } = await import("../src/lib/plans.ts");
+  const past = new Date(Date.now() - 864e5 * 30).toISOString();
+  for (const status of ["active", "canceled", "trialing", null]) {
+    const s = effectivePlan({ plan: "internal", status, trial_ends_at: past });
+    assert.equal(s.plan, "internal");
+    assert.equal(s.paid, true);
+    assert.equal(s.aiAllowance, PLANS.internal.aiAllowance);
+  }
+  assert.equal(isPaidPlan("internal"), false);
+});
+
