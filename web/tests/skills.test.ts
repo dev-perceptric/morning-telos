@@ -25,9 +25,12 @@ import {
   USE_SKILL,
   type SkillRow,
 } from "../src/lib/skills.ts";
+import { ACTION_TOOL, SEARCH_TOOL } from "../src/lib/composio/appAction.ts";
+import { APP_ACCESS } from "../src/lib/composio/catalog.ts";
 import { HIDDEN, toolName } from "../src/lib/productTools.ts";
 import { skillTool } from "../src/lib/skillTool.ts";
 import { AGENTS, workingAgents, type AgentKey } from "../src/lib/team.ts";
+import { withSoon } from "./soon.ts";
 
 const TOOLS = JSON.parse(readFileSync(new URL("./fixtures/product-tools.json", import.meta.url), "utf8")) as {
   arrowsterr: { read: string[]; write: string[] };
@@ -64,22 +67,53 @@ test("every System skill parses cleanly: its folder is its name, a title, and a 
   assert.equal(new Set(SYSTEM_SKILLS.map((s) => s.key)).size, SYSTEM_SKILLS.length);
 });
 
-test("System skills name only tools their teammate has: its products' tools from the fixture, or Morning Telos's own", () => {
+test("System skills name only tools their teammate has: its products' tools from the fixture, the app tools if it may use apps, or Morning Telos's own", () => {
   const product = { arrowsterr: [...TOOLS.arrowsterr.read, ...TOOLS.arrowsterr.write], capybaroar: [...TOOLS.capybaroar.read, ...TOOLS.capybaroar.write] };
   const writes = new Set([...TOOLS.arrowsterr.write, ...TOOLS.capybaroar.write]);
+  const appTools = [SEARCH_TOOL, ACTION_TOOL];
   for (const s of SYSTEM_SKILLS) {
     const a = AGENTS[s.agent!];
     const apps = a.apps.includes("*") ? (["arrowsterr", "capybaroar"] as const) : a.apps.filter((x): x is "arrowsterr" | "capybaroar" => x !== "*");
-    const allowed = new Set([...TOOLS.morningtelos, ...apps.flatMap((p) => product[p])]);
+    // app_search_actions and app_action only for a teammate in APP_ACCESS (src/lib/composio/catalog.ts).
+    const allowed = new Set([...TOOLS.morningtelos, ...apps.flatMap((p) => product[p]), ...(APP_ACCESS[s.agent!] ? appTools : [])]);
     for (const t of s.tools) assert.ok(allowed.has(t), `${s.key} names ${t}, which ${a.god} doesn't have`);
     if (a.readOnly) for (const t of s.tools) assert.ok(!writes.has(t), `${s.key}: ${a.god} only reads, but the skill names ${t}`);
     // Tools Morning Telos never gives an agent (src/lib/productTools.ts HIDDEN).
     for (const t of s.tools) for (const p of apps) assert.ok(!HIDDEN[p].has(t), `${s.key} names ${t}, which agents never get`);
     // Each tool in the header is used in the steps, and each tool the steps lean on is in the header.
     for (const t of s.tools) assert.ok(s.body.includes(t), `${s.key} lists ${t} but never says how to use it`);
-    const known = new Set([...product.arrowsterr, ...product.capybaroar, ...TOOLS.morningtelos]);
+    const known = new Set([...product.arrowsterr, ...product.capybaroar, ...TOOLS.morningtelos, ...appTools]);
     for (const w of s.body.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? []) if (known.has(w)) assert.ok(s.tools.includes(w), `${s.key} uses ${w} but doesn't list it in tools`);
   }
+});
+
+test("Iris, Hora, Hermes and Hestia each have their three skills; app skills say where to connect and that changes wait", () => {
+  const names = (k: AgentKey) => SYSTEM_SKILLS.filter((s) => s.agent === k).map((s) => s.name);
+  assert.deepEqual(names("email"), ["welcome-series", "win-back", "write-a-campaign"]);
+  assert.deepEqual(names("forms"), ["book-a-meeting", "reminder-emails", "weekly-schedule"]);
+  assert.deepEqual(names("sales"), ["follow-up-new-leads", "quote-follow-up", "update-the-crm"]);
+  assert.deepEqual(names("support"), ["answer-an-email", "build-an-faq", "daily-inbox-triage"]);
+  for (const s of SYSTEM_SKILLS.filter((x) => ["email", "forms", "sales", "support"].includes(x.agent!))) {
+    assert.ok(s.tools.includes("app_search_actions") && s.tools.includes("app_action"), `${s.key} works through the apps`);
+    assert.match(s.body, /in Settings, Apps/, `${s.key} says where to connect an app`);
+    assert.match(s.body, /approv|Read only\./, `${s.key} says what waits for the owner's OK, or that it only reads`);
+    assert.ok(!/delete/i.test(s.body) || /Never delete|never.*delete/i.test(s.body) || /close, delete or merge/.test(s.body), `${s.key} never deletes`);
+  }
+  // Hestia's skills that answer customers hand refunds, legal and medical questions and angry customers to the owner.
+  for (const n of ["answer-an-email", "daily-inbox-triage"]) {
+    const s = SYSTEM_SKILLS.find((x) => x.agent === "support" && x.name === n)!;
+    assert.match(s.body, /refund/i, n);
+    assert.match(s.body, /legal/, n);
+    assert.match(s.body, /medical/, n);
+    assert.match(s.body, /angry/, n);
+  }
+});
+
+test("a teammate marked coming soon can't own a skill, and the / menu skips it", async () => {
+  await withSoon("sales", () => {
+    assert.deepEqual(cleanSkill({ agent: "sales", name: "a", description: "d", body: "b" }), { ok: false, error: "Pick who uses this skill." });
+    assert.equal(menuAgent("@Hermes and @Aphrodite /", "chief"), "social");
+  });
 });
 
 test("parseSkill: the header, the body without it, and the title; a file with no header is all body", () => {
@@ -130,7 +164,7 @@ test("cleanSkill: a teammate who works or everyone, a name made into a slug, a d
     value: { agent: null, name: "welcome-new-customers", description: "Use it when a new customer joins.", body: "Step 1\nStep 2" },
   });
   assert.equal(cleanSkill({ agent: "social", name: "a", description: "d", body: "b" }).ok, true);
-  assert.deepEqual(cleanSkill({ agent: "sales", name: "a", description: "d", body: "b" }), { ok: false, error: "Pick who uses this skill." });
+  assert.equal(cleanSkill({ agent: "sales", name: "a", description: "d", body: "b" }).ok, true, "Hermes takes work now");
   assert.deepEqual(cleanSkill({ agent: "zeus", name: "a", description: "d", body: "b" }), { ok: false, error: "Pick who uses this skill." });
   assert.deepEqual(cleanSkill({ name: "!!!", description: "d", body: "b" }), { ok: false, error: "Give the skill a name." });
   assert.deepEqual(cleanSkill({ name: "a", description: " ", body: "b" }), { ok: false, error: "Say when the team should use it." });
@@ -190,8 +224,8 @@ test("the / menu: the query after /, whose skills to show, matches best first, a
   assert.equal(slashQuery("https://x.com/"), null);
   assert.equal(slashQuery("/plan now"), null, "the cursor left the word");
   assert.equal(menuAgent("hi", "chief"), "chief");
-  assert.equal(menuAgent("@Hermes and @Aphrodite /", "chief"), "social", "the first tagged teammate who can take work");
-  assert.equal(menuAgent("@Hermes /", "seo"), "seo");
+  assert.equal(menuAgent("@Hermes and @Aphrodite /", "chief"), "sales", "the first tagged teammate");
+  assert.equal(menuAgent("@Hestia /", "seo"), "support");
   const list = skillsFor("social", []);
   assert.deepEqual(
     matchSkills(list, "post").map((s) => s.name),

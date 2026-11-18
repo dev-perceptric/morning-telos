@@ -21,7 +21,7 @@ export type KnowledgeDoc = {
 
 /**
  * Who a doc can be for. Keys match the old app's roster (app/lib/agents.js) and the agent loop's agentKey.
- * The four marked soon can't take work yet, but a doc saved for them waits until they can.
+ * Every teammate can take work now (none is marked soon), so a doc for any of them is read the next time they answer.
  */
 export const DOC_AGENTS: { key: string; name: string; job: string }[] = [
   { key: "chief", name: "Athena", job: "Chief of staff" },

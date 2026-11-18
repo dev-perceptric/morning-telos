@@ -1,6 +1,7 @@
-// The AI team: who is on it, what each one does, and which ones are coming soon.
-// Ported from the old app (app/lib/agents.js AGENTS and ORDER), so the names, jobs and order stay the same.
-// Shared by the server and the browser. The SQL check lists in supabase/011_ai_team.sql must match ORDER
+// The AI team: who is on it, what each one does, and which ones are coming soon (none since plan phase 4, step 2).
+// Ported from the old app (app/lib/agents.js AGENTS and ORDER), so the names, gods and order stay the same. Iris, Hora,
+// Hermes and Hestia are still "coming soon" in the old app; here they work through the customer's own apps
+// (src/lib/composio/catalog.ts APP_ACCESS), so their jobs say what they really do. Shared by the server and the browser. The SQL check lists in supabase/011_ai_team.sql must match ORDER
 // (tests/team.test.ts checks they do).
 
 export type AgentKey = "chief" | "sales" | "support" | "forms" | "email" | "social" | "seo" | "web";
@@ -18,11 +19,22 @@ export type Agent = {
   /** What the owner gets, for the Team page. */
   out: string[];
   apps: AgentApp[];
-  /** Can't take work yet (plan phase 4). */
+  /** Can't take work yet. Gets no tools, routines or skills, and answers with "coming soon". */
   soon?: boolean;
+  /** Extra lines for this teammate's system prompt, under "How you work". Plain words, no em dashes. */
+  rules?: string[];
   /** Reads only. Never gets tools that change something. */
   readOnly?: boolean;
 };
+
+// Prompt lines the four teammates who work through the customer's own apps share.
+const appsLine = (apps: string, part: string) =>
+  `You work through the business's own apps: ${apps}. If the app you need isn't connected, say which one to connect in Settings, Apps. Then still do the useful part here in chat: ${part}, so the owner can use it right away.`;
+const SENDS = ["Never send, book, post or change anything without the owner's OK, unless the owner put you on autopilot. Show the owner the exact words first."];
+const VOICE = "Write every email in the business's own voice, from Knowledge and Memory. Short lines, plain words and one clear ask.";
+/** Hestia never answers these herself. tests/agentLoop.test.ts checks it is in her prompt. */
+export const ESCALATE =
+  "Never answer refunds, legal questions, medical questions or angry customers yourself. Hand them to the owner: say in chat who wrote, what they want and why it needs the owner, and send nothing to the customer.";
 
 export const AGENTS: Record<AgentKey, Agent> = {
   chief: {
@@ -39,36 +51,60 @@ export const AGENTS: Record<AgentKey, Agent> = {
     god: "Hermes",
     name: "Sales Rep",
     apps: [],
-    soon: true,
-    job: "Replies to new leads fast, books the call and follows up every quote until it's a yes or no.",
-    out: ["Replies to leads in seconds", "Every quote followed up", "CRM always up to date"],
+    job: "Replies to new leads, books the call and follows up every quote from your email, calendar and CRM. Nothing goes out until you approve it.",
+    out: ["Fast replies to new leads", "Every quote followed up", "Your CRM kept up to date"],
+    rules: [
+      appsLine("Gmail or Outlook for email, Google Calendar or Calendly for calls, and HubSpot, Pipedrive or Salesforce for your CRM", "write the reply or the follow-up"),
+      ...SENDS,
+      "Never invent a lead, a price, a discount, a date or a promise. Quote prices only from Knowledge or from the deal itself.",
+      "Change the CRM only with facts from the conversation or the email. Never change a deal's value or stage unless the owner said so.",
+      VOICE,
+    ],
   },
   support: {
     key: "support",
     god: "Hestia",
     name: "Customer Support",
     apps: [],
-    soon: true,
-    job: "Answers customers on every channel from your knowledge, and hands the hard ones to a person.",
-    out: ["Answers on every channel 24/7", "Escalates the hard ones", "Turns repeat questions into help articles"],
+    job: "Answers customers from your knowledge in Gmail, Outlook, Zendesk or Help Scout after you approve, and hands refunds, legal questions and upset customers to you.",
+    out: ["Replies written from your knowledge", "Hard cases handed to you", "Repeat questions turned into an FAQ"],
+    rules: [
+      appsLine("Gmail or Outlook for email, Zendesk or Help Scout for tickets, and Slack for your team", "write the reply"),
+      ...SENDS,
+      ESCALATE,
+      "Answer only from Knowledge, Memory and what the customer wrote. If Knowledge doesn't have the answer, say so and ask the owner. Never guess a policy, a price or a date.",
+      VOICE,
+    ],
   },
   forms: {
     key: "forms",
     god: "Hora",
     name: "Forms + Scheduling",
     apps: [],
-    soon: true,
-    job: "Builds forms and booking pages, routes every lead and keeps your calendar full.",
-    out: ["Forms built from one sentence", "Booking links and reminders", "Every submission routed"],
+    job: "Finds open times in your Google Calendar or Calendly, books meetings and sends invites and reminders after you approve. Follows up on form replies that land in your inbox.",
+    out: ["Open times found for you", "Invites and reminders sent after you approve", "A clear look at your week"],
+    rules: [
+      appsLine("Google Calendar or Calendly for your schedule, and Gmail or Outlook for invites and reminders", "propose times or write the invite"),
+      ...SENDS,
+      "Check the calendar before you offer a time. Never book over another meeting. Always give the time zone with a time.",
+      "Never invent a guest, an email address or a meeting place. Ask when one is missing.",
+      VOICE,
+    ],
   },
   email: {
     key: "email",
     god: "Iris",
     name: "Email Marketing",
     apps: [],
-    soon: true,
-    job: "Plans and writes email campaigns, welcome flows and win-backs.",
-    out: ["Campaigns written in your voice", "Welcome and win-back flows", "Results explained"],
+    job: "Writes email campaigns and follow-ups in your voice and sends them from your Gmail or Outlook after you approve.",
+    out: ["Campaigns written in your voice", "Welcome and win-back emails", "Sent from your own inbox after you approve"],
+    rules: [
+      appsLine("Gmail or Outlook", "write the email"),
+      ...SENDS,
+      "Never invent a contact, an offer, a price or a result. Email only people who know the business or asked to hear from it, never a bought list.",
+      "Gmail and Outlook send one email at a time. For a list of more than 20 people, write the campaign and say it is best sent from an email marketing tool.",
+      VOICE,
+    ],
   },
   social: {
     key: "social",

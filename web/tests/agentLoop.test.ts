@@ -23,7 +23,9 @@ import {
 } from "../src/lib/agentLoop.ts";
 import { CAP_MESSAGES, costOf } from "../src/lib/meter.ts";
 import { MODELS } from "../src/lib/models.ts";
-import { AGENTS, type AgentKey } from "../src/lib/team.ts";
+import { APP_ACCESS, appName } from "../src/lib/composio/catalog.ts";
+import { AGENTS, ESCALATE, ORDER, workingAgents, type AgentKey } from "../src/lib/team.ts";
+import { withSoon } from "./soon.ts";
 
 type Params = Anthropic.Beta.MessageCreateParamsNonStreaming;
 type Block = Anthropic.Beta.BetaContentBlock;
@@ -124,11 +126,12 @@ test("no tag: Athena answers with a cached prompt, medium effort and the refusal
 });
 
 test("the system prompt keeps the old app's rules: plain English, 9th grade, no em dashes, teammates listed", () => {
-  const s = systemPrompt({ name: "Ana's Bakery", website: null }, "seo", { tools: false, missing: [], teammates: ["chief", "social", "web"] });
+  const s = systemPrompt({ name: "Ana's Bakery", website: null }, "seo", { tools: false, missing: [], teammates: ["chief", "sales", "social", "web"] });
   assert.match(s, /^You are Artemis, the SEO Specialist on the AI team of Ana's Bakery\. Gets you found/);
   assert.match(s, /plain English at a 9th grade level\. Short sentences\. No em dashes\./);
   assert.match(s, /- Athena: Chief of Staff\. Runs the owner's day/);
-  assert.match(s, /- Hermes: Sales Rep\. \(Coming soon, can't take work yet\.\)/);
+  assert.match(s, /- Hermes: Sales Rep\. Replies to new leads/);
+  assert.match(s, /- Hestia: Customer Support\. \(Paused right now\.\)/);
   assert.match(s, /no tools connected yet/);
   assert.match(s, /call handoff/);
   assert.doesNotMatch(s, /[—–]/);
@@ -138,6 +141,37 @@ test("the system prompt keeps the old app's rules: plain English, 9th grade, no 
   assert.match(withTools, /saved for the owner's approval/);
   assert.match(withTools, /Not available right now: Social media \(temporarily unavailable\)/);
   assert.doesNotMatch(withTools, /call handoff/);
+});
+
+test("a coming soon teammate is listed as one in the prompt", async () => {
+  await withSoon("sales", () => {
+    const s = systemPrompt({ name: "B", website: null }, "seo", { tools: false, missing: [], teammates: ["chief"] });
+    assert.match(s, /- Hermes: Sales Rep\. \(Coming soon, can't take work yet\.\)/);
+  });
+});
+
+test("Iris, Hora, Hermes and Hestia: their prompts name their apps, where to connect them, approvals and no invented facts", () => {
+  for (const k of ["email", "forms", "sales", "support"] as AgentKey[]) {
+    const s = systemPrompt({ name: "Ana's Bakery", website: null }, k, { tools: true, writes: "ask", missing: [], teammates: workingAgents().filter((x) => x !== k) });
+    const access = APP_ACCESS[k]!;
+    assert.ok(Array.isArray(access.toolkits));
+    for (const t of access.toolkits as string[]) assert.ok(s.includes(appName(t)), `${k}'s prompt names ${appName(t)}`);
+    assert.match(s, /If the app you need isn't connected, say which one to connect in Settings, Apps\. Then still do the useful part here in chat/, k);
+    assert.match(s, /Never send, book, post or change anything without the owner's OK, unless the owner put you on autopilot\./, k);
+    assert.match(s, /Never invent/, k);
+    assert.match(s, /in the business's own voice, from Knowledge and Memory/, k);
+    assert.doesNotMatch(s, /[—–]/, k);
+    // The rest of the team is listed as working, so a handoff makes sense.
+    for (const o of ORDER.filter((x) => x !== k)) assert.match(s, new RegExp(`- ${AGENTS[o].god}: ${AGENTS[o].name.replace("+", "\\+")}\\. ${AGENTS[o].job.slice(0, 20)}`), `${k} lists ${o}`);
+  }
+  // Hestia hands refunds, legal, medical and angry customers to the owner. The others don't carry that line.
+  const hestia = systemPrompt({ name: "B", website: null }, "support", { tools: true, missing: [], teammates: [] });
+  assert.ok(hestia.includes(ESCALATE));
+  assert.match(ESCALATE, /refunds, legal questions, medical questions or angry customers/);
+  assert.match(ESCALATE, /send nothing to the customer/);
+  for (const k of ["email", "forms", "sales", "chief", "social"] as AgentKey[]) assert.ok(!systemPrompt({ name: "B", website: null }, k, { tools: true, missing: [], teammates: [] }).includes(ESCALATE), k);
+  // Athena and the product teammates have no app lines.
+  for (const k of ["chief", "social", "seo", "web"] as AgentKey[]) assert.doesNotMatch(systemPrompt({ name: "B", website: null }, k, { tools: true, missing: [], teammates: [] }), /Settings, Apps/, k);
 });
 
 test("the handoff tool lists only the teammates given", () => {
@@ -188,7 +222,7 @@ test("tool_use handoff: Athena hands to Artemis, who runs next and sees the note
   assert.match(String(seen[0].content), /How are we doing online\?\n\nAthena: I asked Artemis to check\.\n\nAthena handed this to Artemis: Check our AI visibility this week\./);
   // Artemis can hand back to Athena but not to herself.
   const handoff = calls[2].params.tools!.find((t) => (t as { name: string }).name === "handoff") as Anthropic.Beta.BetaTool;
-  assert.deepEqual((handoff.input_schema.properties as { teammate: { enum: string[] } }).teammate.enum, ["Athena", "Aphrodite", "Hephaestus"]);
+  assert.deepEqual((handoff.input_schema.properties as { teammate: { enum: string[] } }).teammate.enum, ["Athena", "Hermes", "Hestia", "Hora", "Iris", "Aphrodite", "Hephaestus"]);
   assert.deepEqual(
     r.said.map((m) => [m.role, m.agent]),
     [
@@ -209,31 +243,67 @@ test("tool_use handoff: Athena hands to Artemis, who runs next and sees the note
 });
 
 test("a handoff to itself, a coming soon teammate or a paused one is refused, and nobody else runs", async () => {
+  await withSoon("sales", async () => {
+    const { client, calls } = fakeClaude({
+      chief: [
+        {
+          content: [toolUse("a", "handoff", { teammate: "Athena", note: "x" }), toolUse("b", "handoff", { teammate: "Hermes", note: "x" }), toolUse("c", "handoff", { teammate: "Aphrodite", note: "x" }), toolUse("d", "handoff", { teammate: "Artemis", note: " " })],
+          stop_reason: "tool_use",
+        },
+        say("OK."),
+      ],
+    });
+    const r = await turn("Do it all", { client, store: memoryStore({ prefs: { social: { enabled: false } } }) });
+    assert.deepEqual(
+      calls.map((c) => c.agent),
+      ["chief", "chief"],
+    );
+    const results = calls[1].params.messages.at(-1)!.content as Anthropic.Beta.BetaToolResultBlockParam[];
+    assert.deepEqual(
+      results.map((x) => [x.tool_use_id, x.is_error]),
+      [
+        ["a", true],
+        ["b", true],
+        ["c", true],
+        ["d", true],
+      ],
+    );
+    assert.equal(r.events.filter((e) => e.type === "handoff").length, 0);
+  });
+});
+
+test("Athena hands work to Iris, Hora, Hermes and Hestia, who run next with the note", async () => {
   const { client, calls } = fakeClaude({
     chief: [
       {
-        content: [toolUse("a", "handoff", { teammate: "Athena", note: "x" }), toolUse("b", "handoff", { teammate: "Hermes", note: "x" }), toolUse("c", "handoff", { teammate: "Aphrodite", note: "x" }), toolUse("d", "handoff", { teammate: "Artemis", note: " " })],
+        content: [toolUse("a", "handoff", { teammate: "Hermes", note: "Follow up on the quote to Bob." }), toolUse("b", "handoff", { teammate: "Hestia", note: "Answer Ana's question." }), toolUse("c", "handoff", { teammate: "Iris", note: "Write the welcome email." })],
         stop_reason: "tool_use",
       },
-      say("OK."),
+      say("Handed off."),
     ],
+    sales: [say("Follow-up drafted.")],
+    support: [say("Reply drafted.")],
+    email: [say("Welcome email drafted.")],
   });
-  const r = await turn("Do it all", { client, store: memoryStore({ prefs: { social: { enabled: false } } }) });
+  const r = await turn("Do the follow-ups", { client });
+  const handoff = calls[0].params.tools!.find((t) => (t as { name: string }).name === "handoff") as Anthropic.Beta.BetaTool;
+  assert.deepEqual((handoff.input_schema.properties as { teammate: { enum: string[] } }).teammate.enum, ["Hermes", "Hestia", "Hora", "Iris", "Aphrodite", "Artemis", "Hephaestus"]);
+  const results = calls[1].params.messages.at(-1)!.content as Anthropic.Beta.BetaToolResultBlockParam[];
+  assert.deepEqual(results.map((x) => x.is_error), [undefined, undefined, undefined]);
   assert.deepEqual(
     calls.map((c) => c.agent),
-    ["chief", "chief"],
+    ["chief", "chief", "sales", "support", "email"],
   );
-  const results = calls[1].params.messages.at(-1)!.content as Anthropic.Beta.BetaToolResultBlockParam[];
+  assert.match(String(lastUser(calls[2].params).content), /Athena handed this to Hermes: Follow up on the quote to Bob\./);
+  assert.match(String(calls[2].params.system && (calls[2].params.system as { text: string }[])[0].text), /^You are Hermes, the Sales Rep/);
   assert.deepEqual(
-    results.map((x) => [x.tool_use_id, x.is_error]),
-    [
-      ["a", true],
-      ["b", true],
-      ["c", true],
-      ["d", true],
-    ],
+    r.events.filter((e) => e.type === "handoff").map((e) => (e as { to: AgentKey }).to),
+    ["sales", "support", "email"],
   );
-  assert.equal(r.events.filter((e) => e.type === "handoff").length, 0);
+  // Hora can take one too.
+  const h = fakeClaude({ chief: [{ content: [toolUse("d", "handoff", { teammate: "Hora", note: "Find times." })], stop_reason: "tool_use" }, say("OK.")], forms: [say("Three times found.")] });
+  const r2 = await turn("Book a call", { client: h.client });
+  assert.deepEqual(r2.said.filter((m) => m.role === "agent").map((m) => m.agent), ["chief", "forms"]);
 });
 
 test("@mentions: tagged teammates answer in the order they were tagged, once each; unknown names are ignored", async () => {
@@ -259,17 +329,30 @@ test("@mentions: tagged teammates answer in the order they were tagged, once eac
 });
 
 test(`at most ${MAX_RUNS} replies a turn, then a note that the team stopped`, async () => {
-  const { client, calls } = fakeClaude({});
+  const { client, calls } = fakeClaude({ sales: [say("Hi from Hermes.")], support: [say("Hi from Hestia.")], forms: [say("Hi from Hora.")], email: [say("Hi from Iris.")] });
   const r = await turn("@Hermes @Hestia @Hora @Iris @Athena hello", { client });
-  assert.equal(calls.length, 0, "Athena is fifth, so she never runs");
+  assert.deepEqual(
+    calls.map((c) => c.agent),
+    ["sales", "support", "forms", "email"],
+    "Athena is fifth, so she never runs",
+  );
   assert.deepEqual(
     r.said.map((m) => m.agent),
     ["sales", "support", "forms", "email", "chief"],
   );
-  assert.equal(r.said[0].content, TEAM_MESSAGES.soon("sales"));
-  assert.match(r.said[0].content, /Hermes is coming soon\. For now, ask Athena, Aphrodite, Artemis or Hephaestus\./);
   assert.equal(r.said[4].content, TEAM_MESSAGES.pausedTurn);
   assert.equal(r.said[4].role, "note");
+});
+
+test("a coming soon teammate says so without calling Claude, naming who can help", async () => {
+  await withSoon("sales", async () => {
+    const { client, calls } = fakeClaude({});
+    const r = await turn("@Hermes hello", { client });
+    assert.equal(calls.length, 0);
+    assert.equal(r.said[0].content, TEAM_MESSAGES.soon("sales"));
+    assert.match(r.said[0].content, /^Hermes is coming soon\. For now, ask Athena, Hestia, Hora, Iris, Aphrodite, Artemis or Hephaestus\.$/);
+    assert.deepEqual(r.said[0].meta, { soon: true });
+  });
 });
 
 test("a chain of handoffs stops at 4 replies", async () => {

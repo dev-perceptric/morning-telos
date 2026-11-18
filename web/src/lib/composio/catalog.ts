@@ -23,7 +23,7 @@ export type AppEntry = ComposioTool & {
   group: AppGroup;
   /** One short line on the Apps page: what the team does with it. */
   blurb: string;
-  /** The teammates this app is for, once they go live on Composio (plan phase 4, step 2). Not access: see APP_ACCESS. */
+  /** The teammates this app is for, shown on the Apps page. Not access: see APP_ACCESS (tests/apps.test.ts keeps them the same). */
   forAgents: AgentKey[];
 };
 
@@ -33,8 +33,8 @@ const oauth = (toolkit: string) => ({ toolkit, scheme: "OAUTH2" as const, manage
 const ownApp = (toolkit: string) => ({ toolkit, scheme: "OAUTH2" as const, managed: false });
 
 export const APPS: AppEntry[] = [
-  { ...oauth("gmail"), name: "Gmail", group: "mail", blurb: "Read and answer your email, and send what you approve.", forAgents: ["email", "sales", "support"] },
-  { ...oauth("outlook"), name: "Outlook", group: "mail", blurb: "Read and answer your email, and send what you approve.", forAgents: ["email", "sales", "support"] },
+  { ...oauth("gmail"), name: "Gmail", group: "mail", blurb: "Read and answer your email, and send what you approve.", forAgents: ["sales", "support", "forms", "email"] },
+  { ...oauth("outlook"), name: "Outlook", group: "mail", blurb: "Read and answer your email, and send what you approve.", forAgents: ["sales", "support", "forms", "email"] },
   { ...oauth("googlecalendar"), name: "Google Calendar", group: "calendar", blurb: "See when you're free and add the meetings you approve.", forAgents: ["forms", "sales"] },
   { ...oauth("calendly"), name: "Calendly", group: "calendar", blurb: "See your bookings and share your booking links.", forAgents: ["forms", "sales"] },
   { ...oauth("hubspot"), name: "HubSpot", group: "crm", blurb: "Look up contacts and deals, and keep them up to date.", forAgents: ["sales"] },
@@ -56,11 +56,19 @@ export const appLogo = (toolkit: string) => `https://logos.composio.dev/api/${en
 /**
  * Which connected apps each teammate may use, in one place. "*" is every app. `reads`: only actions that read.
  * A teammate that is coming soon gets nothing, whatever this says (appsFor).
- * For now only Athena reads. Plan phase 4, step 2 turns Iris, Hora, Hermes and Hestia on and gives each its apps:
- * set `email`, `forms`, `sales` and `support` here (from APPS[].forAgents), and drop `soon` in src/lib/team.ts.
+ * Athena reads every app. Iris, Hora, Hermes and Hestia (plan phase 4, step 2) read and change their own apps; every
+ * change waits for the owner's approval below autopilot (src/lib/composio/appAction.ts), and runApproval checks again.
  */
 export const APP_ACCESS: Partial<Record<AgentKey, { toolkits: "*" | readonly string[]; reads?: boolean }>> = {
   chief: { toolkits: "*", reads: true },
+  // Email campaigns and follow-ups, sent from the owner's own inbox.
+  email: { toolkits: ["gmail", "outlook"] },
+  // Open times, bookings, and the invites and reminders that go with them.
+  forms: { toolkits: ["googlecalendar", "calendly", "gmail", "outlook"] },
+  // Leads and quotes: email, booking the call, and the CRM.
+  sales: { toolkits: ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce"] },
+  // Customer email and tickets, and the team's chat for handing things over.
+  support: { toolkits: ["gmail", "outlook", "slack", "zendesk", "help_scout"] },
 };
 
 /** The apps a teammate may use, and whether only to read. Nothing for a teammate that is coming soon. */
@@ -69,6 +77,12 @@ export function appsFor(agent: AgentKey, soon: boolean): { toolkits: string[]; r
   if (!a || soon) return { toolkits: [], reads: true };
   const toolkits = a.toolkits === "*" ? APPS.map((x) => x.toolkit) : a.toolkits.filter(isToolkit);
   return { toolkits, reads: a.reads === true };
+}
+
+/** True when a teammate may change something in a connected app (it gets the Ask me first or Autopilot setting). */
+export function changesApps(agent: AgentKey, soon = false): boolean {
+  const a = appsFor(agent, soon);
+  return a.toolkits.length > 0 && !a.reads;
 }
 
 // ─────────────── words ───────────────
