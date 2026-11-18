@@ -45,3 +45,19 @@ services:
       - traefik.http.routers.morningtelos-new.tls.certresolver=letsencrypt
       - traefik.http.routers.morningtelos-new.service=morningtelos-web-new
       - traefik.http.services.morningtelos-web-new.loadbalancer.server.port=3000
+
+  # Runs the job worker every minute (sign-up setup, key revokes, brand removal, the daily trial check).
+  # It calls the app over the project's own network, so the worker URL is never public to the cron.
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    depends_on: [web-new]
+    environment:
+      CRON_SECRET: ${CRON_SECRET:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        while true; do
+        wget -q -T 280 -O /dev/null --header "Authorization: Bearer $$CRON_SECRET" --post-data "" http://web-new:3000/api/worker || echo "worker call failed";
+        sleep 60;
+        done
