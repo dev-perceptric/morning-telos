@@ -1,7 +1,7 @@
 // Pages inside the one client app (src/app/[[...slug]]). The address bar holds the page, so links and Back work.
 import { inviteTokenFromPath } from "./workspace.ts";
 
-export type SettingsTab = "general" | "members" | "social" | "skills";
+export type SettingsTab = "general" | "members" | "social" | "apps" | "skills";
 export type Route =
   | { page: "home" }
   | { page: "thread"; id: string | null }
@@ -19,6 +19,7 @@ export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "general", label: "General" },
   { id: "members", label: "Members" },
   { id: "social", label: "Social accounts" },
+  { id: "apps", label: "Apps" },
   { id: "skills", label: "Skills" },
 ];
 
@@ -29,6 +30,7 @@ export function parseRoute(path: string): Route {
   if (p === "/settings" || p === "/settings/general") return { page: "settings", tab: "general" };
   if (p === "/settings/members") return { page: "settings", tab: "members" };
   if (p === "/settings/social") return { page: "settings", tab: "social" };
+  if (p === "/settings/apps") return { page: "settings", tab: "apps" };
   if (p === "/settings/skills") return { page: "settings", tab: "skills" };
   if (p === "/team") return { page: "team" };
   // A new chat is /chat until its first reply names the thread, then /chat/<thread id>.

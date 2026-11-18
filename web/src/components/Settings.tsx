@@ -1,11 +1,12 @@
 "use client";
 
-// Workspace settings: the business details, members and invites, social accounts, and deleting the workspace.
+// Workspace settings: the business details, members and invites, social accounts, apps, and deleting the workspace.
 // Copied from Arrowsterr's SettingsPage.tsx, MembersPage.tsx and WorkspaceSettings.tsx (TimezoneSetting), trimmed down.
 // Row level security in Supabase decides what each person may change. These screens only hide what they can't do.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AppsSettings } from "./Apps";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/routes";
 import { ASSIGNABLE, can, cleanSettings, deleteConfirmMatches, inviteLink, memberActions, roleLabel, ROLES, type MemberRow, type Role } from "@/lib/workspace";
 import { callApi, message, navigate } from "./nav";
@@ -64,6 +65,8 @@ export function SettingsPage({
           </>
         ) : tab === "members" ? (
           <MembersSettings key={ws.id} sb={sb} ws={ws} userId={userId} onGone={onGone} />
+        ) : tab === "apps" ? (
+          <AppsSettings key={`apps-${ws.id}`} sb={sb} ws={ws} />
         ) : tab === "skills" ? (
           <SkillsSettings key={`skills-${ws.id}`} sb={sb} ws={ws} />
         ) : (

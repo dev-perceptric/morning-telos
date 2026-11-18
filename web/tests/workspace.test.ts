@@ -39,6 +39,8 @@ test("which roles can do which workspace action", () => {
     editSkills: ["owner", "admin"],
     deleteMemory: ["owner", "admin", "editor", "viewer"],
     approve: ["owner", "admin", "editor"],
+    viewApps: ["owner", "admin", "editor", "viewer"],
+    connectApps: ["owner", "admin"],
   };
   assert.deepEqual(Object.keys(expected).sort(), Object.keys(NEEDS).sort());
   for (const [action, allowed] of Object.entries(expected) as [Action, Role[]][]) {
@@ -112,6 +114,8 @@ test("page routes", () => {
   assert.deepEqual(parseRoute("/routines"), { page: "routines" });
   assert.deepEqual(parseRoute("/memory/"), { page: "memory" });
   assert.deepEqual(parseRoute("/settings/skills"), { page: "settings", tab: "skills" });
+  assert.deepEqual(parseRoute("/settings/apps"), { page: "settings", tab: "apps" });
+  assert.equal(routePath({ page: "settings", tab: "apps" }), "/settings/apps");
   assert.deepEqual(parseRoute("/nope"), { page: "home" });
   const token = "b".repeat(64);
   assert.deepEqual(parseRoute(`/invite/${token}`), { page: "invite", token });

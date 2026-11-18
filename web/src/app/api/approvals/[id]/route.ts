@@ -1,13 +1,12 @@
 import * as Sentry from "@sentry/nextjs";
 import { approvalId, decide, readDecision } from "@/lib/approvals";
-import { runApproval } from "@/lib/productTools";
 import { adminClient, roleGate } from "@/lib/serverAuth";
-import { approvalStore, productDeps } from "@/lib/teamTools";
+import { approvalStore, runTeamApproval } from "@/lib/teamTools";
 import { NEEDS } from "@/lib/workspace";
 
 // Approve or deny one change the AI team prepared (editors and up). Body: { workspaceId, action: "approve" | "deny",
 // input? }. `input` replaces the saved details when the person edited them. Approving runs the change right away with
-// the workspace's brand key, saves the result, and posts a short note back in the chat it came from.
+// the workspace's brand key (or in the customer's own app through Composio), saves the result, and posts a short note back in the chat it came from.
 // Approvals are read by the screens straight from Supabase (row level security: members read, supabase/013_approvals.sql).
 export const dynamic = "force-dynamic";
 // A product call may take up to 90 seconds (src/lib/mcpClient.ts).
@@ -35,12 +34,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (!db) return reply({ error: "Add SUPABASE_SECRET_KEY to the server's settings." }, 500);
 
   const store = approvalStore(db);
-  const deps = productDeps(db, log);
+  const run = runTeamApproval(db, log);
   try {
     const out = await decide(id, who.userId, read.value, {
       load: (i) => store.load(ws, i),
       claim: (i, by, d) => store.claim(ws, i, by, d),
-      run: (ap) => runApproval(ap, deps),
+      run,
       finish: (i, status, result) => store.finish(ws, i, status, result),
       note: async (ap, text, status) => {
         if (!ap.thread_id) return;

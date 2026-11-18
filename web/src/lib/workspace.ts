@@ -37,6 +37,8 @@ export const NEEDS = {
   editSkills: "admin",
   deleteMemory: "viewer",
   approve: "editor",
+  viewApps: "viewer",
+  connectApps: "admin",
 } as const satisfies Record<string, Role>;
 export type Action = keyof typeof NEEDS;
 

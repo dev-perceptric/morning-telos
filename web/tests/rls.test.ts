@@ -1828,3 +1828,57 @@ test("memories: members read and delete, only the server writes, the same fact o
   await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
   assert.equal((await db.query("select count(*)::int n from memories where workspace_id = $1", [ws])).rows[0].n, 0);
 });
+
+// ─────────────── P4.1: the customer's own apps (016_app_connections.sql) ───────────────
+
+test("app_connections: members read which apps are connected and their labels, never the Composio account; nobody writes from the browser", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("apps-rls");
+  const other = await team("apps-other");
+  const saved = await asService(async (q) =>
+    (await q("insert into app_connections (workspace_id, toolkit, composio_account, account_label, connected_by) values ($1, 'gmail', 'ca_mine1', 'ana@ana.test', $2), ($3, 'gmail', 'ca_theirs', 'bo@bo.test', $4) returning id", [ws, owner.id, other.ws, other.owner.id])).rows,
+  );
+  const mine = saved[0].id as string;
+  const theirs = saved[1].id as string;
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => {
+      assert.deepEqual((await q("select id, toolkit, status, account_label, connected_by from app_connections")).rows, [{ id: mine, toolkit: "gmail", status: "active", account_label: "ana@ana.test", connected_by: owner.id }]);
+    });
+    for (const sql of [
+      ["select composio_account from app_connections", []],
+      ["select last_error from app_connections", []],
+      ["select * from app_connections", []],
+      ["insert into app_connections (workspace_id, toolkit, composio_account) values ($1, 'slack', 'ca_planted')", [ws]],
+      ["update app_connections set account_label = 'x' where id = $1", [mine]],
+      ["update app_connections set composio_account = 'ca_theirs' where id = $1", [mine]],
+      ["delete from app_connections where id = $1", [mine]],
+    ] as const) {
+      await as(u, async (q) => {
+        await assert.rejects(q(sql[0], [...sql[1]]), /permission denied/, sql[0]);
+      });
+    }
+  }
+  await as(other.owner, async (q) => {
+    assert.deepEqual((await q("select id from app_connections")).rows, [{ id: theirs }]);
+    assert.equal((await q("select id from app_connections where workspace_id = $1", [ws])).rowCount, 0);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select id from app_connections"), /permission denied/);
+  });
+  assert.equal((await db.query("select composio_account from app_connections where id = $1", [mine])).rows[0].composio_account, "ca_mine1");
+});
+
+test("app_connections: known apps only, one connection per app in a workspace, gone with the workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner } = await team("apps-shape");
+  const add = (toolkit: string, account = `ca_${toolkit}1`, extra = "") => db!.query(`insert into app_connections (workspace_id, toolkit, composio_account${extra ? ", status" : ""}) values ($1, $2, $3${extra ? ", $4" : ""})`, extra ? [ws, toolkit, account, extra] : [ws, toolkit, account]);
+  for (const k of ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce", "slack", "zendesk", "help_scout"]) await add(k);
+  await assert.rejects(add("gmail", "ca_again"), /app_connections_ws_toolkit_idx/);
+  await assert.rejects(add("linkedin"), /app_connections_toolkit_check/);
+  const fresh = await team("apps-shape2");
+  await assert.rejects(db.query("insert into app_connections (workspace_id, toolkit, composio_account) values ($1, 'gmail', 'bad id!')", [fresh.ws]), /app_connections_composio_account_check/);
+  await assert.rejects(db.query("insert into app_connections (workspace_id, toolkit, composio_account, status) values ($1, 'gmail', 'ca_ok1', 'broken')", [fresh.ws]), /app_connections_status_check/);
+  await assert.rejects(db.query("insert into app_connections (workspace_id, toolkit, composio_account, account_label) values ($1, 'gmail', 'ca_ok1', repeat('a', 201))", [fresh.ws]), /app_connections_account_label_check/);
+  await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
+  assert.equal((await db.query("select count(*)::int n from app_connections where workspace_id = $1", [ws])).rows[0].n, 0);
+});
