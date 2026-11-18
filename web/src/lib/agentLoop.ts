@@ -7,8 +7,10 @@
 // (src/app/api/chat/route.ts) wires in the real ones. Nothing here reads the environment.
 //
 // Hook points for the next steps:
-//   tools    ToolRegistry: each agent's tools for this workspace (Arrowsterr and Capybaroar through its brand keys).
-//            A tool that changes something saves an approval instead of running unless ctx.trust is autopilot.
+//   tools    ToolRegistry: each agent's tools for this workspace, composed from tool sources (src/lib/toolRegistry.ts,
+//            wired in src/lib/teamTools.ts): Arrowsterr and Capybaroar through its brand keys, search_knowledge, ...
+//            A tool that changes something saves an approval instead of running unless ctx.trust is autopilot
+//            (src/lib/productTools.ts), and says so with ToolResult.approval.
 //   context  PromptContext: extra cached system sections per agent (knowledge search, skills, memory).
 //   runTurn  routines call it with `forced` set to the routine's agent.
 
@@ -65,6 +67,8 @@ export type ChatEvent =
   | { type: "status"; agent: AgentKey; text: string }
   | { type: "tool"; agent: AgentKey; text: string }
   | { type: "handoff"; from: AgentKey; to: AgentKey; note: string }
+  /** A change saved for approval (supabase/013_approvals.sql). The screen shows a card with Review. */
+  | { type: "approval"; agent: AgentKey; id: number; title: string }
   | { type: "message"; agent: AgentKey; text: string; error?: boolean; blocked?: "expired" | "allowance" | "starting" }
   | { type: "done" };
 export type Emit = (e: ChatEvent) => void;
@@ -73,13 +77,22 @@ export type Emit = (e: ChatEvent) => void;
 export type LoopClient = { beta: { messages: { create: (params: Anthropic.Beta.MessageCreateParamsNonStreaming) => Promise<Anthropic.Beta.BetaMessage> } } };
 
 export type ToolContext = { workspace: TeamWorkspace; agent: AgentKey; threadId: string; trust: Trust; emit: Emit };
-export type ToolResult = { content: string; isError?: boolean };
+export type ToolResult = {
+  content: string;
+  isError?: boolean;
+  /** Set when the call was saved for approval instead of running. Shown in the chat as a card. */
+  approval?: { id: number; title: string };
+};
 export type AgentTool = {
   definition: Anthropic.Beta.BetaTool;
   /** What the person sees while it runs, like "AI visibility: get prompts". */
   label: string;
+  /** True when it changes something outside the app (it goes through approvals). Tells the prompt which rules apply. */
+  write?: boolean;
   run: (input: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>;
 };
+/** One tool, as tool sources make them. */
+export type ToolDef = AgentTool;
 /** An agent's tools for this workspace, and services it should have but can't use right now (said in the prompt). */
 export type ToolSet = { tools: AgentTool[]; missing: string[] };
 export type ToolRegistry = (ctx: ToolContext) => Promise<ToolSet>;
@@ -123,14 +136,23 @@ const listNames = (keys: AgentKey[]) => {
 // ─────────────── the prompt ───────────────
 
 /** The agent's system prompt. Frozen for a workspace and agent, so it caches across turns. */
-export function systemPrompt(ws: { name: string; website: string | null }, key: AgentKey, o: { tools: boolean; missing: string[]; teammates: AgentKey[] }): string {
+/** How changes work for this agent: saved for approval ("ask"), run on autopilot, or none (its tools only read). */
+export type WriteMode = "ask" | "autopilot" | "none";
+
+const TOOL_RULES: Record<WriteMode, string> = {
+  ask: "Tools that only read run right away. Tools that change something (create, schedule, publish, send, delete) are saved for the owner's approval instead of running. Give complete, final inputs so the owner can approve in one click. Never call the same change twice. After a change is saved for approval, say in one or two lines what you prepared.",
+  autopilot: "Tools that only read run right away. The owner put you on autopilot, so tools that change something (create, schedule, publish, send, delete) run right away too. Only make changes the person asked for, with complete, final inputs. Never call the same change twice. After a change, say in one or two lines what you did.",
+  none: "Your tools only read. You can't change anything in the business's apps. If the job needs a change, hand it to the teammate who can, or say what to do.",
+};
+
+export function systemPrompt(ws: { name: string; website: string | null }, key: AgentKey, o: { tools: boolean; writes?: WriteMode; missing: string[]; teammates: AgentKey[] }): string {
   const a = AGENTS[key];
   const team = ORDER.filter((k) => k !== key)
     .map((k) => `- ${AGENTS[k].god}: ${AGENTS[k].name}.${AGENTS[k].soon ? " (Coming soon, can't take work yet.)" : o.teammates.includes(k) ? ` ${AGENTS[k].job}` : " (Paused right now.)"}`)
     .join("\n");
   const rules = [
     o.tools
-      ? "Tools that only read run right away. Tools that change something (create, schedule, publish, send, delete) are saved for the owner's approval instead of running. Give complete, final inputs so the owner can approve in one click. Never call the same change twice. After a change is saved for approval, say in one or two lines what you prepared."
+      ? TOOL_RULES[o.writes ?? "ask"]
       : "You have no tools connected yet. You can plan, write, explain and advise, but you can't look up live data or change anything. If the job needs that, say so plainly.",
     o.teammates.length ? "If part of the job belongs to a teammate who can take work, call handoff with their name and a clear note." : null,
     "Messages from teammates start with their name. Read them, but answer as yourself.",
@@ -209,11 +231,11 @@ const textOf = (content: Anthropic.Beta.BetaContentBlock[]) =>
 // ─────────────── one agent ───────────────
 
 type Handoff = { agent: AgentKey; note: string };
-type Run = { handoffs: Handoff[]; cost: number };
+type Run = { handoffs: Handoff[]; cost: number; approvals: { id: number; title: string }[] };
 
 async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<Pref>>>, input: TurnInput, d: TurnDeps & { client: LoopClient }): Promise<Run> {
   const ws = input.workspace;
-  const run: Run = { handoffs: [], cost: 0 };
+  const run: Run = { handoffs: [], cost: 0, approvals: [] };
   const say = async (text: string, meta: Record<string, unknown> = {}) => {
     await d.store.addMessage({ thread_id: input.threadId, workspace_id: ws.id, role: "agent", agent: key, content: text, meta });
     d.emit({ type: "message", agent: key, text });
@@ -243,7 +265,11 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
 
   const extra = (await d.context?.(key, ws).catch(() => [])) ?? [];
   const system: Anthropic.Beta.BetaTextBlockParam[] = [
-    { type: "text", text: systemPrompt(ws, key, { tools: set.tools.length > 0, missing: set.missing, teammates }), cache_control: { type: "ephemeral" } },
+    {
+      type: "text",
+      text: systemPrompt(ws, key, { tools: set.tools.length > 0, writes: !set.tools.some((t) => t.write) ? "none" : pref.trust >= 2 ? "autopilot" : "ask", missing: set.missing, teammates }),
+      cache_control: { type: "ephemeral" },
+    },
     ...(extra.length ? [{ type: "text" as const, text: extra.join("\n\n"), cache_control: { type: "ephemeral" as const } }] : []),
   ];
   const messages = historyFor(await d.store.history(input.threadId), key);
@@ -326,6 +352,10 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
         d.emit({ type: "tool", agent: key, text: tool.label });
         try {
           const r = await tool.run(args, ctx);
+          if (r.approval) {
+            run.approvals.push(r.approval);
+            d.emit({ type: "approval", agent: key, id: r.approval.id, title: r.approval.title });
+          }
           return R(r.content || "(empty)", Boolean(r.isError));
         } catch (e) {
           return R(`Tool failed: ${String((e as Error)?.message ?? e).slice(0, 300)}`, true);
@@ -335,7 +365,8 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
     messages.push({ role: "user", content: results });
     if (step === MAX_STEPS - 1) finalText = finalText ? `${finalText}\n\n${TEAM_MESSAGES.tooManySteps}` : TEAM_MESSAGES.tooManySteps;
   }
-  await say(finalText || TEAM_MESSAGES.done, { model });
+  // The approvals this reply prepared, so the chat shows their cards under it.
+  await say(finalText || TEAM_MESSAGES.done, { model, ...(run.approvals.length ? { approvals: run.approvals } : {}) });
   return run;
 }
 

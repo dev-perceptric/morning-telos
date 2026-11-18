@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { brandJobHandlers, expireTrialsHandler } from "@/lib/closeoutDb";
 import { cronAllowed } from "@/lib/cronAuth";
+import { STALE_AFTER } from "@/lib/approvals";
 import { runJob, type Handler, type Job } from "@/lib/jobs";
 import { partnerFor, type Product } from "@/lib/partner";
 import { provision, type ServicePatch, type ServiceStatus } from "@/lib/provision";
@@ -102,6 +103,10 @@ export async function POST(request: Request) {
   // A missing daily job must not stop the jobs that are due, so a problem here is only logged.
   const daily = await db.rpc("queue_daily_jobs");
   if (daily.error) warn(/queue_daily_jobs/.test(daily.error.message) ? "Run supabase/010_expire_trials.sql in Supabase." : `Daily jobs: ${daily.error.message}`);
+
+  // An approved change whose call never finished (the server restarted mid-call) is failed, so a person checks it.
+  const stale = await db.rpc("fail_stale_approvals", { p_older: STALE_AFTER });
+  if (stale.error) warn(/fail_stale_approvals/.test(stale.error.message) ? "Run supabase/013_approvals.sql in Supabase." : `Stale approvals: ${stale.error.message}`);
 
   const limit = Math.min(50, Math.max(1, Number(new URL(request.url).searchParams.get("limit")) || 10));
   const { data, error } = await db.rpc("claim_jobs", { n: limit, lease: LEASE });

@@ -25,6 +25,8 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
     let one = false;
     let sort: { col: string; asc: boolean } | null = null;
     let cap: number | null = null;
+    /** .insert(...).select() returns the saved row, like PostgREST's return=representation. */
+    let returning = false;
 
     const run = () => {
       const rows = table(name);
@@ -39,8 +41,9 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
       if (op === "insert") {
         const keys = uniques[name] ?? [];
         if (keys.length && rows.some((x) => keys.every((k) => x[k] === payload![k]))) return { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } };
-        rows.push({ ...(o.autoId?.includes(name) && payload!.id === undefined ? { id: ++nextId } : {}), ...payload });
-        return { data: null, error: null };
+        const row = { ...(o.autoId?.includes(name) && payload!.id === undefined ? { id: ++nextId } : {}), ...payload };
+        rows.push(row);
+        return { data: returning ? (one ? row : [row]) : null, error: null };
       }
       if (op === "upsert") {
         const same = rows.find((x) => conflict.every((k) => x[k] === payload![k]));
@@ -66,7 +69,7 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
     };
 
     const q = {
-      select: () => q,
+      select: () => ((returning = op !== "select"), q),
       insert: (p: Row) => ((op = "insert"), (payload = p), q),
       update: (p: Row) => ((op = "update"), (payload = p), q),
       upsert: (p: Row, o: { onConflict: string }) => ((op = "upsert"), (payload = p), (conflict = o.onConflict.split(",").map((k) => k.trim())), q),
@@ -74,6 +77,7 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
       is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), q),
       maybeSingle: () => ((one = true), q),
+      single: () => ((one = true), q),
       order: (col: string, o: { ascending?: boolean } = {}) => ((sort = { col, asc: o.ascending !== false }), q),
       limit: (n: number) => ((cap = n), q),
       then: (ok: (v: unknown) => unknown, bad?: (e: unknown) => unknown) => Promise.resolve().then(run).then(ok, bad),
