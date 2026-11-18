@@ -137,6 +137,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
       "Before you publish, show the owner what changed and where they can see it.",
       "Webflow can't design new pages. There you add and update blog posts and other site content. WordPress.com only gets drafts, and the owner publishes them there.",
       "Use Arrowsterr's keywords and content plan, so every page answers what people search for.",
+      "Follow your design skills: match-the-brand before the first design, design-a-page for layouts, and review-the-design before you ask to publish.",
       "Never invent facts, prices, reviews or awards. Leave [fill in] where a fact is missing.",
     ],
   },

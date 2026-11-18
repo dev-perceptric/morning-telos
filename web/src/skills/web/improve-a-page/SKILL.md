@@ -36,6 +36,7 @@ A short list of what holds a page back, then the new copy for the parts worth ch
    - Webflow: WEBFLOW_UPDATE_COLLECTION_ITEM_V2 for a blog post or other CMS item, with isDraft set to true. For a page's search title and description, WEBFLOW_UPDATE_PAGE_METADATA. Other page copy stays in chat, ready to paste.
    - WordPress.com: WORDPRESS_COM_UPDATE_DRAFT_POST works only on drafts. For a published post, write a new draft with WORDPRESS_COM_CREATE_DRAFT_POST.
    - None connected: give the new copy in chat, and say the owner can connect Framer, Webflow or WordPress.com in Settings, Apps.
+8. Run review-the-design on the changed page before you ask the owner to publish it.
 
 ## Output
 - **What holds it back**: up to five points.

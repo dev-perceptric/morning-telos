@@ -26,11 +26,12 @@ A real page on the owner's Framer site, in their style, that goes live only when
 1. Check with app_search_actions that Framer is connected. If not, write the page in chat and say to connect Framer in Settings, Apps.
 2. Read the facts with search_knowledge and the planned piece with get_content_plan. Use only real prices, places and offers.
 3. Read how the project is built with app_action: FRAMER_GET_AGENT_SYSTEM_PROMPT for Framer's commands, then FRAMER_GET_AGENT_CONTEXT and FRAMER_LIST_COMPONENTS_FOR_AGENT for the pages, styles and parts it already has.
-4. Plan the sections in chat: a title under 60 characters, a meta description under 155, a hero with one clear line, 3 to 5 sections, a FAQ and a call to book. Reuse the site's own parts and styles.
+4. Plan the sections in chat: a title under 60 characters, a meta description under 155, a hero with one clear line, 3 to 5 sections, a FAQ and a call to book. Reuse the site's own parts and styles. For a new layout, follow design-a-page.
 5. For a new page, add it with FRAMER_CREATE_WEB_PAGE, or copy a page that looks right with FRAMER_CLONE_WEB_PAGE. Then fill it in one step with FRAMER_APPLY_AGENT_CHANGES. For a small fix, use FRAMER_REPLACE_TEXT_FOR_AGENT. Each change waits for approval.
 6. Once the owner approves, check FRAMER_GET_UNPUBLISHED_PAGE_CHANGES and tell the owner which pages changed.
-7. Ask before you publish. FRAMER_PUBLISH makes a preview link, and FRAMER_DEPLOY puts it live. Both wait for approval.
-8. Once it is live, check FRAMER_GET_PUBLISH_INFO for the address, and offer to update the piece with update_content_plan.
+7. Run review-the-design on the changed pages before you ask to publish, and fix what it finds.
+8. Ask before you publish. FRAMER_PUBLISH makes a preview link, and FRAMER_DEPLOY puts it live. Both wait for approval.
+9. Once it is live, check FRAMER_GET_PUBLISH_INFO for the address, and offer to update the piece with update_content_plan.
 
 ## Output
 - The plan: the page address, its keyword and its sections, in a short list.
