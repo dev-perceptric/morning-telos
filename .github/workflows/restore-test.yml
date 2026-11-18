@@ -1,0 +1,109 @@
+# Weekly restore test: download the newest backup from R2, check it against its manifest, decrypt it, load it into a
+# throwaway Postgres 17 and check that our tables came back with their rows (web/scripts/restore.ts check and load).
+# The private key that reads backups lives only here, in repo secrets, never on the server.
+#
+# Repo secrets (Settings, Secrets and variables, Actions, Secrets): R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+# BACKUP_PRIVATE_KEY, and R2_BUCKET (optional, default morningtelos-backups). A read-only R2 token is enough.
+# Repo variable (Variables): BACKUP_PREFIX (optional, default db/daily/; production uses morningtelos/db/daily/).
+# Until the secrets are set, the run skips with a notice instead of failing.
+name: Restore test
+
+on:
+  schedule:
+    # Sundays at 05:43 UTC, after the 03:17 backup and the server's own check.
+    - cron: "43 5 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-test
+  cancel-in-progress: false
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          BACKUP_PRIVATE_KEY: ${{ secrets.BACKUP_PRIVATE_KEY }}
+        run: |
+          missing=""
+          for k in R2_ENDPOINT R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY BACKUP_PRIVATE_KEY; do
+            if [ -z "${!k}" ]; then missing="$missing $k"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::notice title=Restore test skipped::Add these repo secrets to run the restore test:$missing"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  restore:
+    needs: secrets
+    if: needs.secrets.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: restore-test
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      RESTORE_DATABASE_URL: postgres://postgres:restore-test@localhost:54329/postgres
+      RESTORE_DIR: ${{ runner.temp }}/restore
+      BACKUP_PREFIX: ${{ vars.BACKUP_PREFIX }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The runner has Postgres 16, and pg_restore 16 can't read a dump from pg_dump 17.
+      - name: Install the Postgres 17 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+      - name: Check the newest backup is there, recent and whole
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          pg_restore --version
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/restore.ts check latest
+      # Supabase's API roles, so the dump's policies load too. A plain Postgres lacks the rest of Supabase,
+      # so some statements still fail; restore.ts counts those and fails only when our tables differ.
+      - name: Make the Supabase roles
+        run: |
+          for r in anon authenticated service_role supabase_auth_admin supabase_storage_admin authenticator; do
+            psql "$RESTORE_DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -c "create role $r nologin"
+          done
+      - name: Restore into Postgres 17 and compare row counts
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          BACKUP_PRIVATE_KEY: ${{ secrets.BACKUP_PRIVATE_KEY }}
+          CONFIRM: "yes"
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/restore.ts load latest
+      # The decrypted dump holds customer data.
+      - name: Delete the decrypted files
+        if: always()
+        run: rm -rf "$RESTORE_DIR"

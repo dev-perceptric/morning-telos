@@ -6,6 +6,18 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf
 const envExample = read("../.env.example");
 const compose = read("../../deploy/web-compose.yml");
 const workflow = read("../../.github/workflows/build-images.yml");
+const restoreWorkflow = read("../../.github/workflows/restore-test.yml");
+const backupDockerfile = read("../Dockerfile.backup");
+
+/** One service's block in web-compose.yml: its name line and everything indented under it. */
+function service(name: string): string {
+  const start = compose.indexOf(`\n  ${name}:\n`);
+  assert.ok(start >= 0, `no ${name} service in deploy/web-compose.yml`);
+  const lines = compose.slice(start + 1).split("\n");
+  const end = lines.findIndex((l, i) => i > 0 && l.trim() !== "" && !l.startsWith("    "));
+  return lines.slice(0, end < 0 ? undefined : end).join("\n");
+}
+const envKeys = (block: string) => [...block.matchAll(/^ {6}([A-Z][A-Z0-9_]*): /gm)].map((m) => m[1]);
 
 const exampleKeys = [...envExample.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]);
 
@@ -24,14 +36,16 @@ test(".env.example lists keys with empty values only", () => {
   }
 });
 
-// Keys for the nightly backup job (web/scripts/backup.ts), which runs outside the web container.
-// The web app must never hold the database superuser URL, so these stay out of web-compose.yml on purpose.
-const BACKUP_ONLY = new Set(["BACKUP_DATABASE_URL", "BACKUP_PUBLIC_KEY", "BACKUP_PING_URL"]);
+// Keys for the nightly backup job (web/scripts/backup.ts), which runs in its own backup service.
+// The web app must never hold the database superuser URL, so these stay out of the web-new service on purpose.
+const BACKUP_ONLY = new Set(["BACKUP_DATABASE_URL", "BACKUP_PUBLIC_KEY", "BACKUP_PING_URL", "BACKUP_PREFIX"]);
+const R2_KEYS = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"];
 
 test("web-compose.yml passes every key in .env.example from the server environment", () => {
+  const web = service("web-new");
   for (const key of exampleKeys) {
     if (BACKUP_ONLY.has(key)) continue;
-    assert.ok(compose.includes(`${key}: \${${key}:-}`), `deploy/web-compose.yml is missing ${key}: \${${key}:-}`);
+    assert.ok(web.includes(`${key}: \${${key}:-}`), `the web-new service is missing ${key}: \${${key}:-}`);
   }
 });
 
@@ -52,8 +66,79 @@ test("build workflow reads browser keys from repo variables, not literal values"
   }
 });
 
-test("web-compose.yml never gives the web app the backup job's keys", () => {
-  for (const key of BACKUP_ONLY) assert.ok(!compose.includes(key), `${key} must not be in deploy/web-compose.yml`);
+test("web-compose.yml never gives the web app or the cron the backup job's keys", () => {
+  for (const name of ["web-new", "cron"]) {
+    for (const key of BACKUP_ONLY) assert.ok(!service(name).includes(key), `${key} must not be in the ${name} service`);
+  }
+});
+
+test("every backup-only key is in .env.example", () => {
+  for (const key of BACKUP_ONLY) assert.ok(exampleKeys.includes(key), `${key} is missing from .env.example`);
+});
+
+test("the backup service gets the backup and R2 keys and nothing else", () => {
+  const backup = service("backup");
+  assert.deepEqual(envKeys(backup).sort(), [...BACKUP_ONLY, ...R2_KEYS].sort());
+  assert.match(backup, /image: ghcr\.io\/dev-perceptric\/morningtelos-backup:latest/);
+  assert.match(backup, /restart: unless-stopped/);
+  assert.match(backup, /init: true/);
+  assert.doesNotMatch(backup, /ports:|labels:|traefik/);
+});
+
+test("the backup service reaches Postgres on the Supabase project's network", () => {
+  assert.match(service("backup"), /networks: \[sb-morningtelos\]/);
+  assert.match(compose, /\nnetworks:\n  sb-morningtelos:\n    external: true\n/);
+  assert.doesNotMatch(service("web-new"), /networks:/);
+});
+
+test("the build workflow builds the backup image from web/Dockerfile.backup", () => {
+  assert.match(workflow, /- image: morningtelos-backup\n\s+context: web\n\s+file: web\/Dockerfile\.backup/);
+});
+
+test("the backup image has pg_dump 17 first on the PATH and Node 22, and runs the nightly loop", () => {
+  assert.match(backupDockerfile, /^FROM node:22-bookworm-slim$/m);
+  assert.match(backupDockerfile, /install -y --no-install-recommends postgresql-client-17/);
+  assert.match(backupDockerfile, /ENV PATH=\/usr\/lib\/postgresql\/17\/bin:\$PATH/);
+  assert.match(backupDockerfile, /^USER node$/m);
+  assert.match(backupDockerfile, /CMD \["node", "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", "scripts\/backup-cron\.ts"\]/);
+});
+
+test("the backup image copies every file the backup scripts import, and no packages are needed", () => {
+  const copied = new Set<string>();
+  for (const m of backupDockerfile.matchAll(/^COPY (.+) \.\/(\S*)$/gm)) {
+    const [srcs, dest] = [m[1].split(/\s+/), m[2]];
+    for (const f of srcs) copied.add(dest ? `${dest}${f.slice(f.lastIndexOf("/") + 1)}` : f);
+  }
+  const seen = new Set<string>();
+  const walk = (file: string) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    assert.ok(copied.has(file), `web/Dockerfile.backup does not copy ${file}`);
+    const text = read(`../${file}`);
+    for (const [, spec] of text.matchAll(/^import [^;]*? from "([^"]+)";/gm)) {
+      if (spec.startsWith(".")) walk(new URL(spec, `file:///${file}`).pathname.slice(1));
+      else assert.match(spec, /^node:/, `${file} imports ${spec}, which the backup image doesn't install`);
+    }
+    for (const [, spec] of text.matchAll(/runScript\("([^"]+)"/g)) walk(new URL(spec, `file:///${file}`).pathname.slice(1));
+  };
+  walk("scripts/backup-cron.ts");
+  for (const f of ["scripts/backup.ts", "scripts/restore.ts", "src/lib/backup.ts"]) assert.ok(seen.has(f), `${f} is not reached`);
+});
+
+test("the restore test runs weekly and by hand, and skips with a notice until its secrets are set", () => {
+  assert.match(restoreWorkflow, /schedule:\n\s+# .*\n\s+- cron: "43 5 \* \* 0"/);
+  assert.match(restoreWorkflow, /workflow_dispatch:/);
+  assert.match(restoreWorkflow, /::notice title=Restore test skipped::/);
+  assert.match(restoreWorkflow, /if: needs\.secrets\.outputs\.ready == 'true'/);
+  assert.match(restoreWorkflow, /image: postgres:17\n/);
+  assert.match(restoreWorkflow, /postgresql-client-17/);
+  assert.match(restoreWorkflow, /scripts\/restore\.ts check latest/);
+  assert.match(restoreWorkflow, /scripts\/restore\.ts load latest/);
+  assert.match(restoreWorkflow, /BACKUP_PREFIX: \$\{\{ vars\.BACKUP_PREFIX \}\}/);
+  for (const key of [...R2_KEYS, "BACKUP_PRIVATE_KEY"]) assert.match(restoreWorkflow, new RegExp(`${key}: \\$\\{\\{ secrets\\.${key} \\}\\}`));
+  // The private key reaches only the step that decrypts.
+  assert.equal(restoreWorkflow.match(/BACKUP_PRIVATE_KEY: \$\{\{ secrets\.BACKUP_PRIVATE_KEY \}\}/g)?.length, 2);
+  assert.match(restoreWorkflow, /if: always\(\)\n\s+run: rm -rf "\$RESTORE_DIR"/);
 });
 
 test("web-compose.yml runs the job worker every minute with CRON_SECRET, over the private network", () => {

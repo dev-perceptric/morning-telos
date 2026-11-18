@@ -4,6 +4,7 @@
 import crypto from "node:crypto";
 
 export const BACKUP_BUCKET = "morningtelos-backups";
+/** The bucket folder backups go in when BACKUP_PREFIX isn't set. A shared bucket sets its own (morningtelos/db/daily/). */
 export const BACKUP_PREFIX = "db/daily/";
 /** Backups older than this many days are deleted after each good run. */
 export const KEEP_DAYS = 30;
@@ -22,8 +23,31 @@ export function backupName(at: Date): string {
   return `morningtelos-${iso.slice(0, 10)}T${iso.slice(11, 13)}${iso.slice(14, 16)}Z`;
 }
 
-export const dumpKey = (name: string) => `${BACKUP_PREFIX}${name}.dump.mtb`;
-export const manifestKey = (name: string) => `${BACKUP_PREFIX}${name}.manifest.json`;
+export const dumpKey = (name: string, prefix = BACKUP_PREFIX) => `${prefix}${name}.dump.mtb`;
+export const manifestKey = (name: string, prefix = BACKUP_PREFIX) => `${prefix}${name}.manifest.json`;
+
+const PREFIX_RE = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*\/$/;
+
+/**
+ * The bucket folder from BACKUP_PREFIX, ending in "/", or db/daily/ when it isn't set. The bucket can be shared with
+ * another product, so a folder that could reach outside its own (the bucket root, "..", "//") is refused.
+ */
+export function backupPrefix(env: Record<string, string | undefined>): string {
+  const raw = (env.BACKUP_PREFIX ?? "").trim();
+  if (!raw) return BACKUP_PREFIX;
+  const p = raw.endsWith("/") ? raw : `${raw}/`;
+  if (!PREFIX_RE.test(p) || p.split("/").some((part) => part === "." || part === "..")) {
+    throw new Error("BACKUP_PREFIX should be a folder like morningtelos/db/daily/ (letters, digits, . _ - and /)");
+  }
+  return p;
+}
+
+/** The backup a key belongs to when it sits directly in the prefix folder, or null for any other key. */
+function nameUnder(key: string, prefix: string): string | null {
+  if (!key.startsWith(prefix) || key.slice(prefix.length).includes("/")) return null;
+  const name = backupNameOf(key);
+  return name && (key === dumpKey(name, prefix) || key === manifestKey(name, prefix)) ? name : null;
+}
 
 /** The backup name a bucket key belongs to, or null for any other file. */
 export function backupNameOf(key: string): string | null {
@@ -42,16 +66,16 @@ export function backupTime(name: string): Date | null {
 }
 
 /** Backup names found in a bucket listing, newest first. Only names with both files count as complete. */
-export function completeBackups(keys: string[]): string[] {
+export function completeBackups(keys: string[], prefix = BACKUP_PREFIX): string[] {
   const files = new Map<string, Set<string>>();
   for (const k of keys) {
-    const name = k.startsWith(BACKUP_PREFIX) ? backupNameOf(k) : null;
+    const name = nameUnder(k, prefix);
     if (!name) continue;
     if (!files.has(name)) files.set(name, new Set());
     files.get(name)!.add(k);
   }
   return [...files]
-    .filter(([name, set]) => set.has(dumpKey(name)) && set.has(manifestKey(name)))
+    .filter(([name, set]) => set.has(dumpKey(name, prefix)) && set.has(manifestKey(name, prefix)))
     .map(([name]) => name)
     .sort()
     .reverse();
@@ -59,12 +83,13 @@ export function completeBackups(keys: string[]): string[] {
 
 /**
  * The keys to delete so the bucket keeps 30 days: every file of a backup made more than keepDays before now,
- * except the newest minKeep backups. Files that aren't backups, or are outside db/daily/, are never touched.
+ * except the newest minKeep backups. Only our own backup files directly in the prefix folder are ever picked:
+ * anything else in the bucket (another product's files, other folders, other names) is never touched.
  */
-export function backupsToDelete(keys: string[], now: Date, keepDays = KEEP_DAYS, minKeep = MIN_KEEP): string[] {
+export function backupsToDelete(keys: string[], now: Date, keepDays = KEEP_DAYS, minKeep = MIN_KEEP, prefix = BACKUP_PREFIX): string[] {
   const byName = new Map<string, string[]>();
   for (const k of keys) {
-    const name = k.startsWith(BACKUP_PREFIX) ? backupNameOf(k) : null;
+    const name = nameUnder(k, prefix);
     if (!name) continue;
     byName.set(name, [...(byName.get(name) ?? []), k]);
   }
@@ -334,4 +359,71 @@ export function compareRows(expected: Record<string, number>, restored: Record<s
     (mustMatch(table) ? bad : other).push(line);
   }
   return { bad, other };
+}
+
+// ---- Schedule (scripts/backup-cron.ts, the backup service in deploy/web-compose.yml) ----
+
+/** The nightly backup runs at this time, in UTC. */
+export const BACKUP_AT = { hour: 3, minute: 17 };
+
+/** The next backup time strictly after now, in UTC. */
+export function nextBackupAt(now: Date, at = BACKUP_AT): Date {
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), at.hour, at.minute));
+  if (next.getTime() <= now.getTime()) next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
+/** Sundays (UTC), after the backup, the server also checks the newest backup (restore.ts check). */
+export const isCheckDay = (at: Date) => at.getUTCDay() === 0;
+
+// ---- The weekly check of the newest backup, with no private key (restore.ts check) ----
+
+/** The newest backup must be younger than this. One night, plus room for a slow run. */
+export const MAX_AGE_HOURS = 26;
+/** A backup file smaller than this is no real dump. */
+export const MIN_BACKUP_BYTES = 1024;
+/** A backup less than this share of the one before it means data went missing or the dump stopped early. */
+export const MIN_SIZE_RATIO = 0.5;
+/** Tables a real Morning Telos database always has rows in. A backup or a restore where one is empty fails. */
+export const KEY_TABLES = ["public.workspaces", "public.workspace_members", "public.jobs", "auth.users"];
+
+/** The key tables that are missing or empty in a set of row counts. */
+export function emptyKeyTables(rows: Record<string, number>, tables = KEY_TABLES): string[] {
+  return tables.filter((t) => !(rows[t] > 0));
+}
+
+export type BackupCheck = {
+  /** The newest complete backup, or null when there is none. */
+  name: string | null;
+  now: Date;
+  manifest: Partial<Manifest> | null;
+  /** The backup file as downloaded. */
+  file: Uint8Array | null;
+  /** The size of the backup before this one, from its manifest, or null for the first one. */
+  previousBytes: number | null;
+  maxAgeHours?: number;
+};
+
+/** What is wrong with the newest backup: none, recent, checksum, size, our tables. An empty list means it passed. */
+export function backupProblems(c: BackupCheck): string[] {
+  if (!c.name) return ["there are no complete backups"];
+  const at = backupTime(c.name);
+  if (!at) return [`${c.name} is not a backup name`];
+  const problems: string[] = [];
+  const maxAge = c.maxAgeHours ?? MAX_AGE_HOURS;
+  const hours = (c.now.getTime() - at.getTime()) / 3_600_000;
+  if (hours > maxAge) problems.push(`the newest backup, ${c.name}, is ${Math.floor(hours)} hours old (the limit is ${maxAge})`);
+  const m = c.manifest;
+  if (!m) return [...problems, "the manifest could not be read"];
+  if (m.name !== c.name) problems.push(`the manifest is for ${m.name ?? "no name"}, not ${c.name}`);
+  if (!c.file) return [...problems, "the backup file could not be read"];
+  const bytes = c.file.byteLength;
+  if (m.dump_bytes !== bytes) problems.push(`the file is ${bytes} bytes but the manifest says ${m.dump_bytes ?? "nothing"}`);
+  if (m.dump_sha256 !== sha256Hex(c.file)) problems.push("the checksum does not match the manifest");
+  if (Buffer.from(c.file.subarray(0, 4)).toString() !== "MTB2") problems.push("the file is not an encrypted Morning Telos backup (MTB2)");
+  if (bytes < MIN_BACKUP_BYTES) problems.push(`the file is only ${bytes} bytes`);
+  if (c.previousBytes && bytes < c.previousBytes * MIN_SIZE_RATIO) problems.push(`the file is ${bytes} bytes, less than half of the one before (${c.previousBytes})`);
+  const empty = emptyKeyTables(m.rows ?? {});
+  if (empty.length) problems.push(`no rows in ${empty.join(", ")}`);
+  return problems;
 }
