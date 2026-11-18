@@ -447,6 +447,8 @@ const CASES: { name: string; plan: string; status: string; days: number; want: s
   { name: "canceled during the trial", plan: "starter", status: "canceled", days: 3, want: "trial" },
   { name: "unpaid", plan: "starter", status: "unpaid", days: -30, want: "expired" },
   { name: "first payment still going through", plan: "pro", status: "incomplete", days: -1, want: "expired" },
+  { name: "internal, long after the trial", plan: "internal", status: "active", days: -90, want: "internal" },
+  { name: "internal, even when canceled", plan: "internal", status: "canceled", days: -90, want: "internal" },
 ];
 
 test("effective_plan() for trial, active, past due, canceled and trial ended, and it matches effectivePlan()", async (t) => {
