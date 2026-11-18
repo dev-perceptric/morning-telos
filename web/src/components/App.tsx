@@ -13,8 +13,10 @@ import { AuthScreen, NewPassword } from "./AuthScreen";
 import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
 import { SettingsPage, type Workspace } from "./Settings";
 import { KnowledgePage } from "./Knowledge";
+import { MemoryPage } from "./Memory";
+import { RoutinesPage } from "./Routines";
 import { ConnectSocialCard } from "./Social";
-import { TeamHome, TeamPage, ThreadPage } from "./Team";
+import { TeamHome, TeamPage, ThreadPage, type StartChat } from "./Team";
 import { AGENTS } from "@/lib/team";
 import { btnPrimary, btnSecondary, ErrorText, Frame, input, label, Logo, Notice } from "./ui";
 
@@ -125,12 +127,18 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
   // What's typed on Home, the first message of a chat being started, and the chat this tab started (its page keeps
   // streaming while the address changes from /chat to /chat/<id>).
   const [draft, setDraft] = useState("");
-  const [start, setStart] = useState<string | null>(null);
+  const [start, setStart] = useState<StartChat | null>(null);
   const [ownThread, setOwnThread] = useState<string | null>(null);
   const startChat = useCallback((text: string) => {
     setDraft("");
     setOwnThread(null);
-    setStart(text);
+    setStart({ text });
+    navigate("/chat");
+  }, []);
+  // Run now on the Routines page: a new chat that streams the routine.
+  const runRoutine = useCallback((r: { id: string; title: string; instruction: string }) => {
+    setOwnThread(null);
+    setStart({ text: r.instruction, routineId: r.id, title: r.title });
     navigate("/chat");
   }, []);
   const started = useCallback(() => setStart(null), []);
@@ -207,6 +215,10 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
             />
           ) : route.page === "knowledge" ? (
             <KnowledgePage key={ws.id} sb={sb} ws={ws} />
+          ) : route.page === "routines" ? (
+            <RoutinesPage key={ws.id} sb={sb} ws={ws} onRun={runRoutine} />
+          ) : route.page === "memory" ? (
+            <MemoryPage key={ws.id} sb={sb} ws={ws} />
           ) : (
             <Home sb={sb} ws={ws} draft={draft} onDraft={setDraft} onStart={startChat} />
           )}
@@ -269,7 +281,9 @@ function SetupStatus({ sb, workspaceId }: { sb: SupabaseClient; workspaceId: str
 const NAV = [
   { page: "home", label: "Home", path: "/" },
   { page: "team", label: "Team", path: "/team" },
+  { page: "routines", label: "Routines", path: "/routines" },
   { page: "knowledge", label: "Knowledge", path: "/knowledge" },
+  { page: "memory", label: "Memory", path: "/memory" },
   { page: "settings", label: "Settings", path: "/settings" },
 ] as const;
 

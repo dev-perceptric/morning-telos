@@ -41,6 +41,13 @@ test("the SQL agent and model lists match team.ts and models.ts", () => {
   assert.deepEqual(models, [...MODEL_CHOICES]);
 });
 
+test("the agent lists in 014 (routines, skills, memories) match team.ts", () => {
+  const sql = readFileSync(new URL("../supabase/014_routines_skills_memory.sql", import.meta.url), "utf8");
+  const lists = [...sql.matchAll(/agent in \(([^)]+)\)/g)].map((m) => m[1].split(",").map((s) => s.trim().replace(/'/g, "")));
+  assert.equal(lists.length, 3);
+  for (const list of lists) assert.deepEqual(list, ORDER);
+});
+
 test("agentByGod and parseMentions", () => {
   assert.equal(agentByGod("ATHENA"), "chief");
   assert.equal(agentByGod("Zeus"), null);

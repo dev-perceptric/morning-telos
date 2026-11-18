@@ -9,10 +9,12 @@ export const CHAT_MESSAGES = {
   empty: "Type a message.",
   tooLong: `That message is too long. Keep it under ${MAX_MESSAGE.toLocaleString("en-US")} letters.`,
   badThread: "That chat was not found.",
+  badRoutine: "That routine was not found.",
   tooMany: "That's a lot of messages this hour. Try again soon.",
 } as const;
 
-export type ChatRequest = { text: string; threadId: string | null; agent: AgentKey | null; model: ModelChoice | null };
+/** routineId: Run now on the Routines page. The routine's own words and teammate are used, in a new chat. */
+export type ChatRequest = { text: string; threadId: string | null; agent: AgentKey | null; model: ModelChoice | null; routineId: string | null };
 
 /** Checks the body of POST /api/chat. Unknown agents and models are ignored, not errors. */
 export function readChat(body: Record<string, unknown>): { ok: true; value: ChatRequest } | { ok: false; error: string } {
@@ -20,7 +22,8 @@ export function readChat(body: Record<string, unknown>): { ok: true; value: Chat
   if (!text) return { ok: false, error: CHAT_MESSAGES.empty };
   if (text.length > MAX_MESSAGE) return { ok: false, error: CHAT_MESSAGES.tooLong };
   const threadId = typeof body.threadId === "string" && body.threadId ? body.threadId : null;
-  return { ok: true, value: { text, threadId, agent: isAgentKey(body.agent) ? body.agent : null, model: isModelChoice(body.model) ? body.model : null } };
+  const routineId = typeof body.routineId === "string" && body.routineId ? body.routineId : null;
+  return { ok: true, value: { text, threadId, agent: isAgentKey(body.agent) ? body.agent : null, model: isModelChoice(body.model) ? body.model : null, routineId } };
 }
 
 /** At most `max` messages per workspace in `windowMs`. Kept in memory, like the old app's limited(). */

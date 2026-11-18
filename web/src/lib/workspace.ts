@@ -33,6 +33,9 @@ export const NEEDS = {
   chat: "editor",
   changeTeam: "admin",
   editKnowledge: "editor",
+  editRoutines: "editor",
+  editSkills: "admin",
+  deleteMemory: "viewer",
 } as const satisfies Record<string, Role>;
 export type Action = keyof typeof NEEDS;
 

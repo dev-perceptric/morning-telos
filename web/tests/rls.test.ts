@@ -1375,3 +1375,302 @@ test("rescan_website: editors and up start a scan, once at a time; website_scan_
     await assert.rejects(q("select rescan_website($1)", [ws]), /Add your website in Settings first/);
   });
 });
+
+// ─────────────── P3.4: routines, skills and memory (014_routines_skills_memory.sql) ───────────────
+
+test("routines: members read, editors and up add, change, pause and delete; viewers, strangers and visitors can't", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("rt-rls");
+  const other = await team("rt-other");
+  const add = (u: User, title = "Plan posts") =>
+    asCommit(u, async (q) => (await q("insert into routines (workspace_id, agent, title, instruction, days, at_time) values ($1, 'social', $2, 'Draft 5 posts', '{1,3}', '09:15') returning id, created_by, enabled, last_run_at", [ws, title])).rows[0]);
+  const r = await add(editor);
+  assert.equal(r.created_by, editor.id);
+  assert.equal(r.enabled, true);
+  assert.equal(r.last_run_at, null);
+  await add(owner, "Weekly report");
+  await add(admin, "Keywords");
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => assert.equal((await q("select * from routines where workspace_id = $1", [ws])).rowCount, 3));
+  }
+  await as(viewer, async (q) => {
+    await assert.rejects(q("insert into routines (workspace_id, agent, title, instruction) values ($1, 'seo', 'Mine', 'x')", [ws]), /row-level security/);
+  });
+  await as(viewer, async (q) => {
+    assert.equal((await q("update routines set enabled = false where id = $1", [r.id])).rowCount, 0);
+    assert.equal((await q("delete from routines where id = $1", [r.id])).rowCount, 0);
+  });
+  await as(other.owner, async (q) => {
+    assert.equal((await q("select * from routines where workspace_id = $1", [ws])).rowCount, 0);
+    assert.equal((await q("update routines set title = 'hacked' where id = $1", [r.id])).rowCount, 0);
+    assert.equal((await q("delete from routines where id = $1", [r.id])).rowCount, 0);
+  });
+  await as(other.owner, async (q) => {
+    await assert.rejects(q("insert into routines (workspace_id, agent, title, instruction) values ($1, 'seo', 'Planted', 'x')", [ws]), /row-level security/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from routines"), /permission denied/);
+  });
+  // Editors pause, change and delete. They can't fake a run, its note, who made it, or move it to another workspace.
+  await as(editor, async (q) => {
+    assert.equal((await q("update routines set enabled = false, title = 'Plan the week', days = '{0,6}', at_time = '07:00' where id = $1", [r.id])).rowCount, 1);
+    assert.equal((await q("delete from routines where id = $1", [r.id])).rowCount, 1);
+  });
+  for (const sql of [
+    "update routines set last_run_at = now() where id = $1",
+    "update routines set last_note = 'x' where id = $1",
+    "update routines set created_by = null where id = $1",
+    "update routines set workspace_id = workspace_id where id = $1",
+  ]) {
+    await as(editor, async (q) => {
+      await assert.rejects(q(sql, [r.id]), /permission denied/, sql);
+    });
+  }
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into routines (workspace_id, agent, title, instruction, created_by) values ($1, 'seo', 'X', 'x', $2)", [ws, owner.id]), /permission denied/);
+  });
+  // Only the server finds and queues due routines.
+  for (const fn of ["select * from due_routines(now())", "select queue_routine_runs(now())"]) {
+    await as(owner, async (q) => {
+      await assert.rejects(q(fn), /permission denied for function/, fn);
+    });
+  }
+});
+
+test("routines: known values only, 25 at most per workspace, gone with the workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor } = await team("rt-limits");
+  for (const [sql, err] of [
+    ["insert into routines (workspace_id, agent, title, instruction) values ($1, 'zeus', 'X', 'x')", /routines_agent_check/],
+    ["insert into routines (workspace_id, agent, title, instruction) values ($1, 'seo', ' ', 'x')", /routines_title_check/],
+    ["insert into routines (workspace_id, agent, title, instruction) values ($1, 'seo', 'X', repeat('a', 4001))", /routines_instruction_check/],
+    ["insert into routines (workspace_id, agent, title, instruction, days) values ($1, 'seo', 'X', 'x', '{}')", /routines_days_check/],
+    ["insert into routines (workspace_id, agent, title, instruction, days) values ($1, 'seo', 'X', 'x', '{1,7}')", /routines_days_check/],
+    ["insert into routines (workspace_id, agent, title, instruction, at_time) values ($1, 'seo', 'X', 'x', '8:00')", /routines_at_time_check/],
+    ["insert into routines (workspace_id, agent, title, instruction, at_time) values ($1, 'seo', 'X', 'x', '24:00')", /routines_at_time_check/],
+  ] as const) {
+    await assert.rejects(db.query(sql, [ws]), err, sql);
+  }
+  await db.query("insert into routines (workspace_id, agent, title, instruction) select $1, 'seo', 'R ' || g, 'x' from generate_series(1, 25) g", [ws]);
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into routines (workspace_id, agent, title, instruction) values ($1, 'seo', 'One more', 'x')", [ws]), /You can have up to 25 routines/);
+  });
+  await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
+  assert.equal((await db.query("select count(*)::int n from routines where workspace_id = $1", [ws])).rows[0].n, 0);
+});
+
+/** A workspace in a time zone with one routine, made long ago so its schedule counts. */
+async function routineIn(tag: string, tz: string, r: { at: string; days?: number[]; enabled?: boolean; agent?: string }) {
+  const owner = await signUp(`rt-${tag}@example.com`, { business: `Rt ${tag}`, timezone: tz });
+  const ws = await wsOf(owner);
+  await db!.query("update workspaces set timezone = $2 where id = $1", [ws, tz]);
+  const id = (
+    await db!.query("insert into routines (workspace_id, agent, title, instruction, days, at_time, enabled, created_at, updated_at) values ($1, $2, 'R', 'Do it', $3, $4, $5, '2026-01-01', '2026-01-01') returning id", [
+      ws,
+      r.agent ?? "seo",
+      r.days ?? [0, 1, 2, 3, 4, 5, 6],
+      r.at,
+      r.enabled ?? true,
+    ])
+  ).rows[0].id as string;
+  return { ws, id, owner };
+}
+
+const dueAt = async (id: string, at: string) => (await asService(async (q) => (await q("select slot from due_routines($1) where routine_id = $2", [at, id])).rows)).map((r) => (r.slot as Date).toISOString());
+const queueAt = (at: string) => asService(async (q) => (await q("select queue_routine_runs($1) n", [at])).rows[0].n as number);
+const runsOf = async (id: string) => (await db!.query("select payload ->> 'slot' slot, max_attempts from jobs where kind = 'run_routine' and payload ->> 'routine' = $1 order by id", [id])).rows;
+
+test("due_routines: the routine's local minute in its workspace's time zone, on its days, for 10 minutes", async (t) => {
+  if (!db) return t.skip("no test database");
+  // 8:00 on Mondays in Ho Chi Minh City (UTC+7) is 01:00 UTC. 2026-11-16 is a Monday.
+  const hcm = await routineIn("hcm", "Asia/Ho_Chi_Minh", { at: "08:00", days: [1] });
+  assert.deepEqual(await dueAt(hcm.id, "2026-11-16T01:00:00Z"), ["2026-11-16T01:00:00.000Z"]);
+  assert.deepEqual(await dueAt(hcm.id, "2026-11-16T01:09:59Z"), ["2026-11-16T01:00:00.000Z"], "a late tick still runs it");
+  assert.deepEqual(await dueAt(hcm.id, "2026-11-16T00:59:59Z"), [], "not before");
+  assert.deepEqual(await dueAt(hcm.id, "2026-11-16T01:10:00Z"), [], "not after 10 minutes");
+  assert.deepEqual(await dueAt(hcm.id, "2026-11-15T01:00:00Z"), [], "Sunday isn't one of its days");
+  // The same local time in Los Angeles is a different instant: 16:00 UTC in winter.
+  const la = await routineIn("la", "America/Los_Angeles", { at: "08:00", days: [1] });
+  assert.deepEqual(await dueAt(la.id, "2026-11-16T16:05:00Z"), ["2026-11-16T16:00:00.000Z"]);
+  assert.deepEqual(await dueAt(la.id, "2026-11-16T01:00:00Z"), []);
+  // The day is the local day: 23:55 Sunday in Los Angeles is Monday in UTC, and runs on Sunday's schedule.
+  const late = await routineIn("late", "America/Los_Angeles", { at: "23:55", days: [0] });
+  assert.deepEqual(await dueAt(late.id, "2026-11-16T08:02:00Z"), ["2026-11-16T07:55:00.000Z"], "yesterday's slot, just after local midnight");
+  assert.deepEqual(await dueAt(late.id, "2026-11-17T08:00:00Z"), [], "Monday isn't one of its days");
+  // Paused routines aren't due. Neither is one changed after the slot: turning it on at 8:05 doesn't run 8:00.
+  const off = await routineIn("off", "UTC", { at: "08:00", enabled: false });
+  assert.deepEqual(await dueAt(off.id, "2026-11-16T08:00:00Z"), []);
+  await db.query("update routines set updated_at = '2026-11-16T08:05:00Z' where id = $1", [hcm.id]);
+  assert.deepEqual(await dueAt(hcm.id, "2026-11-16T01:05:00Z"), [], "changed after the slot");
+  // A time zone Postgres doesn't know counts as America/Chicago, and the other routines still come back.
+  const bad = await routineIn("badtz", "Mars/Base", { at: "08:00" });
+  assert.deepEqual(await dueAt(bad.id, "2026-11-16T14:00:00Z"), ["2026-11-16T14:00:00.000Z"]);
+  assert.deepEqual(await dueAt(la.id, "2026-11-16T16:00:00Z"), ["2026-11-16T16:00:00.000Z"]);
+});
+
+test("due_routines across daylight saving time: the local time moves in UTC, a skipped time runs once, a repeated time runs once", async (t) => {
+  if (!db) return t.skip("no test database");
+  // New York: 8:00 is 12:00 UTC in summer time and 13:00 UTC in standard time. Clocks went back on 2026-11-01.
+  const ny = await routineIn("ny", "America/New_York", { at: "08:00" });
+  assert.deepEqual(await dueAt(ny.id, "2026-10-30T12:00:00Z"), ["2026-10-30T12:00:00.000Z"]);
+  assert.deepEqual(await dueAt(ny.id, "2026-11-02T12:00:00Z"), []);
+  assert.deepEqual(await dueAt(ny.id, "2026-11-02T13:00:00Z"), ["2026-11-02T13:00:00.000Z"]);
+  // 2:30 doesn't exist on 2026-03-08 (2:00 jumps to 3:00). It still runs that day, exactly once.
+  const spring = await routineIn("spring", "America/New_York", { at: "02:30" });
+  for (let m = 5 * 60; m <= 9 * 60; m++) await queueAt(new Date(Date.UTC(2026, 2, 8, 0, m)).toISOString());
+  assert.deepEqual(await runsOf(spring.id), [{ slot: "2026-03-08T07:30:00Z", max_attempts: 1 }], "at 3:30 summer time");
+  // 1:30 happens twice on 2026-11-01. It runs once.
+  const fall = await routineIn("fall", "America/New_York", { at: "01:30" });
+  for (let m = 4 * 60; m <= 8 * 60; m++) await queueAt(new Date(Date.UTC(2026, 10, 1, 0, m)).toISOString());
+  assert.equal((await runsOf(fall.id)).length, 1);
+});
+
+test("queue_routine_runs: one job per routine and scheduled minute, even when two worker ticks run at once", async (t) => {
+  if (!db) return t.skip("no test database");
+  const r = await routineIn("once", "Europe/London", { at: "09:00", days: [1, 2] });
+  const at = "2026-11-16T09:00:30Z";
+  // Two connections queue at the same moment.
+  const second = new pg.Client({ connectionString: dbUrl });
+  await second.connect();
+  try {
+    await db.query("begin; set local role service_role");
+    await second.query("begin; set local role service_role");
+    const a = (await db.query("select queue_routine_runs($1) n", [at])).rows[0].n;
+    const pending = second.query("select queue_routine_runs($1) n", [at]);
+    await db.query("commit");
+    const b = (await pending).rows[0].n;
+    await second.query("commit");
+    assert.equal(a + b, 1);
+  } finally {
+    await second.end();
+  }
+  assert.equal(await queueAt("2026-11-16T09:01:00Z"), 0, "the next tick in the same 10 minutes queues nothing");
+  assert.equal(await queueAt("2026-11-16T09:09:00Z"), 0);
+  const runs = await runsOf(r.id);
+  assert.deepEqual(runs, [{ slot: "2026-11-16T09:00:00Z", max_attempts: 1 }]);
+  const row = (await db.query("select last_run_at from routines where id = $1", [r.id])).rows[0];
+  assert.equal((row.last_run_at as Date).toISOString(), "2026-11-16T09:00:00.000Z");
+  const job = (await db.query("select workspace_id from jobs where kind = 'run_routine' and payload ->> 'routine' = $1", [r.id])).rows[0];
+  assert.equal(job.workspace_id, r.ws);
+  // The next day it runs again.
+  assert.equal(await queueAt("2026-11-17T09:00:00Z") >= 1, true);
+  assert.deepEqual(
+    (await runsOf(r.id)).map((x) => x.slot),
+    ["2026-11-16T09:00:00Z", "2026-11-17T09:00:00Z"],
+  );
+  // Run now at 8:59 doesn't stop the 9:00 run, but a run at 9:00:20 means the 9:00 slot already ran.
+  await db.query("update routines set last_run_at = '2026-11-18T08:59:00Z' where id = $1", [r.id]);
+  assert.deepEqual(await dueAt(r.id, "2026-11-18T09:00:00Z"), [], "Wednesday isn't one of its days");
+  await db.query("update routines set days = '{3}' where id = $1", [r.id]);
+  // The change above counts from now, so set it back to long ago to test the slot.
+  await db.query("update routines set updated_at = '2026-01-01' where id = $1", [r.id]);
+  assert.deepEqual(await dueAt(r.id, "2026-11-18T09:00:00Z"), ["2026-11-18T09:00:00.000Z"]);
+  await db.query("update routines set last_run_at = '2026-11-18T09:00:20Z' where id = $1", [r.id]);
+  assert.deepEqual(await dueAt(r.id, "2026-11-18T09:01:00Z"), []);
+});
+
+test("skills: members read, owners and admins write, editors and viewers only read, names unique per teammate", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("sk-rls");
+  const other = await team("sk-other");
+  const add = (u: User, name: string, agent: string | null = null) =>
+    asCommit(u, async (q) => (await q("insert into skills (workspace_id, agent, name, description, body) values ($1, $2, $3, 'Use it when x.', '# Steps') returning id, created_by", [ws, agent, name])).rows[0]);
+  const s = await add(admin, "welcome", "social");
+  assert.equal(s.created_by, admin.id);
+  await add(owner, "welcome");
+  await add(owner, "welcome", "seo");
+  await assert.rejects(add(owner, "welcome", "social"), /skills_name_idx/);
+  await assert.rejects(add(owner, "welcome"), /skills_name_idx/);
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => assert.equal((await q("select * from skills where workspace_id = $1", [ws])).rowCount, 3));
+  }
+  for (const u of [editor, viewer]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into skills (workspace_id, name, description, body) values ($1, 'mine', 'd', 'b')", [ws]), /row-level security/);
+    });
+    await as(u, async (q) => {
+      assert.equal((await q("update skills set body = 'changed' where id = $1", [s.id])).rowCount, 0);
+      assert.equal((await q("delete from skills where id = $1", [s.id])).rowCount, 0);
+    });
+  }
+  await as(other.owner, async (q) => {
+    assert.equal((await q("select * from skills where workspace_id = $1", [ws])).rowCount, 0);
+    assert.equal((await q("update skills set body = 'hacked' where id = $1", [s.id])).rowCount, 0);
+  });
+  await as(other.owner, async (q) => {
+    await assert.rejects(q("insert into skills (workspace_id, name, description, body) values ($1, 'planted', 'd', 'b')", [ws]), /row-level security/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from skills"), /permission denied/);
+  });
+  await as(admin, async (q) => {
+    await assert.rejects(q("update skills set workspace_id = $2 where id = $1", [s.id, other.ws]), /permission denied/);
+  });
+  await as(admin, async (q) => {
+    const before = (await q("select updated_at from skills where id = $1", [s.id])).rows[0].updated_at as Date;
+    await q("select pg_sleep(0.01)");
+    assert.equal((await q("update skills set body = '# New steps', description = 'Use it when y.' where id = $1", [s.id])).rowCount, 1);
+    assert.ok(((await q("select updated_at from skills where id = $1", [s.id])).rows[0].updated_at as Date) > before);
+    assert.equal((await q("delete from skills where id = $1", [s.id])).rowCount, 1);
+  });
+  for (const [sql, err] of [
+    ["insert into skills (workspace_id, name, description, body) values ($1, 'Bad Name', 'd', 'b')", /skills_name_check/],
+    ["insert into skills (workspace_id, agent, name, description, body) values ($1, 'zeus', 'x', 'd', 'b')", /skills_agent_check/],
+    ["insert into skills (workspace_id, name, description, body) values ($1, 'x', ' ', 'b')", /skills_description_check/],
+    ["insert into skills (workspace_id, name, description, body) values ($1, 'x', 'd', repeat('a', 20001))", /skills_body_check/],
+  ] as const) {
+    await assert.rejects(db.query(sql, [ws]), err, sql);
+  }
+  await db.query("insert into skills (workspace_id, name, description, body) select $1, 's' || g, 'd', 'b' from generate_series(1, 97) g", [ws]);
+  await as(admin, async (q) => {
+    await assert.rejects(q("insert into skills (workspace_id, name, description, body) values ($1, 'one-more', 'd', 'b')", [ws]), /up to 100 skills/);
+  });
+});
+
+test("memories: members read and delete, only the server writes, the same fact once, 200 at most", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor, viewer } = await team("mem-rls");
+  const other = await team("mem-other");
+  const thread = await chatIn(ws, owner);
+  const save = (fact: string, agent: string | null = null) =>
+    asService(async (q) => (await q("insert into memories (workspace_id, agent, fact, thread_id) values ($1, $2, $3, $4) returning id, fact_key", [ws, agent, fact, thread])).rows[0]);
+  const a = await save("Closed on Mondays.");
+  assert.equal(a.fact_key, "closed on mondays");
+  await save("Posts sound warm.", "social");
+  await assert.rejects(save("  closed ON mondays!! "), /memories_fact_idx/, "the same fact in other words' case and punctuation");
+  for (const u of [owner, editor, viewer]) {
+    await as(u, async (q) => assert.equal((await q("select * from memories where workspace_id = $1", [ws])).rowCount, 2));
+  }
+  // Nobody writes memories by hand, not even the owner.
+  for (const u of [owner, editor]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into memories (workspace_id, fact) values ($1, 'Planted')", [ws]), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("update memories set fact = 'Changed' where id = $1", [a.id]), /permission denied/);
+    });
+  }
+  await as(other.owner, async (q) => {
+    assert.equal((await q("select * from memories where workspace_id = $1", [ws])).rowCount, 0);
+    assert.equal((await q("delete from memories where id = $1", [a.id])).rowCount, 0);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from memories"), /permission denied/);
+  });
+  // A viewer can delete a wrong fact.
+  await asCommit(viewer, async (q) => assert.equal((await q("delete from memories where id = $1", [a.id])).rowCount, 1));
+  for (const [sql, err] of [
+    ["insert into memories (workspace_id, fact) values ($1, ' ')", /memories_fact_check/],
+    ["insert into memories (workspace_id, fact) values ($1, repeat('a', 501))", /memories_fact_check/],
+    ["insert into memories (workspace_id, agent, fact) values ($1, 'zeus', 'x')", /memories_agent_check/],
+  ] as const) {
+    await assert.rejects(db.query(sql, [ws]), err, sql);
+  }
+  await db.query("insert into memories (workspace_id, fact) select $1, 'Fact ' || g from generate_series(1, 199) g", [ws]);
+  await assert.rejects(save("One more"), /Memory is full/);
+  // Deleting the chat keeps the fact; deleting the workspace removes it.
+  await db.query("delete from threads where id = $1", [thread]);
+  assert.equal((await db.query("select thread_id from memories where workspace_id = $1 and agent = 'social'", [ws])).rows[0].thread_id, null);
+  await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
+  assert.equal((await db.query("select count(*)::int n from memories where workspace_id = $1", [ws])).rows[0].n, 0);
+});

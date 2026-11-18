@@ -73,6 +73,12 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
       delete: () => ((op = "delete"), q),
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
       is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), q),
+      // PostgREST's or=(a.is.null,a.eq.x): only "is.null" and "eq" are understood.
+      or: (expr: string) => {
+        const parts = expr.split(",").map((p) => p.split("."));
+        filters.push((r) => parts.some(([c, op, ...v]) => (op === "is" ? (r[c] ?? null) === null : op === "eq" ? String(r[c]) === v.join(".") : false)));
+        return q;
+      },
       maybeSingle: () => ((one = true), q),
       order: (col: string, o: { ascending?: boolean } = {}) => ((sort = { col, asc: o.ascending !== false }), q),
       limit: (n: number) => ((cap = n), q),

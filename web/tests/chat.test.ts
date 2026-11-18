@@ -5,8 +5,9 @@ import { CHAT_MESSAGES, inlineParts, MAX_MESSAGE, ndjsonLine, rateLimiter, readC
 import { isUuid, threadTitle } from "../src/lib/teamStore.ts";
 
 test("readChat: trims the text, keeps known agents and models, drops the rest", () => {
-  assert.deepEqual(readChat({ text: "  hi  ", threadId: "t", agent: "seo", model: "haiku" }), { ok: true, value: { text: "hi", threadId: "t", agent: "seo", model: "haiku" } });
-  assert.deepEqual(readChat({ text: "hi", agent: "zeus", model: "gpt", threadId: 5 }), { ok: true, value: { text: "hi", threadId: null, agent: null, model: null } });
+  assert.deepEqual(readChat({ text: "  hi  ", threadId: "t", agent: "seo", model: "haiku" }), { ok: true, value: { text: "hi", threadId: "t", agent: "seo", model: "haiku", routineId: null } });
+  assert.deepEqual(readChat({ text: "hi", agent: "zeus", model: "gpt", threadId: 5 }), { ok: true, value: { text: "hi", threadId: null, agent: null, model: null, routineId: null } });
+  assert.deepEqual(readChat({ text: "hi", routineId: "r1" }), { ok: true, value: { text: "hi", threadId: null, agent: null, model: null, routineId: "r1" } });
   assert.deepEqual(readChat({ text: "   " }), { ok: false, error: CHAT_MESSAGES.empty });
   assert.deepEqual(readChat({}), { ok: false, error: CHAT_MESSAGES.empty });
   assert.deepEqual(readChat({ text: "x".repeat(MAX_MESSAGE + 1) }), { ok: false, error: CHAT_MESSAGES.tooLong });

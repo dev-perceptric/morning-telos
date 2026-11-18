@@ -1,0 +1,12 @@
+{
+  "_about": "Tool names copied from Arrowsterr (src/lib/mcp/tools.ts, TOOLS) and Capybaroar (src/lib/api/mcp.ts, TOOLS) on 2026-11-18. read: only looks. write: changes something, so it waits for approval. tests/skills.test.ts checks that System skills name only these tools, or Morning Telos's own. Update this file when a product adds or renames a tool.",
+  "arrowsterr": {
+    "read": ["list_brands", "get_ai_visibility", "get_visibility_trend", "get_prompts", "get_prompt_answers", "get_competitors", "get_cited_sources", "get_ai_crawlers", "get_brand_presence", "get_content_plan", "get_topic_bank", "keyword_research"],
+    "write": ["add_to_content_plan", "update_content_plan", "remove_from_content_plan", "add_prompts"]
+  },
+  "capybaroar": {
+    "read": ["list_brands", "list_channels", "list_channel_groups", "list_campaigns", "list_posts", "get_post", "list_media", "get_generation", "get_credits", "next_queue_slot", "get_analytics", "list_webhooks"],
+    "write": ["create_posts", "update_post", "delete_post", "upload_media", "generate_media", "create_webhook", "set_webhook", "test_webhook", "delete_webhook"]
+  },
+  "morningtelos": ["search_knowledge", "handoff", "use_skill", "remember"]
+}
