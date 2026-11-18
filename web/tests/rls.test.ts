@@ -546,8 +546,10 @@ test("a new workspace queues exactly one provision job and two pending services"
   if (!db) return t.skip("no test database");
   const o = await signUp("prov1@example.com", { business: "Prov Co", website: "prov.example" });
   const ws = await wsOf(o);
-  const jobs = (await db.query("select kind, payload, attempts, max_attempts, done_at, run_at <= now() as due from jobs where workspace_id = $1", [ws])).rows;
+  const jobs = (await db.query("select kind, payload, attempts, max_attempts, done_at, run_at <= now() as due from jobs where workspace_id = $1 and kind = 'provision'", [ws])).rows;
   assert.deepEqual(jobs, [{ kind: "provision", payload: {}, attempts: 0, max_attempts: 5, done_at: null, due: true }]);
+  // Its website is read too (012_knowledge.sql), as its own job.
+  assert.deepEqual((await db.query("select kind from jobs where workspace_id = $1 and kind <> 'provision'", [ws])).rows, [{ kind: "scan_website" }]);
   const svc = (await db.query("select product, status, brand_id, sealed_key from services where workspace_id = $1 order by product", [ws])).rows;
   assert.deepEqual(svc, [
     { product: "arrowsterr", status: "pending", brand_id: null, sealed_key: null },
@@ -1143,4 +1145,233 @@ test("deleting a workspace deletes its chats and settings, and keeps its AI usag
   assert.equal((await db.query("select count(*)::int n from messages where workspace_id = $1", [ws])).rows[0].n, 0);
   assert.equal((await db.query("select count(*)::int n from agent_prefs where workspace_id = $1", [ws])).rows[0].n, 0);
   assert.deepEqual((await db.query("select workspace_id, thread_id, cost_usd from ai_usage where id = $1", [u])).rows, [{ workspace_id: null, thread_id: null, cost_usd: "0.100000" }]);
+});
+
+// ─────────────── P3.2: Knowledge, search and the website scan (012_knowledge.sql) ───────────────
+
+/** A workspace with an owner, an editor and a viewer, and a stranger from another workspace. */
+async function knowledgeTeam(tag: string, website: string | null = null) {
+  const owner = await signUp(`kn-own-${tag}@example.com`, { business: `Kn ${tag}`, ...(website ? { website } : {}) });
+  const ws = await wsOf(owner);
+  const editor = await signUp(`kn-ed-${tag}@example.com`);
+  const viewer = await signUp(`kn-vw-${tag}@example.com`);
+  await db!.query("insert into workspace_members (workspace_id, user_id, email, role) values ($1, $2, $3, 'editor'), ($1, $4, $5, 'viewer')", [ws, editor.id, editor.email, viewer.id, viewer.email]);
+  const stranger = await signUp(`kn-str-${tag}@example.com`, { business: `Other ${tag}` });
+  return { owner, editor, viewer, stranger, ws, otherWs: await wsOf(stranger) };
+}
+
+const asService = async <T,>(fn: (q: (sql: string, args?: unknown[]) => Promise<pg.QueryResult>) => Promise<T>): Promise<T> => {
+  await db!.query("begin");
+  try {
+    await db!.query("set local role service_role");
+    const r = await fn((sql, args) => db!.query(sql, args));
+    await db!.query("commit");
+    return r;
+  } catch (e) {
+    await db!.query("rollback");
+    throw e;
+  }
+};
+
+test("knowledge_docs: members read, editors and up write, viewers only read, other workspaces and visitors see nothing", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { owner, editor, viewer, stranger, ws, otherWs } = await knowledgeTeam("rls");
+  const id = await asCommit(editor, async (q) =>
+    (await q("insert into knowledge_docs (workspace_id, title, body, agent) values ($1, 'Prices', 'Loaf $8', 'social') returning id, created_by, source", [ws])).rows[0]);
+  assert.equal(id.created_by, editor.id);
+  assert.equal(id.source, "manual");
+
+  for (const u of [owner, editor, viewer]) {
+    await as(u, async (q) => assert.equal((await q("select * from knowledge_docs where workspace_id = $1", [ws])).rowCount, 1));
+  }
+  // A viewer can't add, change or delete.
+  await as(viewer, async (q) => {
+    await assert.rejects(q("insert into knowledge_docs (workspace_id, title) values ($1, 'Mine')", [ws]), /row-level security/);
+  });
+  await as(viewer, async (q) => {
+    assert.equal((await q("update knowledge_docs set title = 'Changed' where id = $1", [id.id])).rowCount, 0);
+    assert.equal((await q("delete from knowledge_docs where id = $1", [id.id])).rowCount, 0);
+  });
+  // Editors change and delete; updated_at follows the change.
+  await as(editor, async (q) => {
+    const before = (await q("select updated_at from knowledge_docs where id = $1", [id.id])).rows[0].updated_at as Date;
+    await q("select pg_sleep(0.01)");
+    await q("update knowledge_docs set title = 'Our prices', body = 'Loaf $9', agent = null where id = $1", [id.id]);
+    const after = (await q("select title, updated_at from knowledge_docs where id = $1", [id.id])).rows[0];
+    assert.equal(after.title, "Our prices");
+    assert.ok(after.updated_at >= before);
+    assert.equal((await q("delete from knowledge_docs where id = $1", [id.id])).rowCount, 1);
+  });
+  // Someone from another workspace, and a signed-out visitor, see and change nothing.
+  await as(stranger, async (q) => {
+    assert.equal((await q("select * from knowledge_docs where workspace_id = $1", [ws])).rowCount, 0);
+    assert.equal((await q("update knowledge_docs set title = 'hacked' where id = $1", [id.id])).rowCount, 0);
+    assert.equal((await q("delete from knowledge_docs where id = $1", [id.id])).rowCount, 0);
+  });
+  await as(stranger, async (q) => {
+    await assert.rejects(q("insert into knowledge_docs (workspace_id, title) values ($1, 'Planted')", [ws]), /row-level security/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from knowledge_docs"), /permission denied/);
+  });
+  // Editors can't fake who wrote a doc, claim it came from the website, or move it to another workspace.
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into knowledge_docs (workspace_id, title, created_by) values ($1, 'X', $2)", [ws, owner.id]), /permission denied/);
+  });
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into knowledge_docs (workspace_id, title, source) values ($1, 'X', 'website')", [ws]), /row-level security/);
+  });
+  await as(editor, async (q) => {
+    await assert.rejects(q("update knowledge_docs set source = 'website' where id = $1", [id.id]), /permission denied/);
+  });
+  await as(editor, async (q) => {
+    await assert.rejects(q("update knowledge_docs set workspace_id = $2 where id = $1", [id.id, otherWs]), /permission denied/);
+  });
+  // Only the server saves the website doc.
+  await as(owner, async (q) => {
+    await assert.rejects(q("select save_website_doc($1, 'About', 'x', 'https://x.example/')", [ws]), /permission denied for function save_website_doc/);
+  });
+});
+
+test("knowledge_docs: known values only, 200 docs at most (the website doc aside), one website doc replaced each scan, gone with the workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { owner, editor, ws } = await knowledgeTeam("limits");
+  for (const [sql, err] of [
+    ["insert into knowledge_docs (workspace_id, title) values ($1, ' ')", /knowledge_docs_title_check/],
+    ["insert into knowledge_docs (workspace_id, title, agent) values ($1, 'X', 'Bad Agent')", /knowledge_docs_agent_check/],
+    ["insert into knowledge_docs (workspace_id, title, source) values ($1, 'X', 'email')", /knowledge_docs_source_check/],
+    ["insert into knowledge_docs (workspace_id, title, body) values ($1, 'X', repeat('a', 50001))", /knowledge_docs_body_check/],
+  ] as const) {
+    await assert.rejects(db.query(sql, [ws]), err);
+  }
+
+  const first = await asService(async (q) => (await q("select save_website_doc($1, 'Website notes', 'From the site', 'https://kn.example/') id", [ws])).rows[0].id);
+  const again = await asService(async (q) => (await q("select save_website_doc($1, 'About Kn limits', 'What we sell: bread', 'https://kn.example/') id", [ws])).rows[0].id);
+  assert.equal(again, first, "a new scan replaces the website doc");
+  assert.deepEqual((await db.query("select title, body, source, created_by from knowledge_docs where workspace_id = $1", [ws])).rows, [
+    { title: "About Kn limits", body: "What we sell: bread", source: "website", created_by: null },
+  ]);
+
+  await db.query("insert into knowledge_docs (workspace_id, title) select $1, 'Doc ' || g from generate_series(1, 200) g", [ws]);
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into knowledge_docs (workspace_id, title) values ($1, 'One more')", [ws]), /You can have up to 200 docs/);
+  });
+  await asService(async (q) => q("select save_website_doc($1, 'About Kn limits', 'Still saves', 'https://kn.example/')", [ws]));
+  assert.equal((await db.query("select body from knowledge_docs where workspace_id = $1 and source = 'website'", [ws])).rows[0].body, "Still saves");
+
+  await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
+  assert.equal((await db.query("select count(*)::int n from knowledge_docs where workspace_id = $1", [ws])).rows[0].n, 0);
+});
+
+test("search_knowledge: word matches first, title before body, a plain text fallback, plain snippets, only the caller's workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { owner, viewer, stranger, ws, otherWs } = await knowledgeTeam("search");
+  const add = (w: string, title: string, body: string) => db!.query("insert into knowledge_docs (workspace_id, title, body) values ($1, $2, $3)", [w, title, body]);
+  await add(ws, "Prices", "A sourdough loaf costs $8 and a rye loaf costs $9.");
+  await add(ws, "Menu", "Breads, cakes and pastries. Ask about our prices for weddings.");
+  await add(ws, "Wedding cakes", "We bake custom cakes for weddings and birthdays. Order two weeks ahead.");
+  await add(ws, "Hours", "Open Tuesday to Sunday, 7 to 3. 50% off bread after 2.");
+  await add(otherWs, "Prices", "Secret prices of another business.");
+
+  const search = (u: User, w: string, text: string, n = 8) => as(u, async (q) => (await q("select id, title, snippet, rank from search_knowledge($1, $2, $3)", [w, text, n])).rows);
+
+  const prices = await search(viewer, ws, "prices");
+  assert.deepEqual(prices.map((r) => r.title), ["Prices", "Menu"], "a title match ranks above a body match");
+  assert.ok(prices.every((r) => r.rank >= 1));
+  assert.ok(prices[0].rank > prices[1].rank);
+  assert.match(prices[1].snippet, /Ask about our prices for weddings/);
+  assert.doesNotMatch(prices[1].snippet, /<b>|<\/b>/, "snippets are plain text");
+
+  // Stemming: "baking" finds "bake"; two words both count.
+  assert.deepEqual((await search(viewer, ws, "baking birthdays")).map((r) => r.title), ["Wedding cakes"]);
+  // Part of a word isn't a word match, so the plain text match finds it, titles first.
+  const part = await search(viewer, ws, "wedd");
+  assert.deepEqual(part.map((r) => [r.title, r.rank]), [["Wedding cakes", 0.5], ["Menu", 0.25]]);
+  const sour = await search(viewer, ws, "sourd");
+  assert.deepEqual(sour.map((r) => r.title), ["Prices"]);
+  assert.match(sour[0].snippet, /sourdough loaf costs \$8/);
+  // A % or _ is a plain character, not a wildcard.
+  assert.deepEqual((await search(viewer, ws, "50%")).map((r) => r.title), ["Hours"]);
+  assert.deepEqual(await search(viewer, ws, "_"), []);
+  assert.deepEqual(await search(viewer, ws, "   "), []);
+  assert.equal((await search(viewer, ws, "cakes", 1)).length, 1);
+
+  // Another workspace's docs never come back, even when asked for by id.
+  assert.deepEqual(await search(stranger, ws, "prices"), []);
+  assert.deepEqual((await search(owner, otherWs, "prices")), []);
+  assert.match((await search(stranger, otherWs, "prices"))[0].snippet, /^Secret prices of another business/);
+  // The server (service role, no row level security) still gets only the workspace it names.
+  const server = await asService(async (q) => (await q("select title from search_knowledge($1, 'prices', 8)", [ws])).rows);
+  assert.deepEqual(server.map((r) => r.title), ["Prices", "Menu"]);
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from search_knowledge($1, 'prices', 8)", [ws]), /permission denied/);
+  });
+});
+
+test("website scan: queued for a new workspace with a website and when it changes, once at a time", async (t) => {
+  if (!db) return t.skip("no test database");
+  const scans = async (w: string, open = true) =>
+    (await db!.query(`select count(*)::int n from jobs where workspace_id = $1 and kind = 'scan_website'${open ? " and done_at is null" : ""}`, [w])).rows[0].n as number;
+  const { owner, ws } = await knowledgeTeam("scan", "scan.example");
+  assert.equal(await scans(ws), 1);
+  assert.equal((await db.query("select max_attempts from jobs where workspace_id = $1 and kind = 'scan_website'", [ws])).rows[0].max_attempts, 3);
+  // No website, no scan. create_workspace in the app works the same.
+  const none = await signUp("kn-none@example.com", { business: "No Site" });
+  assert.equal(await scans(await wsOf(none), false), 0);
+  const made = await asCommit(owner, async (q) => (await q("select create_workspace('Made Here', 'made.example') id")).rows[0].id as string);
+  assert.equal(await scans(made), 1);
+
+  // Changing the website while a scan waits adds nothing. After it ran, a change queues a new one.
+  await asCommit(owner, (q) => q("update workspaces set website = 'scan.example/home' where id = $1", [ws]));
+  assert.equal(await scans(ws), 1);
+  await db.query("update jobs set done_at = now() where workspace_id = $1 and kind = 'scan_website'", [ws]);
+  await asCommit(owner, (q) => q("update workspaces set name = 'Renamed' where id = $1", [ws]));
+  await asCommit(owner, (q) => q("update workspaces set website = '' where id = $1", [ws]));
+  assert.equal(await scans(ws), 0, "renaming or clearing the website reads nothing");
+  await asCommit(owner, (q) => q("update workspaces set website = 'new-scan.example' where id = $1", [ws]));
+  assert.equal(await scans(ws), 1);
+  // A scan running right now may have read the old address, so a change queues another.
+  await db.query("update jobs set locked_until = now() + interval '5 minutes', attempts = 1 where workspace_id = $1 and kind = 'scan_website' and done_at is null", [ws]);
+  await asCommit(owner, (q) => q("update workspaces set website = 'newer-scan.example' where id = $1", [ws]));
+  assert.equal(await scans(ws), 2);
+  await as(owner, async (q) => {
+    await assert.rejects(q("select queue_website_scan()"), /permission denied|trigger functions can only be called as triggers/);
+  });
+});
+
+test("rescan_website: editors and up start a scan, once at a time; website_scan_status shows members where it is", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { owner, editor, viewer, stranger, ws } = await knowledgeTeam("rescan", "rescan.example");
+  const status = (u: User) => as(u, async (q) => (await q("select status from website_scan_status($1)", [ws])).rows.map((r) => r.status));
+  assert.deepEqual(await status(viewer), ["queued"]);
+  assert.deepEqual(await status(stranger), []);
+
+  await as(viewer, async (q) => {
+    await assert.rejects(q("select rescan_website($1)", [ws]), /You need editor access/);
+  });
+  await as(stranger, async (q) => {
+    await assert.rejects(q("select rescan_website($1)", [ws]), /You need editor access/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select rescan_website($1)", [ws]), /permission denied/);
+  });
+  // One is already waiting.
+  assert.equal(await asCommit(editor, async (q) => (await q("select rescan_website($1) ok", [ws])).rows[0].ok), false);
+
+  await db.query("update jobs set locked_until = now() + interval '5 minutes', attempts = 1 where workspace_id = $1 and kind = 'scan_website'", [ws]);
+  assert.deepEqual(await status(viewer), ["running"]);
+  await db.query("update jobs set locked_until = null, attempts = max_attempts where workspace_id = $1 and kind = 'scan_website'", [ws]);
+  assert.deepEqual(await status(viewer), ["failed"]);
+  // Just started (in the last 2 minutes): no second scan yet.
+  assert.equal(await asCommit(editor, async (q) => (await q("select rescan_website($1) ok", [ws])).rows[0].ok), false);
+  await db.query("update jobs set created_at = now() - interval '10 minutes' where workspace_id = $1 and kind = 'scan_website'", [ws]);
+  assert.equal(await asCommit(editor, async (q) => (await q("select rescan_website($1) ok", [ws])).rows[0].ok), true);
+  assert.deepEqual(await status(owner), ["queued"]);
+  await db.query("update jobs set done_at = now() where workspace_id = $1 and kind = 'scan_website'", [ws]);
+  assert.deepEqual(await status(viewer), ["done"]);
+
+  await asCommit(owner, (q) => q("update workspaces set website = null where id = $1", [ws]));
+  await as(editor, async (q) => {
+    await assert.rejects(q("select rescan_website($1)", [ws]), /Add your website in Settings first/);
+  });
 });

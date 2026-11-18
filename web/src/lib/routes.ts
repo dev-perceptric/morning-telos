@@ -6,6 +6,7 @@ export type Route =
   | { page: "home" }
   | { page: "thread"; id: string | null }
   | { page: "team" }
+  | { page: "knowledge" }
   | { page: "settings"; tab: SettingsTab }
   | { page: "invite"; token: string };
 
@@ -29,6 +30,7 @@ export function parseRoute(path: string): Route {
   if (p === "/chat") return { page: "thread", id: null };
   const chat = /^\/chat\/([^/]+)$/.exec(p);
   if (chat && UUID.test(chat[1])) return { page: "thread", id: chat[1].toLowerCase() };
+  if (p === "/knowledge") return { page: "knowledge" };
   return { page: "home" };
 }
 
@@ -37,5 +39,6 @@ export function routePath(r: Route): string {
   if (r.page === "invite") return `/invite/${r.token}`;
   if (r.page === "thread") return r.id ? `/chat/${r.id}` : "/chat";
   if (r.page === "team") return "/team";
+  if (r.page === "knowledge") return "/knowledge";
   return "/";
 }

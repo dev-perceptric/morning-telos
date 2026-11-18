@@ -12,6 +12,7 @@ import { inviteTokenFromPath, roleLabel } from "@/lib/workspace";
 import { AuthScreen, NewPassword } from "./AuthScreen";
 import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
 import { SettingsPage, type Workspace } from "./Settings";
+import { KnowledgePage } from "./Knowledge";
 import { ConnectSocialCard } from "./Social";
 import { TeamHome, TeamPage, ThreadPage } from "./Team";
 import { AGENTS } from "@/lib/team";
@@ -204,6 +205,8 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
                 navigate("/");
               }}
             />
+          ) : route.page === "knowledge" ? (
+            <KnowledgePage key={ws.id} sb={sb} ws={ws} />
           ) : (
             <Home sb={sb} ws={ws} draft={draft} onDraft={setDraft} onStart={startChat} />
           )}
@@ -266,6 +269,7 @@ function SetupStatus({ sb, workspaceId }: { sb: SupabaseClient; workspaceId: str
 const NAV = [
   { page: "home", label: "Home", path: "/" },
   { page: "team", label: "Team", path: "/team" },
+  { page: "knowledge", label: "Knowledge", path: "/knowledge" },
   { page: "settings", label: "Settings", path: "/settings" },
 ] as const;
 
