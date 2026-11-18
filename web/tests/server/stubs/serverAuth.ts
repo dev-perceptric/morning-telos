@@ -40,3 +40,6 @@ export function roleGate(request: Request, workspaceId: unknown) {
 
 /** Email is off in route tests, so nothing reaches Resend. */
 export const resendSettings = () => ({ key: "", from: "Morning Telos <meet@morningtelos.com>", fetch });
+
+/** The address the request came to, like the real appOrigin without APP_URL. */
+export const appOrigin = (request: Request) => new URL(request.url).origin;

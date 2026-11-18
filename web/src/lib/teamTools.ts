@@ -1,5 +1,6 @@
 // The AI team's tools on the server: every tool source, put together (toolRegistry.ts), and the database side of
-// approvals (supabase/013_approvals.sql). Used by POST /api/chat and POST /api/approvals/:id, and by anything else
+// approvals (supabase/013_approvals.sql). Approvals run through runTeamApproval: Arrowsterr and Capybaroar changes
+// through productTools.ts, changes in the customer's own apps through src/lib/composio/appAction.ts. Used by POST /api/chat and POST /api/approvals/:id, and by anything else
 // that runs a turn (routines).
 //
 // To add tools, write a ToolSource (a function from ToolContext to { tools, missing }) and add it to the list in
@@ -8,12 +9,15 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ToolRegistry } from "./agentLoop.ts";
-import type { Approval, Decision, NewApproval } from "./approvals.ts";
+import type { Approval, Decision, NewApproval, RunResult } from "./approvals.ts";
+import { appToolSource, isAppApproval, runApproval as runAppApproval, type AppToolDeps } from "./composio/appAction.ts";
+import { composioOn } from "./composio/composio.ts";
+import { connectionsOf, markReconnect } from "./composio/store.ts";
 import { knowledgeToolSource } from "./knowledgeTools.ts";
 import { searchKnowledge } from "./knowledgeServer.ts";
 import { mcpClient, type McpClient } from "./mcpClient.ts";
 import type { Product } from "./partner.ts";
-import { mcpUrls, productToolSource, type ActivityRow, type ProductToolDeps, type ServiceRow } from "./productTools.ts";
+import { mcpUrls, productToolSource, runApproval as runProductApproval, type ActivityRow, type ProductToolDeps, type ServiceRow } from "./productTools.ts";
 import { open } from "./sealing.ts";
 import { composeTools, type ToolSource } from "./toolRegistry.ts";
 
@@ -67,11 +71,33 @@ export function productDeps(db: SupabaseClient, log?: (message: string) => void)
   };
 }
 
+/** What the app tools need on the server: the workspace's connections, Composio from the server's settings, approvals. */
+export function appDeps(db: SupabaseClient, log?: (message: string) => void): AppToolDeps {
+  const store = approvalStore(db);
+  return {
+    on: composioOn(),
+    connections: (workspaceId) => connectionsOf(db, workspaceId),
+    saveApproval: store.save,
+    activity: store.activity,
+    markReconnect: (workspaceId, toolkit, why) => markReconnect(db, workspaceId, toolkit, why),
+    log,
+  };
+}
+
+/** Runs an approved change where it belongs: the customer's own app, or Arrowsterr and Capybaroar. */
+export function runTeamApproval(db: SupabaseClient, log?: (message: string) => void): (ap: Approval) => Promise<RunResult> {
+  const products = productDeps(db, log);
+  const apps = appDeps(db, log);
+  return (ap) => (isAppApproval(ap) ? runAppApproval(ap, apps) : runProductApproval(ap, products));
+}
+
 /** Every tool source, in order. The first source's tool wins when two share a name. */
 export function toolSources(db: SupabaseClient, log?: (message: string) => void): ToolSource[] {
   return [
     // Arrowsterr and Capybaroar through the workspace's brand keys, with approvals.
     productToolSource(productDeps(db, log)),
+    // The customer's own apps through Composio (app_search_actions, app_action), with approvals.
+    appToolSource(appDeps(db, log)),
     // search_knowledge for every working agent.
     knowledgeToolSource((ws, q, n) => searchKnowledge(ws, q, n, db)),
   ];

@@ -1,4 +1,4 @@
-// Approvals: a change an agent wants to make in Arrowsterr or Capybaroar waits here until an editor says yes.
+// Approvals: a change an agent wants to make in Arrowsterr, Capybaroar or a connected app waits here until an editor says yes.
 // Ported from the old app (app/lib/agents.js isWrite and the approvals routes in app/server.js) and shaped like
 // Omniscient's confirm cards (src/lib/askActions.ts): the tool checks the request and saves a card, and only the
 // person's click runs the change.
@@ -17,7 +17,7 @@ export type Approval = {
   workspace_id: string;
   thread_id: string | null;
   agent: AgentKey;
-  /** Where it runs: "arrowsterr" or "capybaroar" for now. */
+  /** Where it runs: "arrowsterr", "capybaroar", or a connected app's Composio toolkit like "gmail" (composio/appAction.ts). */
   product: string;
   /** The product's own tool name, like "create_posts". */
   tool: string;
