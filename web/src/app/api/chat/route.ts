@@ -2,6 +2,8 @@ import * as Sentry from "@sentry/nextjs";
 import { randomUUID } from "node:crypto";
 import { runTurn, type ChatEvent, type TeamWorkspace } from "@/lib/agentLoop";
 import { CHAT_MESSAGES, ndjsonLine, rateLimiter, readChat } from "@/lib/chat";
+import { knowledgeSection } from "@/lib/knowledge";
+import { knowledgeForPrompt } from "@/lib/knowledgeServer";
 import { teamClient } from "@/lib/claude";
 import { adminClient, roleGate } from "@/lib/serverAuth";
 import { loadWorkspace, teamStore, threadInWorkspace, threadTitle } from "@/lib/teamStore";
@@ -73,7 +75,14 @@ export async function POST(request: Request) {
       emit({ type: "thread", id: thread });
       try {
         // The turn finishes and is saved even if the person closes the page.
-        await runTurn({ workspace: team, threadId: thread, text, forced: agent, model }, { client: teamClient(), store: teamStore(db, ws), emit, log });
+        await runTurn({ workspace: team, threadId: thread, text, forced: agent, model }, {
+            client: teamClient(),
+            store: teamStore(db, ws),
+            emit,
+            log,
+            // The business brain: this agent's and everyone's docs, as a second cached part of the instructions.
+            context: async (key, w) => [knowledgeSection(w.name, await knowledgeForPrompt(w.id, key, 24_000, db))],
+          });
       } catch (e) {
         log(`Chat turn failed in workspace ${ws}: ${e instanceof Error ? e.message : String(e)}`);
         emit({ type: "message", agent: LEAD, text: "Something went wrong. Try again in a moment.", error: true });

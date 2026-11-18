@@ -143,3 +143,9 @@ export function buildKnowledgePrompt(docs: PromptDoc[], agentKey: string, budget
   if (left.length) parts.push(`More docs that didn't fit here: ${left.join("; ")}. Search Knowledge for them when you need them.`);
   return parts.join("\n");
 }
+
+/** The knowledge part of an agent's instructions: the business's docs, as knowledgeForPrompt built them. */
+export function knowledgeSection(businessName: string, docs: string): string {
+  return `What you know about ${businessName}. Use it, and never contradict it. If something isn't here, ask or search Knowledge.\n<knowledge>\n${docs.trim()}\n</knowledge>`;
+}
+

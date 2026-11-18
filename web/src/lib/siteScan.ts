@@ -141,6 +141,21 @@ export type AskClaude = (req: { model: string; system: string; user: string; sch
 /** What one call cost, for the AI meter. */
 export type AiUsage = { workspaceId: string; kind: "scan_website"; model: string; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; costUsd: number };
 
+/** The ai_usage row for a scan's Claude call: no agent and no thread, so it counts against the month's allowance only. */
+export function usageRow(u: AiUsage) {
+  return {
+    workspace_id: u.workspaceId,
+    thread_id: null,
+    agent: null,
+    model: u.model,
+    input_tokens: u.inputTokens,
+    output_tokens: u.outputTokens,
+    cache_read_tokens: u.cacheReadTokens,
+    cache_write_tokens: u.cacheWriteTokens,
+    cost_usd: Number(u.costUsd.toFixed(6)),
+  };
+}
+
 export function usageOf(workspaceId: string, a: ClaudeAnswer): AiUsage {
   const u = a.usage;
   const cacheRead = u.cache_read_input_tokens ?? 0;

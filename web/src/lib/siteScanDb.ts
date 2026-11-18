@@ -5,7 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Handler } from "./jobs.ts";
 import { fetchPage } from "./siteFetch.ts";
-import { scanWebsite, type AiUsage, type AskClaude } from "./siteScan.ts";
+import { scanWebsite, usageRow, type AiUsage, type AskClaude } from "./siteScan.ts";
 
 type MessagesClient = { messages: { create: (body: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message> } };
 
@@ -35,13 +35,13 @@ export function askWith(client: MessagesClient): AskClaude {
   };
 }
 
-/**
- * The AI meter for the scan's one Claude call.
- * TODO(ai_usage): when the agent loop's migration (011_ai_team.sql) adds ai_usage, insert `u` there with its
- * workspace id, so the scan counts against the month's allowance. Until then it goes to the server log only.
- */
-async function meter(u: AiUsage): Promise<void> {
-  console.info(`AI usage: ${u.kind} for workspace ${u.workspaceId}, ${u.model}, ${u.inputTokens} in, ${u.outputTokens} out, $${u.costUsd.toFixed(6)}`);
+/** The AI meter for the scan's one Claude call: a row in ai_usage, so it counts against the month's allowance.
+ *  A failed write is logged and never fails the scan. */
+function meterWith(db: SupabaseClient) {
+  return async (u: AiUsage): Promise<void> => {
+    const { error } = await db.from("ai_usage").insert(usageRow(u));
+    if (error) warn(`AI usage for the website scan of workspace ${u.workspaceId} wasn't saved: ${error.message}`);
+  };
 }
 
 function warn(message: string) {
@@ -67,7 +67,7 @@ export function knowledgeJobHandlers(db: SupabaseClient, env: Record<string, str
           const { error } = await db.rpc("save_website_doc", { ws: job.workspace_id, p_title: doc.title, p_body: doc.body, p_url: doc.url });
           if (error) throw new Error(/save_website_doc/.test(error.message) ? "Run supabase/012_knowledge.sql in Supabase." : `Could not save the website doc: ${error.message}`);
         },
-        meter,
+        meter: meterWith(db),
         warn,
         attempt: job.attempts,
         maxAttempts: job.max_attempts,
