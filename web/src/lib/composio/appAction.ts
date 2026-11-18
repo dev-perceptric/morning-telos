@@ -14,7 +14,7 @@ import type { ActivityRow } from "../productTools.ts";
 import type { ToolSource } from "../toolRegistry.ts";
 import { AGENTS, type AgentKey } from "../team.ts";
 import { AppSetupError, needsReconnect, runTool, toolsOf, type ActionOpts, type Conn, type JsonSchema, type Sorted } from "./actions.ts";
-import { appName, appsFor, GROUPS, isToolkit, TOOLKITS } from "./catalog.ts";
+import { appAction, appName, appsFor, changeTitle, GROUPS, isToolkit, TOOLKITS } from "./catalog.ts";
 import { composioUser } from "./composio.ts";
 import type { ConnRow } from "./store.ts";
 
@@ -40,6 +40,8 @@ export type AppToolDeps = {
 const errText = (e: unknown) => String((e as Error)?.message ?? e).slice(0, 300);
 const autopilot = (trust: Trust) => trust >= 2;
 const MAX_DATA = 8000;
+/** For an action marked `long` in the catalog (Framer's guide to its own commands). Under the registry's cut. */
+const MAX_LONG_DATA = 14_000;
 const MAX_ARGS = 20_000;
 
 /** The apps a teammate may use, and whether only to read. Reads only for a teammate that never changes anything. */
@@ -159,7 +161,7 @@ async function act(input: Record<string, unknown>, ctx: ToolContext, conns: Conn
   if (missing.length) return fail(`Missing ${missing.join(", ")}. app_search_actions with this action lists the inputs.`);
   if (JSON.stringify(args).length > MAX_ARGS) return fail("Those inputs are too long.");
 
-  const title = `${t.name} (${name})`.slice(0, 200);
+  const title = changeTitle(toolkit, t.slug, t.name);
   if (t.kind === "write" && !autopilot(ctx.trust)) {
     const ap = await deps.saveApproval({ workspace_id: ctx.workspace.id, thread_id: ctx.threadId, agent: ctx.agent, product: toolkit, tool: t.slug, input: args, title, why: WHY(toolkit) });
     await deps.activity({ workspace_id: ctx.workspace.id, agent: ctx.agent, thread_id: ctx.threadId, approval_id: ap.id, text: `prepared "${title}" for your approval` }).catch((e) => deps.log?.(`Activity wasn't saved: ${errText(e)}`));
@@ -169,7 +171,9 @@ async function act(input: Record<string, unknown>, ctx: ToolContext, conns: Conn
     const data = await runTool(conn, t.slug, args, deps.net);
     if (t.kind === "write") await deps.activity({ workspace_id: ctx.workspace.id, agent: ctx.agent, thread_id: ctx.threadId, approval_id: null, text: `ran "${title}" on autopilot` }).catch((e) => deps.log?.(`Activity wasn't saved: ${errText(e)}`));
     const text = JSON.stringify(data ?? null);
-    return { content: JSON.stringify({ app: name, action: t.slug, data: text.length > MAX_DATA ? `${text.slice(0, MAX_DATA)}... (cut short; ask for less)` : data }) };
+    const listed = appAction(toolkit, t.slug);
+    const max = listed?.kind === "read" && listed.long ? MAX_LONG_DATA : MAX_DATA;
+    return { content: JSON.stringify({ app: name, action: t.slug, data: text.length > max ? `${text.slice(0, max)}... (cut short; ask for less)` : data }) };
   } catch (e) {
     if (needsReconnect(e)) await deps.markReconnect(ctx.workspace.id, toolkit, errText(e)).catch((x) => deps.log?.(`Reconnect wasn't saved: ${errText(x)}`));
     return fail(e instanceof AppSetupError ? e.message : `${name} didn't answer. Try again in a moment.`);

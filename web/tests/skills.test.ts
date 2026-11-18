@@ -26,7 +26,7 @@ import {
   type SkillRow,
 } from "../src/lib/skills.ts";
 import { ACTION_TOOL, SEARCH_TOOL } from "../src/lib/composio/appAction.ts";
-import { APP_ACCESS } from "../src/lib/composio/catalog.ts";
+import { APP_ACCESS, appAction } from "../src/lib/composio/catalog.ts";
 import { HIDDEN, toolName } from "../src/lib/productTools.ts";
 import { skillTool } from "../src/lib/skillTool.ts";
 import { AGENTS, workingAgents, type AgentKey } from "../src/lib/team.ts";
@@ -107,6 +107,29 @@ test("Iris, Hora, Hermes and Hestia each have their three skills; app skills say
     assert.match(s.body, /medical/, n);
     assert.match(s.body, /angry/, n);
   }
+});
+
+test("Hephaestus: build-on-framer and the page skills put their work on a connected site builder, never publish on their own, and never delete", () => {
+  const web = SYSTEM_SKILLS.filter((s) => s.agent === "web");
+  assert.deepEqual(web.map((s) => s.name), ["build-on-framer", "improve-a-page", "plan-the-site", "write-a-page"]);
+  for (const n of ["build-on-framer", "improve-a-page", "write-a-page"]) {
+    const s = web.find((x) => x.name === n)!;
+    assert.ok(s.tools.includes("app_search_actions") && s.tools.includes("app_action"), `${n} works through the site builder`);
+    assert.match(s.body, /in Settings, Apps/, `${n} says where to connect a site builder`);
+    assert.match(s.body, /approv/, `${n} says changes wait for the owner's OK`);
+    assert.match(s.body, /Never publish/, n);
+    assert.doesNotMatch(s.body, /\b(FRAMER|WEBFLOW|WORDPRESS_COM)_\w*(DELETE|REMOVE)/, `${n} never names a delete`);
+    // Every action a skill names is one Hephaestus may run.
+    for (const slug of s.body.match(/\b(?:FRAMER|WEBFLOW|WORDPRESS_COM)_[A-Z0-9_]+\b/g) ?? []) {
+      const toolkit = slug.startsWith("WORDPRESS_COM_") ? "wordpress_com" : slug.split("_")[0].toLowerCase();
+      assert.ok(appAction(toolkit, slug), `${n} names ${slug}, which isn't in the catalog`);
+    }
+  }
+  const framer = web.find((x) => x.name === "build-on-framer")!.body;
+  assert.match(framer, /search_knowledge/);
+  assert.match(framer, /FRAMER_DEPLOY/);
+  assert.match(framer, /Ask before you publish/);
+  for (const n of ["write-a-page", "improve-a-page"]) assert.match(web.find((x) => x.name === n)!.body, /Framer.*\n.*Webflow.*\n.*WordPress\.com/, `${n} covers each builder`);
 });
 
 test("a teammate marked coming soon can't own a skill, and the / menu skips it", async () => {

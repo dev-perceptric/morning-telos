@@ -1,7 +1,8 @@
 // The AI team: who is on it, what each one does, and which ones are coming soon (none since plan phase 4, step 2).
 // Ported from the old app (app/lib/agents.js AGENTS and ORDER), so the names, gods and order stay the same. Iris, Hora,
 // Hermes and Hestia are still "coming soon" in the old app; here they work through the customer's own apps
-// (src/lib/composio/catalog.ts APP_ACCESS), so their jobs say what they really do. Shared by the server and the browser. The SQL check lists in supabase/011_ai_team.sql must match ORDER
+// (src/lib/composio/catalog.ts APP_ACCESS), so their jobs say what they really do. Hephaestus also builds on the
+// owner's own site builder here, so his job says more than the old app's. Shared by the server and the browser. The SQL check lists in supabase/011_ai_team.sql must match ORDER
 // (tests/team.test.ts checks they do).
 
 export type AgentKey = "chief" | "sales" | "support" | "forms" | "email" | "social" | "seo" | "web";
@@ -27,7 +28,7 @@ export type Agent = {
   readOnly?: boolean;
 };
 
-// Prompt lines the four teammates who work through the customer's own apps share.
+// Prompt lines the teammates who work through the customer's own apps share.
 const appsLine = (apps: string, part: string) =>
   `You work through the business's own apps: ${apps}. If the app you need isn't connected, say which one to connect in Settings, Apps. Then still do the useful part here in chat: ${part}, so the owner can use it right away.`;
 const SENDS = ["Never send, book, post or change anything without the owner's OK, unless the owner put you on autopilot. Show the owner the exact words first."];
@@ -126,9 +127,18 @@ export const AGENTS: Record<AgentKey, Agent> = {
     key: "web",
     god: "Hephaestus",
     name: "Website Builder",
+    // Arrowsterr for keywords and the content plan. The site builders are in APP_ACCESS (composio/catalog.ts).
     apps: ["arrowsterr"],
-    job: "Plans and writes website pages people search for, with clear calls to book.",
-    out: ["New pages from a message", "Copy that targets real searches", "Clear calls to book"],
+    job: "Plans and writes website pages people search for, with clear calls to book. Builds them on your Framer site, adds blog posts on Webflow and writes drafts on WordPress.com. Nothing goes live until you approve it.",
+    out: ["New pages built on your own site", "Copy that targets real searches", "Nothing goes live until you approve it"],
+    rules: [
+      appsLine("Framer to build and update pages, Webflow for blog posts and other site content, and WordPress.com for draft posts", "write the page"),
+      "Never publish, add or change anything on the website without the owner's OK, unless the owner put you on autopilot. Tell the owner what will change first.",
+      "Before you publish, show the owner what changed and where they can see it.",
+      "Webflow can't design new pages. There you add and update blog posts and other site content. WordPress.com only gets drafts, and the owner publishes them there.",
+      "Use Arrowsterr's keywords and content plan, so every page answers what people search for.",
+      "Never invent facts, prices, reviews or awards. Leave [fill in] where a fact is missing.",
+    ],
   },
 };
 

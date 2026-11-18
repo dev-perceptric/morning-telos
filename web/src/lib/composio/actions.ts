@@ -7,7 +7,7 @@
 // here). Not "server-only", so the tests load it; only server code imports it.
 
 import { isWrite } from "../approvals.ts";
-import { appName, TOOLKITS } from "./catalog.ts";
+import { appAction, appName, TOOLKITS } from "./catalog.ts";
 import { composioCall, GONE, type Net } from "./composio.ts";
 
 export type JsonSchema = { type?: string | string[]; description?: string; title?: string; enum?: unknown[]; items?: JsonSchema; properties?: Record<string, JsonSchema>; required?: string[]; default?: unknown; format?: string };
@@ -37,14 +37,20 @@ export function verbOf(toolkit: string, slug: string): string {
 /**
  * Read, write or blocked, from the action's name, Composio's hints (its tags) and the verb list the products' tools
  * use (isWrite in approvals.ts). Anything unclear is a write, so it waits for the owner.
+ * An app that lists its actions (the website builders in catalog.ts) runs only those. A listed change is a write even
+ * when Composio hints it is destructive (Framer marks publishing that way), so it waits for the owner like any change.
+ * A listed read is a read only when its name says so too. Deleting is blocked whatever a list says.
  */
 export function kindOf(toolkit: string, t: Pick<Tool, "slug" | "name" | "description" | "tags">): { kind: ToolKind; why?: string } {
   const slug = t.slug.toUpperCase();
   if (!TOOLKITS[toolkit]) return { kind: "blocked", why: "That app can't be connected here." };
   if (!slug.startsWith(`${toolkit.toUpperCase()}_`)) return { kind: "blocked", why: "That action belongs to another app." };
   if (NEVER.test(slug) || /linkedin/i.test(`${t.name} ${t.description}`)) return { kind: "blocked", why: "Your team doesn't run that action." };
+  const listed = appAction(toolkit, slug);
+  if (TOOLKITS[toolkit].actions && !listed) return { kind: "blocked", why: "Your team doesn't run that action." };
   const tags = (t.tags ?? []).map((x) => x.toLowerCase());
-  if (DESTRUCTIVE.test(slug) || tags.includes("destructivehint")) return { kind: "blocked", why: "Deleting and cancelling stay in the app itself." };
+  if (DESTRUCTIVE.test(slug) || (tags.includes("destructivehint") && listed?.kind !== "write")) return { kind: "blocked", why: "Deleting and cancelling stay in the app itself." };
+  if (listed?.kind === "write") return { kind: "write" };
   const verb = verbOf(toolkit, slug);
   const hinted = tags.includes("readonlyhint") && !CHANGES.test(slug);
   const read = (READ.has(verb) || hinted) && !isWrite({ name: verb.toLowerCase() });

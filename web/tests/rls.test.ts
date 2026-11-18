@@ -1872,9 +1872,12 @@ test("app_connections: known apps only, one connection per app in a workspace, g
   if (!db) return t.skip("no test database");
   const { ws, owner } = await team("apps-shape");
   const add = (toolkit: string, account = `ca_${toolkit}1`, extra = "") => db!.query(`insert into app_connections (workspace_id, toolkit, composio_account${extra ? ", status" : ""}) values ($1, $2, $3${extra ? ", $4" : ""})`, extra ? [ws, toolkit, account, extra] : [ws, toolkit, account]);
-  for (const k of ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce", "slack", "zendesk", "help_scout"]) await add(k);
+  // The website builders came in 019_website_builders.sql.
+  for (const k of ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce", "slack", "zendesk", "help_scout", "framer", "webflow", "wordpress_com"]) await add(k);
   await assert.rejects(add("gmail", "ca_again"), /app_connections_ws_toolkit_idx/);
+  await assert.rejects(add("framer", "ca_again"), /app_connections_ws_toolkit_idx/);
   await assert.rejects(add("linkedin"), /app_connections_toolkit_check/);
+  await assert.rejects(add("wordpress"), /app_connections_toolkit_check/);
   const fresh = await team("apps-shape2");
   await assert.rejects(db.query("insert into app_connections (workspace_id, toolkit, composio_account) values ($1, 'gmail', 'bad id!')", [fresh.ws]), /app_connections_composio_account_check/);
   await assert.rejects(db.query("insert into app_connections (workspace_id, toolkit, composio_account, status) values ($1, 'gmail', 'ca_ok1', 'broken')", [fresh.ws]), /app_connections_status_check/);

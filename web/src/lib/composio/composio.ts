@@ -12,8 +12,9 @@
 export type Scheme = "OAUTH2" | "OAUTH1" | "API_KEY" | "BASIC" | "BEARER_TOKEN";
 /**
  * One toolkit on Composio. `managed`: Composio has its own app for it (no developer app for us to register), from
- * the toolkit's page on composio.dev (is_composio_managed). An OAuth toolkit without a managed app needs our own app,
- * set up once in Composio, with its auth config id in COMPOSIO_AUTH_CONFIG_<TOOLKIT>.
+ * the toolkit's page on composio.dev (is_composio_managed). A toolkit without a managed app needs our own auth config,
+ * set up once in Composio (our OAuth app, or an API key config for an app that only takes a key), with its id in
+ * COMPOSIO_AUTH_CONFIG_<TOOLKIT>.
  */
 export type ComposioTool = { toolkit: string; scheme: Scheme; managed: boolean };
 
@@ -27,10 +28,13 @@ export const composioBase = (e: Env = process.env) => env("COMPOSIO_BASE_URL", e
 /** An auth config set by hand (our own app for a toolkit), by toolkit. */
 export const authConfigEnv = (toolkit: string, e: Env = process.env) => env(`COMPOSIO_AUTH_CONFIG_${toolkit.toUpperCase()}`, e);
 
-/** Whether a toolkit connects now: the server has a key, and the toolkit needs no app of ours or has one. */
+/**
+ * Whether a toolkit connects now: the server has a key, and Composio has its own app for the toolkit or we set our
+ * own auth config (our OAuth app, or an API key config like Framer's).
+ */
 export function connectable(t: ComposioTool | undefined, e: Env = process.env): boolean {
   if (!t || !composioKey(e)) return false;
-  return t.managed || !t.scheme.startsWith("OAUTH") || !!authConfigEnv(t.toolkit, e);
+  return t.managed || !!authConfigEnv(t.toolkit, e);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
