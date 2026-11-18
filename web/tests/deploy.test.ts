@@ -64,3 +64,8 @@ test("web-compose.yml runs the job worker every minute with CRON_SECRET, over th
   assert.match(cron, /http:\/\/web-new:3000\/api\/worker/);
   assert.match(cron, /sleep 60/);
 });
+
+test("web-compose.yml sends the app's database calls straight to this VPS", () => {
+  assert.match(compose, /extra_hosts:\n\s+- "db\.morningtelos\.com:host-gateway"/);
+});
+
