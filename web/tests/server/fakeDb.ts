@@ -23,6 +23,8 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
     let payload: Row | null = null;
     let conflict: string[] = [];
     let one = false;
+    let sort: { col: string; asc: boolean } | null = null;
+    let cap: number | null = null;
 
     const run = () => {
       const rows = table(name);
@@ -55,7 +57,12 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
         tables[name] = rows.filter((r) => !hit.includes(r));
         return { data: null, error: null };
       }
-      return one ? { data: hit[0] ?? null, error: null } : { data: hit, error: null };
+      if (sort) {
+        const { col, asc } = sort;
+        hit.sort((a, b) => (a[col] === b[col] ? 0 : (a[col] as number) < (b[col] as number) === asc ? -1 : 1));
+      }
+      const capped = cap === null ? hit : hit.slice(0, cap);
+      return one ? { data: capped[0] ?? null, error: null } : { data: capped, error: null };
     };
 
     const q = {
@@ -67,6 +74,8 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
       is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), q),
       maybeSingle: () => ((one = true), q),
+      order: (col: string, o: { ascending?: boolean } = {}) => ((sort = { col, asc: o.ascending !== false }), q),
+      limit: (n: number) => ((cap = n), q),
       then: (ok: (v: unknown) => unknown, bad?: (e: unknown) => unknown) => Promise.resolve().then(run).then(ok, bad),
     };
     return q;

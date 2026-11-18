@@ -1,6 +1,7 @@
 "use client";
 
-// The whole client app: the sign-in screens, then the app shell with its pages. Billing (P1.6) plugs in here.
+// The whole client app: the sign-in screens, then the app shell with its pages: Home (talk to the team), a chat,
+// Team and Settings. Billing (P1.6) plugs in here.
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,6 +14,8 @@ import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
 import { SettingsPage, type Workspace } from "./Settings";
 import { KnowledgePage } from "./Knowledge";
 import { ConnectSocialCard } from "./Social";
+import { TeamHome, TeamPage, ThreadPage } from "./Team";
+import { AGENTS } from "@/lib/team";
 import { btnPrimary, btnSecondary, ErrorText, Frame, input, label, Logo, Notice } from "./ui";
 
 // An invite token waits here from the moment the link is opened until the person is signed in.
@@ -119,6 +122,18 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
   useEffect(() => writeLocal(NOTICE_KEY, null), []);
   // Bump to load the list again (after a change).
   const [version, setVersion] = useState(0);
+  // What's typed on Home, the first message of a chat being started, and the chat this tab started (its page keeps
+  // streaming while the address changes from /chat to /chat/<id>).
+  const [draft, setDraft] = useState("");
+  const [start, setStart] = useState<string | null>(null);
+  const [ownThread, setOwnThread] = useState<string | null>(null);
+  const startChat = useCallback((text: string) => {
+    setDraft("");
+    setOwnThread(null);
+    setStart(text);
+    navigate("/chat");
+  }, []);
+  const started = useCallback(() => setStart(null), []);
   const load = useCallback(() => setVersion((v) => v + 1), []);
   useEffect(() => {
     let live = true;
@@ -170,10 +185,30 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
           ) : null}
           {route.page === "settings" ? (
             <SettingsPage sb={sb} ws={ws} userId={session.user.id} tab={route.tab} onChanged={load} onGone={gone} />
+          ) : route.page === "thread" ? (
+            <ThreadPage
+              key={`${ws.id}:${route.id && route.id !== ownThread ? route.id : "new"}`}
+              sb={sb}
+              ws={ws}
+              id={route.id}
+              start={route.id ? null : start}
+              onStarted={started}
+              onThread={setOwnThread}
+            />
+          ) : route.page === "team" ? (
+            <TeamPage
+              key={ws.id}
+              sb={sb}
+              ws={ws}
+              onAsk={(k) => {
+                setDraft(`@${AGENTS[k].god} `);
+                navigate("/");
+              }}
+            />
           ) : route.page === "knowledge" ? (
             <KnowledgePage key={ws.id} sb={sb} ws={ws} />
           ) : (
-            <Home sb={sb} ws={ws} />
+            <Home sb={sb} ws={ws} draft={draft} onDraft={setDraft} onStart={startChat} />
           )}
         </div>
       </main>
@@ -181,17 +216,13 @@ function Shell({ sb, session }: { sb: SupabaseClient; session: Session }) {
   );
 }
 
-function Home({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {
+function Home({ sb, ws, draft, onDraft, onStart }: { sb: SupabaseClient; ws: Workspace; draft: string; onDraft: (v: string) => void; onStart: (text: string) => void }) {
   return (
-    <section className="flex flex-col gap-6 py-4">
-      <div>
-        <p className="mb-1 text-[14px] text-ink-3">{ws.name}</p>
-        <h1 className="mb-3 font-serif text-[34px] leading-tight">What should your team do today?</h1>
-        <p className="text-[15px] text-ink-3">Your AI team is getting set up. Chat and approvals are coming next.</p>
-      </div>
-      <SetupStatus key={ws.id} sb={sb} workspaceId={ws.id} />
+    <div className="flex flex-col gap-6">
+      <TeamHome key={ws.id} sb={sb} ws={ws} draft={draft} onDraft={onDraft} onStart={onStart} />
+      <SetupStatus key={`setup-${ws.id}`} sb={sb} workspaceId={ws.id} />
       <ConnectSocialCard key={`social-${ws.id}`} sb={sb} ws={ws} />
-    </section>
+    </div>
   );
 }
 
@@ -237,6 +268,7 @@ function SetupStatus({ sb, workspaceId }: { sb: SupabaseClient; workspaceId: str
 
 const NAV = [
   { page: "home", label: "Home", path: "/" },
+  { page: "team", label: "Team", path: "/team" },
   { page: "knowledge", label: "Knowledge", path: "/knowledge" },
   { page: "settings", label: "Settings", path: "/settings" },
 ] as const;
@@ -286,12 +318,12 @@ function Sidebar({
           <a
             key={n.page}
             href={n.path}
-            aria-current={page === n.page ? "page" : undefined}
+            aria-current={page === n.page || (n.page === "home" && page === "thread") ? "page" : undefined}
             onClick={(e) => {
               e.preventDefault();
               navigate(n.path);
             }}
-            className={`rounded-[9px] px-3 py-2 text-[15px] ${page === n.page ? "bg-surface font-semibold text-ink shadow-sm" : "text-ink-3 hover:bg-sunk hover:text-ink"}`}
+            className={`rounded-[9px] px-3 py-2 text-[15px] ${page === n.page || (n.page === "home" && page === "thread") ? "bg-surface font-semibold text-ink shadow-sm" : "text-ink-3 hover:bg-sunk hover:text-ink"}`}
           >
             {n.label}
           </a>

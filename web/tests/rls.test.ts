@@ -918,6 +918,235 @@ test("members and visitors can't call queue_daily_jobs or expired_workspaces", a
   }
 });
 
+// ─────────────── the AI team (011_ai_team.sql) ───────────────
+
+/** A thread with one message of each role, written as the server. */
+async function chatIn(ws: string, by: User) {
+  const t = (await db!.query("insert into threads (workspace_id, title, created_by) values ($1, 'Plan my week', $2) returning id", [ws, by.id])).rows[0].id as string;
+  await db!.query(
+    "insert into messages (thread_id, workspace_id, role, agent, content, meta) values ($1, $2, 'user', null, 'Plan my week', '{}'), ($1, $2, 'agent', 'chief', 'Here it is.', '{}'), ($1, $2, 'note', 'chief', 'Athena handed this to Artemis: check', '{\"to\":\"seo\"}')",
+    [t, ws],
+  );
+  return t;
+}
+
+test("threads and messages: every member reads their own workspace's chats, never another's; visitors see nothing", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("chat-read");
+  const other = await team("chat-other");
+  const mine = await chatIn(ws, owner);
+  const theirs = await chatIn(other.ws, other.owner);
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => {
+      assert.deepEqual((await q("select id from threads")).rows, [{ id: mine }]);
+      const msgs = (await q("select role, agent, content from messages order by id")).rows;
+      assert.deepEqual(msgs.map((m) => m.role), ["user", "agent", "note"]);
+      assert.equal((await q("select * from messages where thread_id = $1", [theirs])).rowCount, 0);
+    });
+  }
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from threads"), /permission denied/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from messages"), /permission denied/);
+  });
+});
+
+test("threads: editors and up start, rename and delete chats; viewers can't; nobody writes another workspace's", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("chat-write");
+  const other = await team("chat-write-other");
+  for (const u of [owner, admin, editor]) {
+    await as(u, async (q) => {
+      const id = (await q("insert into threads (workspace_id, title, created_by) values ($1, 'Mine', $2) returning id", [ws, u.id])).rows[0].id;
+      assert.equal((await q("update threads set title = 'Renamed' where id = $1", [id])).rowCount, 1);
+      assert.equal((await q("delete from threads where id = $1", [id])).rowCount, 1);
+    });
+    // Started in someone else's name, or in another workspace.
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into threads (workspace_id, title, created_by) values ($1, 'x', $2)", [ws, other.owner.id]), /row-level security/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into threads (workspace_id, title, created_by) values ($1, 'x', $2)", [other.ws, u.id]), /row-level security/);
+    });
+  }
+  const id = await chatIn(ws, owner);
+  await as(viewer, async (q) => {
+    await assert.rejects(q("insert into threads (workspace_id, title, created_by) values ($1, 'x', $2)", [ws, viewer.id]), /row-level security/);
+  });
+  await as(viewer, async (q) => {
+    assert.equal((await q("update threads set title = 'x' where id = $1", [id])).rowCount, 0);
+    assert.equal((await q("delete from threads where id = $1", [id])).rowCount, 0);
+  });
+  // Only the title can be changed by people. updated_at is the server's.
+  await as(editor, async (q) => {
+    await assert.rejects(q("update threads set updated_at = now() where id = $1", [id]), /permission denied/);
+  });
+  await as(other.owner, async (q) => {
+    assert.equal((await q("delete from threads where id = $1", [id])).rowCount, 0);
+  });
+  // Deleting a chat deletes its messages.
+  await as(editor, async (q) => {
+    assert.equal((await q("delete from threads where id = $1", [id])).rowCount, 1);
+    assert.equal((await q("select count(*)::int n from messages where thread_id = $1", [id])).rows[0].n, 0);
+  });
+});
+
+test("messages: editors write only their own words, in their own workspace's threads; viewers write nothing", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor, viewer } = await team("msg-write");
+  const other = await team("msg-write-other");
+  const id = await chatIn(ws, owner);
+  const theirs = await chatIn(other.ws, other.owner);
+  await as(editor, async (q) => {
+    assert.equal((await q("insert into messages (thread_id, workspace_id, role, content) values ($1, $2, 'user', 'More please')", [id, ws])).rowCount, 1);
+  });
+  // A reply that looks like it came from an agent, or a handoff note: only the server writes those.
+  for (const [role, agent] of [
+    ["agent", "chief"],
+    ["note", "chief"],
+  ]) {
+    await as(editor, async (q) => {
+      await assert.rejects(q("insert into messages (thread_id, workspace_id, role, agent, content) values ($1, $2, $3, $4, 'fake')", [id, ws, role, agent]), /row-level security/);
+    });
+  }
+  await as(viewer, async (q) => {
+    await assert.rejects(q("insert into messages (thread_id, workspace_id, role, content) values ($1, $2, 'user', 'hi')", [id, ws]), /row-level security/);
+  });
+  // Another workspace's thread, named as this workspace or as its own.
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into messages (thread_id, workspace_id, role, content) values ($1, $2, 'user', 'x')", [theirs, ws]), /foreign key/);
+  });
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into messages (thread_id, workspace_id, role, content) values ($1, $2, 'user', 'x')", [theirs, other.ws]), /row-level security/);
+  });
+  // Nobody edits or deletes a message: the history stays as it was.
+  await as(owner, async (q) => {
+    await assert.rejects(q("update messages set content = 'changed' where thread_id = $1", [id]), /permission denied/);
+  });
+  await as(owner, async (q) => {
+    await assert.rejects(q("delete from messages where thread_id = $1", [id]), /permission denied/);
+  });
+});
+
+test("messages only take known roles, agents and shapes", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner } = await team("msg-shape");
+  const id = await chatIn(ws, owner);
+  const bad = [
+    ["robot", "chief", "role"],
+    ["agent", "zeus", "agent"],
+    ["agent", null, "check"],
+    ["user", "chief", "check"],
+  ];
+  for (const [role, agent] of bad) {
+    await assert.rejects(db.query("insert into messages (thread_id, workspace_id, role, agent, content) values ($1, $2, $3, $4, 'x')", [id, ws, role, agent]), /violates check constraint/);
+  }
+  await assert.rejects(db.query("insert into messages (thread_id, workspace_id, role, content, meta) values ($1, $2, 'user', 'x', '[]')", [id, ws]), /violates check constraint/);
+  await assert.rejects(db.query("insert into messages (thread_id, workspace_id, role, content) values ($1, $2, 'user', $3)", [id, ws, "x".repeat(40001)]), /violates check constraint/);
+});
+
+test("agent_prefs: members read, admins and the owner change, others can't; known values only", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("prefs");
+  const other = await team("prefs-other");
+  for (const u of [owner, admin]) {
+    await as(u, async (q) => {
+      await q("insert into agent_prefs (workspace_id, agent, enabled, trust, model) values ($1, 'seo', false, 2, 'sonnet')", [ws]);
+      assert.equal((await q("update agent_prefs set enabled = true where workspace_id = $1 and agent = 'seo'", [ws])).rowCount, 1);
+      assert.equal((await q("delete from agent_prefs where workspace_id = $1 and agent = 'seo'", [ws])).rowCount, 1);
+    });
+  }
+  await db.query("insert into agent_prefs (workspace_id, agent, enabled) values ($1, 'social', false), ($2, 'social', true)", [ws, other.ws]);
+  for (const u of [editor, viewer]) {
+    await as(u, async (q) => {
+      assert.deepEqual((await q("select workspace_id, agent, enabled, trust, model from agent_prefs")).rows, [{ workspace_id: ws, agent: "social", enabled: false, trust: 0, model: "auto" }]);
+      assert.equal((await q("update agent_prefs set enabled = true where workspace_id = $1", [ws])).rowCount, 0);
+      assert.equal((await q("delete from agent_prefs where workspace_id = $1", [ws])).rowCount, 0);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into agent_prefs (workspace_id, agent) values ($1, 'web')", [ws]), /row-level security/);
+    });
+  }
+  await as(owner, async (q) => {
+    assert.equal((await q("update agent_prefs set enabled = false where workspace_id = $1", [other.ws])).rowCount, 0);
+  });
+  await as(owner, async (q) => {
+    await assert.rejects(q("insert into agent_prefs (workspace_id, agent) values ($1, 'web')", [other.ws]), /row-level security/);
+  });
+  for (const [col, val] of [
+    ["trust", 3],
+    ["model", "gpt"],
+    ["agent", "zeus"],
+  ] as const) {
+    await assert.rejects(db.query(`insert into agent_prefs (workspace_id, agent, ${col === "agent" ? "enabled" : col}) values ($1, $2, $3)`, [ws, col === "agent" ? val : "web", col === "agent" ? true : val]), /violates check constraint/);
+  }
+});
+
+test("ai_usage, ai_spend and cost_by_workspace: server only", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, viewer } = await team("usage");
+  await db.query("insert into ai_usage (workspace_id, agent, model, input_tokens, output_tokens, cost_usd) values ($1, 'chief', 'claude-opus-5-5', 10, 10, 0.5)", [ws]);
+  for (const u of [owner, viewer, null]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select * from ai_usage"), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into ai_usage (workspace_id, model, cost_usd) values ($1, 'x', 0)", [ws]), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("select * from cost_by_workspace"), /permission denied/);
+    });
+    await as(u, async (q) => {
+      await assert.rejects(q("select ai_spend($1, now() - interval '1 day')", [ws]), /permission denied for function ai_spend/);
+    });
+  }
+});
+
+test("ai_spend sums a workspace's AI cost since a time; cost_by_workspace adds it up per month", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws } = await team("spend");
+  const other = await team("spend-other");
+  await db.query(
+    `insert into ai_usage (workspace_id, agent, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, created_at) values
+       ($1, 'chief', 'claude-opus-5-5', 100, 10, 1000, 50, 1.25, now() - interval '2 days'),
+       ($1, 'seo', 'claude-opus-5-5', 100, 10, 0, 0, 0.75, now() - interval '1 hour'),
+       ($1, 'seo', 'claude-opus-5-5', 1, 1, 0, 0, 9, now() - interval '40 days'),
+       ($2, 'chief', 'claude-opus-5-5', 1, 1, 0, 0, 100, now())`,
+    [ws, other.ws],
+  );
+  await db.query("begin");
+  try {
+    await db.query("set local role service_role");
+    const spend = async (since: string) => Number((await db!.query(`select ai_spend($1, now() - interval '${since}') usd`, [ws])).rows[0].usd);
+    assert.equal(await spend("3 days"), 2);
+    assert.equal(await spend("1 day"), 0.75);
+    assert.equal(await spend("1 minute"), 0);
+    assert.equal(Number((await db.query("select ai_spend(gen_random_uuid(), now() - interval '1 year') usd")).rows[0].usd), 0);
+    const rows = (await db.query("select name, plan, month, cost_usd, calls, input_tokens, cache_read_tokens from cost_by_workspace where workspace_id = $1 order by month", [ws])).rows;
+    const thisMonth = rows.filter((r) => Number(r.cost_usd) !== 9);
+    assert.ok(thisMonth.length >= 1);
+    assert.equal(rows.reduce((s, r) => s + Number(r.cost_usd), 0), 11);
+    assert.equal(rows.reduce((s, r) => s + Number(r.calls), 0), 3);
+    assert.ok(rows.every((r) => r.name === "spend Co" && r.plan === "trial"));
+  } finally {
+    await db.query("rollback");
+  }
+});
+
+test("deleting a workspace deletes its chats and settings, and keeps its AI usage without a workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner } = await team("chat-gone");
+  const id = await chatIn(ws, owner);
+  await db.query("insert into agent_prefs (workspace_id, agent) values ($1, 'seo')", [ws]);
+  const u = (await db.query("insert into ai_usage (workspace_id, thread_id, agent, model, cost_usd) values ($1, $2, 'chief', 'claude-opus-5-5', 0.1) returning id", [ws, id])).rows[0].id;
+  await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
+  assert.equal((await db.query("select count(*)::int n from threads where workspace_id = $1", [ws])).rows[0].n, 0);
+  assert.equal((await db.query("select count(*)::int n from messages where workspace_id = $1", [ws])).rows[0].n, 0);
+  assert.equal((await db.query("select count(*)::int n from agent_prefs where workspace_id = $1", [ws])).rows[0].n, 0);
+  assert.deepEqual((await db.query("select workspace_id, thread_id, cost_usd from ai_usage where id = $1", [u])).rows, [{ workspace_id: null, thread_id: null, cost_usd: "0.100000" }]);
+});
+
 // ─────────────── P3.2: Knowledge, search and the website scan (012_knowledge.sql) ───────────────
 
 /** A workspace with an owner, an editor and a viewer, and a stranger from another workspace. */
