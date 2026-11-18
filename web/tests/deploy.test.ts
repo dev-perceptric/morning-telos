@@ -55,3 +55,12 @@ test("build workflow reads browser keys from repo variables, not literal values"
 test("web-compose.yml never gives the web app the backup job's keys", () => {
   for (const key of BACKUP_ONLY) assert.ok(!compose.includes(key), `${key} must not be in deploy/web-compose.yml`);
 });
+
+test("web-compose.yml runs the job worker every minute with CRON_SECRET, over the private network", () => {
+  const cron = compose.slice(compose.indexOf("\n  cron:"));
+  assert.ok(compose.includes("\n  cron:"), "no cron service");
+  assert.match(cron, /CRON_SECRET: \$\{CRON_SECRET:-\}/);
+  assert.match(cron, /Authorization: Bearer \$\$CRON_SECRET/);
+  assert.match(cron, /http:\/\/web-new:3000\/api\/worker/);
+  assert.match(cron, /sleep 60/);
+});
