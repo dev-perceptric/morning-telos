@@ -6,6 +6,10 @@ services:
     image: ghcr.io/dev-perceptric/morningtelos-web:latest
     pull_policy: always
     restart: unless-stopped
+    # Server-side calls to the database go straight to this VPS (Traefik), not out through public DNS.
+    # A first lookup made before db.morningtelos.com existed stayed cached for an hour and broke the worker.
+    extra_hosts:
+      - "db.morningtelos.com:host-gateway"
     environment:
       NODE_ENV: production
       PORT: "3000"
