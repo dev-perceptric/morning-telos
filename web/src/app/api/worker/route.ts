@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { brandJobHandlers } from "@/lib/closeoutDb";
+import { brandJobHandlers, expireTrialsHandler } from "@/lib/closeoutDb";
 import { cronAllowed } from "@/lib/cronAuth";
 import { runJob, type Handler, type Job } from "@/lib/jobs";
 import { partnerFor, type Product } from "@/lib/partner";
@@ -19,6 +19,8 @@ import { adminClient } from "@/lib/serverAuth";
 //        * * * * * curl -fsS -m 280 -X POST -H @/root/.morningtelos-worker https://new.morningtelos.com/api/worker >/dev/null
 // CRON_SECRET is the same value in the web container's settings. A wrong or missing secret gets 401 and runs nothing.
 // Ticks may overlap: claim_jobs skips jobs another tick holds, and a job's lease brings it back if a tick dies.
+// Daily jobs need no cron line of their own: each tick calls queue_daily_jobs() (supabase/010_expire_trials.sql),
+// which queues each one once per UTC day.
 // When the worker image (plan: Deploy, morningtelos-worker) lands, it calls this in a loop instead of cron.
 
 export const maxDuration = 300;
@@ -36,6 +38,8 @@ function handlers(db: SupabaseClient): Record<string, Handler> {
     // Closing a deleted or canceled workspace's brands (src/lib/closeout.ts): a revoke that failed at close time,
     // and the brand's removal 30 days later.
     ...brandJobHandlers(db),
+    // Once a day: close the brands of trials that ended without a plan, which Stripe tells us nothing about.
+    expire_trials: expireTrialsHandler(db),
     provision: async (job) => {
       const ws = job.workspace_id;
       if (!ws) return { status: "failed", error: "A provision job needs a workspace." };
@@ -74,6 +78,12 @@ function alert(message: string, job: Job) {
   Sentry.captureMessage(message, { level: "error", tags: { job_kind: job.kind }, extra: { job_id: job.id, workspace_id: job.workspace_id } });
 }
 
+/** A problem outside any job (the daily jobs couldn't be queued). Sentry groups repeats of the same line. */
+function warn(message: string) {
+  console.error(message);
+  Sentry.captureMessage(message, { level: "error", tags: { job_kind: "daily" } });
+}
+
 async function pool<T>(items: T[], n: number, fn: (item: T) => Promise<void>) {
   let i = 0;
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
@@ -85,6 +95,10 @@ export async function POST(request: Request) {
   if (!cronAllowed(request.headers.get("authorization"), process.env.CRON_SECRET)) return Response.json({ error: "Wrong or missing CRON_SECRET." }, { status: 401 });
   const db = adminClient();
   if (!db) return Response.json({ error: "Add SUPABASE_SECRET_KEY to the server's settings." }, { status: 500 });
+
+  // A missing daily job must not stop the jobs that are due, so a problem here is only logged.
+  const daily = await db.rpc("queue_daily_jobs");
+  if (daily.error) warn(/queue_daily_jobs/.test(daily.error.message) ? "Run supabase/010_expire_trials.sql in Supabase." : `Daily jobs: ${daily.error.message}`);
 
   const limit = Math.min(50, Math.max(1, Number(new URL(request.url).searchParams.get("limit")) || 10));
   const { data, error } = await db.rpc("claim_jobs", { n: limit, lease: LEASE });

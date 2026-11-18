@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { createHmac, randomBytes } from "node:crypto";
 import { register } from "node:module";
-import { beforeEach, test } from "node:test";
+import { beforeEach, describe, test } from "node:test";
 import { fakeDb } from "./fakeDb.ts";
 import { auth } from "./stubs/serverAuth.ts";
 
@@ -22,6 +22,8 @@ process.env.CAPYBAROAR_PARTNER_URL = "https://cb.test";
 process.env.CAPYBAROAR_PARTNER_KEY = "cb_partner_test";
 process.env.SEALING_KEYS = `t1:${randomBytes(32).toString("base64")}`;
 
+const { trialOver } = await import("../../src/lib/closeout.ts");
+type PlanFields = import("../../src/lib/plans.ts").PlanFields;
 const del = await import("../../src/app/api/workspace/delete/route.ts");
 const webhook = await import("../../src/app/api/billing/webhook/route.ts");
 const worker = await import("../../src/app/api/worker/route.ts");
@@ -34,6 +36,8 @@ const DAY = 86_400_000;
 let partnerCalls: string[];
 /** Hosts that answer 503 to everything. */
 let down: Set<string>;
+/** Brands whose calls answer 503, for one workspace's outage. */
+let downBrands: Set<string>;
 let brands: Set<string>;
 let subs: Map<string, unknown>;
 
@@ -52,6 +56,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   const p = url.pathname.match(/^\/api\/partner\/brands(?:\/([^/]+))?(\/keys)?$/);
   if (!p) return json(404, { error: { code: "not_found", message: "No route." } });
   const [, id, keys] = p;
+  if (id && downBrands.has(id)) return json(503, { error: { code: "unavailable", message: "Down." } });
   if (method === "POST" && !id) {
     const body = JSON.parse(String(init?.body));
     const bid = `${url.hostname}-brand`;
@@ -76,6 +81,7 @@ let db: ReturnType<typeof fakeDb>;
 beforeEach(() => {
   partnerCalls = [];
   down = new Set();
+  downBrands = new Set();
   brands = new Set(["aw.test-brand", "cb.test-brand"]);
   subs = new Map();
   db = fakeDb({ stripe_events: ["id"] }, { autoId: ["jobs"] });
@@ -94,6 +100,15 @@ beforeEach(() => {
     for (const j of due) j.attempts = Number(j.attempts ?? 0) + 1;
     return due.map((j) => ({ max_attempts: 5, ...j }));
   };
+  // supabase/010_expire_trials.sql. Today's daily job counts as queued already, so the tests above see only their own
+  // jobs; the trial tests below queue it for real (queueDaily).
+  db.rpcs.queue_daily_jobs = () => 0;
+  db.rpcs.expired_workspaces = ({ n }) =>
+    db.tables.workspaces
+      .filter((w) => trialOver(w as PlanFields))
+      .filter((w) => db.tables.services.some((s) => s.workspace_id === w.id && ["pending", "waiting", "ready", "failed"].includes(String(s.status))))
+      .map((w) => w.id)
+      .slice(0, Number(n));
   auth.db = db;
   auth.roles = new Map([[`owner1:${WS}`, "owner"]]);
   auth.emails = new Map();
@@ -218,4 +233,153 @@ test("a payment that is only past due closes nothing", async () => {
   assert.deepEqual(partnerCalls, []);
   assert.equal(svc("arrowsterr")!.status, "ready");
   assert.deepEqual(db.tables.jobs, []);
+});
+
+// ─────────────── a free trial that ends without a plan (Stripe sends nothing) ───────────────
+
+/** Ana's workspace on the free trial that ended (or ends) `days` from now, with no subscription. */
+function onTrial(days: number) {
+  Object.assign(db.tables.workspaces[0], { plan: "trial", status: "trialing", trial_ends_at: new Date(Date.now() + days * DAY).toISOString(), stripe_customer_id: null, stripe_subscription_id: null });
+}
+const expireJobs = () => jobsOf("expire_trials");
+
+/** One daily job per kind and UTC day, like queue_daily_jobs() in supabase/010_expire_trials.sql. */
+function queueDaily() {
+  const day = new Date().toISOString().slice(0, 10);
+  if (db.tables.jobs.some((j) => j.kind === "expire_trials" && (j.payload as { day?: string }).day === day)) return 0;
+  db.tables.jobs.push({ id: 900 + db.tables.jobs.length, kind: "expire_trials", workspace_id: null, payload: { day }, run_at: new Date().toISOString(), attempts: 0, max_attempts: 20 });
+  return 1;
+}
+
+describe("the daily expire_trials job", () => {
+  beforeEach(() => {
+    db.rpcs.queue_daily_jobs = queueDaily;
+  });
+
+  test("trial over with no plan: the daily job revokes keys, marks services removing and queues removal in 30 days", async () => {
+    onTrial(-1);
+    const before = Date.now();
+    assert.deepEqual(await tick(), { claimed: 1, done: 1, retry: 0, failed: 0 });
+    assert.equal(expireJobs().length, 1);
+    assert.ok(expireJobs()[0].done_at);
+    assert.deepEqual(partnerCalls, ["DELETE aw.test/api/partner/brands/aw.test-brand/keys", "DELETE cb.test/api/partner/brands/cb.test-brand/keys"]);
+    for (const p of ["arrowsterr", "capybaroar"]) assert.deepEqual([svc(p)!.status, svc(p)!.sealed_key, svc(p)!.key_prefix], ["removing", null, null]);
+    assert.deepEqual(pendingKinds(), ["remove_brand arrowsterr", "remove_brand capybaroar"]);
+    for (const j of jobsOf("remove_brand")) {
+      const wait = Date.parse(String(j.run_at)) - before;
+      assert.ok(wait >= 30 * DAY && wait < 30 * DAY + 60_000, `run_at is 30 days out (${wait})`);
+    }
+    assert.deepEqual(jobsOf("revoke_keys"), []);
+  });
+
+  test("trial over: services with no brand yet (pending, waiting) are marked removed with no partner call", async () => {
+    onTrial(-2);
+    Object.assign(svc("arrowsterr")!, { status: "waiting", brand_id: null, sealed_key: null, key_prefix: null });
+    Object.assign(svc("capybaroar")!, { status: "pending", brand_id: null, sealed_key: null, key_prefix: null });
+    assert.deepEqual(await tick(), { claimed: 1, done: 1, retry: 0, failed: 0 });
+    assert.deepEqual(partnerCalls, []);
+    assert.deepEqual([svc("arrowsterr")!.status, svc("capybaroar")!.status], ["removed", "removed"]);
+    assert.deepEqual(pendingKinds(), []);
+  });
+
+  for (const c of [
+    { name: "a trial that is still running", set: () => onTrial(3) },
+    { name: "a paid plan that is active", set: () => Object.assign(db.tables.workspaces[0], { plan: "pro", status: "active" }) },
+    { name: "a paid plan that is past due", set: () => Object.assign(db.tables.workspaces[0], { plan: "starter", status: "past_due" }) },
+  ]) {
+    test(`the daily job leaves ${c.name} alone`, async () => {
+      c.set();
+      assert.deepEqual(await tick(), { claimed: 1, done: 1, retry: 0, failed: 0 });
+      assert.deepEqual(partnerCalls, []);
+      assert.deepEqual([svc("arrowsterr")!.status, svc("capybaroar")!.status], ["ready", "ready"]);
+      assert.deepEqual(pendingKinds(), []);
+    });
+  }
+
+  test("the daily job leaves a workspace that is already removing alone", async () => {
+    onTrial(-20);
+    for (const p of ["arrowsterr", "capybaroar"]) Object.assign(svc(p)!, { status: p === "arrowsterr" ? "removing" : "removed", sealed_key: null });
+    const writes = db.writes.length;
+    assert.deepEqual(await tick(), { claimed: 1, done: 1, retry: 0, failed: 0 });
+    assert.deepEqual(partnerCalls, []);
+    assert.deepEqual(pendingKinds(), []);
+    // Only the daily job's own row changed.
+    assert.deepEqual(db.writes.slice(writes).map((w) => w.table), ["jobs"]);
+  });
+
+  test("one workspace's partner outage doesn't stop the others; its revoke is queued and retried", async () => {
+    const WS2 = "11111111-2222-4333-8444-888888888888";
+    onTrial(-1);
+    db.tables.workspaces.push({ ...db.tables.workspaces[0], id: WS2, name: "Bo's Garage" });
+    db.tables.services.push(
+      { workspace_id: WS2, product: "arrowsterr", status: "ready", brand_id: "aw-2", sealed_key: "s", key_prefix: "p" },
+      { workspace_id: WS2, product: "capybaroar", status: "ready", brand_id: "cb-2", sealed_key: "s", key_prefix: "p" },
+    );
+    brands.add("aw-2").add("cb-2");
+    downBrands.add("cb.test-brand"); // Capybaroar is down for Ana's brand only
+    assert.deepEqual(await tick(), { claimed: 1, done: 1, retry: 0, failed: 0 });
+    const of = (ws: string) => db.tables.services.filter((s) => s.workspace_id === ws).map((s) => s.status);
+    assert.deepEqual(of(WS), ["removing", "removing"]);
+    assert.deepEqual(of(WS2), ["removing", "removing"]);
+    assert.ok(partnerCalls.includes("DELETE aw.test/api/partner/brands/aw-2/keys"));
+    assert.ok(partnerCalls.includes("DELETE cb.test/api/partner/brands/cb-2/keys"));
+    const revokes = jobsOf("revoke_keys");
+    assert.deepEqual(revokes.map((j) => j.payload), [{ product: "capybaroar", brand_id: "cb.test-brand", workspace_id: WS }]);
+    assert.equal(jobsOf("remove_brand").length, 4);
+    // Capybaroar comes back: the queued revoke goes through on the next tick.
+    downBrands.clear();
+    assert.deepEqual(await tick(), { claimed: 1, done: 1, retry: 0, failed: 0 });
+    assert.ok(revokes[0].done_at);
+  });
+
+  test("only one expire_trials job a day, however often the worker runs", async () => {
+    onTrial(-1);
+    for (let i = 0; i < 5; i++) await tick();
+    assert.equal(expireJobs().length, 1);
+    assert.equal(partnerCalls.filter((c) => c.endsWith("/keys")).length, 2, "each key revoked once");
+    // A new UTC day queues the next one.
+    const day = (expireJobs()[0].payload as { day: string }).day;
+    (expireJobs()[0].payload as { day: string }).day = "2000-01-01";
+    await tick();
+    assert.deepEqual(expireJobs().map((j) => (j.payload as { day: string }).day), ["2000-01-01", day]);
+  });
+
+  test("a worker tick still runs due jobs when queue_daily_jobs is missing (010 not run yet)", async () => {
+    delete db.rpcs.queue_daily_jobs;
+    db.tables.jobs.push({ id: 1, kind: "revoke_keys", workspace_id: WS, payload: { product: "arrowsterr", brand_id: "aw.test-brand", workspace_id: WS }, run_at: new Date(0).toISOString(), attempts: 0, max_attempts: 12 });
+    svc("arrowsterr")!.status = "removing";
+    const logged: string[] = [];
+    const was = console.error;
+    console.error = (...a: unknown[]) => void logged.push(a.join(" "));
+    try {
+      assert.deepEqual(await tick(), { claimed: 1, done: 1, retry: 0, failed: 0 });
+    } finally {
+      console.error = was;
+    }
+    assert.ok(logged.includes("Run supabase/010_expire_trials.sql in Supabase."), logged.join("\n"));
+  });
+
+  test("subscribing after the trial closed brings the brands back with fresh keys", async () => {
+    onTrial(-1);
+    await tick();
+    assert.deepEqual([svc("arrowsterr")!.status, svc("capybaroar")!.status], ["removing", "removing"]);
+
+    partnerCalls = [];
+    subs.set("sub_9", sub("sub_9", "active", 1_790_000_000));
+    assert.equal((await stripe("evt_sub9", "checkout.session.completed", { id: "cs_9", object: "checkout.session", subscription: "sub_9", client_reference_id: WS, customer: "cus_1" })).status, 200);
+    assert.equal(db.tables.workspaces[0].plan, "pro");
+    assert.deepEqual(pendingKinds(), ["provision"]);
+    for (const j of jobsOf("remove_brand")) assert.equal(j.last_error, "Canceled: the subscription came back.");
+
+    assert.deepEqual(await tick(), { claimed: 1, done: 1, retry: 0, failed: 0 });
+    for (const p of ["arrowsterr", "capybaroar"]) {
+      assert.equal(svc(p)!.status, "ready");
+      assert.ok(svc(p)!.sealed_key);
+    }
+    assert.equal(svc("arrowsterr")!.brand_id, "aw.test-brand", "the same brand");
+    assert.ok(partnerCalls.includes("POST aw.test/api/partner/brands/aw.test-brand/keys"), "a fresh key");
+    timePasses();
+    assert.deepEqual(await tick(), { claimed: 0, done: 0, retry: 0, failed: 0 });
+    assert.equal(brands.size, 2);
+  });
 });

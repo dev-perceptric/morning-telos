@@ -6,12 +6,16 @@ import test from "node:test";
 import {
   BRAND_JOB_ATTEMPTS,
   closeServices,
+  EXPIRE_BATCH,
+  expireTrials,
   planAction,
   REMOVE_AFTER_DAYS,
+  trialOver,
   removeBrandJob,
   reopenServices,
   revokeKeysJob,
   type BrandJobDeps,
+  type ExpireDeps,
   type NewJob,
   type ServiceRow,
 } from "../src/lib/closeout.ts";
@@ -350,4 +354,81 @@ test("planAction: close only when the subscription ended, reopen while any plan 
     [{ plan: "trial", status: "trialing", trial_ends_at: past }, "none"],
   ];
   for (const [ws, want] of cases) assert.equal(planAction(ws, now), want, JSON.stringify(ws));
+});
+
+// ─────────────── expireTrials: the daily job for trials that ended without a plan ───────────────
+
+function expireDeps(ids: string[], o: { failing?: Set<string>; paidNow?: Set<string>; paidDuringClose?: Set<string> } = {}) {
+  const seen = { find: [] as number[], closed: [] as string[], reopened: [] as string[], logged: [] as string[] };
+  const paid = new Set(o.paidNow);
+  const deps: ExpireDeps = {
+    find: async (n) => (seen.find.push(n), ids.slice(0, n)),
+    expired: async (ws) => !paid.has(ws),
+    close: async (ws) => {
+      if (o.failing?.has(ws)) throw new Error("Could not save the arrowsterr service: connection reset");
+      seen.closed.push(ws);
+      if (o.paidDuringClose?.has(ws)) paid.add(ws);
+    },
+    reopen: async (ws) => void seen.reopened.push(ws),
+    log: (m) => void seen.logged.push(m),
+  };
+  return { deps, seen };
+}
+
+test("expireTrials closes every expired workspace it finds and is done", async () => {
+  const { deps, seen } = expireDeps(["w1", "w2", "w3"]);
+  assert.deepEqual(await expireTrials(deps), { status: "done" });
+  assert.deepEqual(seen.find, [EXPIRE_BATCH]);
+  assert.deepEqual([...seen.closed].sort(), ["w1", "w2", "w3"]);
+  assert.deepEqual(seen.reopened, []);
+});
+
+test("expireTrials with nothing to close is done and closes nothing", async () => {
+  const { deps, seen } = expireDeps([]);
+  assert.deepEqual(await expireTrials(deps), { status: "done" });
+  assert.deepEqual(seen.closed, []);
+});
+
+test("expireTrials: one workspace's error doesn't stop the rest; the job retries", async () => {
+  const { deps, seen } = expireDeps(["w1", "bad", "w3", "w4", "w5", "w6"], { failing: new Set(["bad"]) });
+  const r = await expireTrials(deps);
+  assert.equal(r.status, "retry");
+  assert.match((r as { error: string }).error, /^Could not close 1 of 6 expired workspaces\. bad: Could not save/);
+  assert.deepEqual([...seen.closed].sort(), ["w1", "w3", "w4", "w5", "w6"]);
+  assert.deepEqual(seen.logged, ["Expire trial for workspace bad: Could not save the arrowsterr service: connection reset"]);
+});
+
+test("expireTrials: a full batch closes it and retries for the rest", async () => {
+  const { deps, seen } = expireDeps(["w1", "w2", "w3"]);
+  assert.deepEqual(await expireTrials(deps, 2), { status: "retry", error: "Closed 2 expired workspaces. More to go." });
+  assert.deepEqual([...seen.closed].sort(), ["w1", "w2"]);
+});
+
+test("expireTrials: a workspace that subscribed since the search is left alone", async () => {
+  const { deps, seen } = expireDeps(["w1", "w2"], { paidNow: new Set(["w2"]) });
+  assert.deepEqual(await expireTrials(deps), { status: "done" });
+  assert.deepEqual(seen.closed, ["w1"]);
+});
+
+test("expireTrials: a workspace that subscribed during the close is reopened at once", async () => {
+  const { deps, seen } = expireDeps(["w1"], { paidDuringClose: new Set(["w1"]) });
+  assert.deepEqual(await expireTrials(deps), { status: "done" });
+  assert.deepEqual(seen.closed, ["w1"]);
+  assert.deepEqual(seen.reopened, ["w1"]);
+});
+
+test("trialOver: only a trial that ended with no plan in force, never a payment going through", () => {
+  const now = NOW.getTime();
+  const past = new Date(now - DAYS(1)).toISOString();
+  const future = new Date(now + DAYS(5)).toISOString();
+  const cases: [Record<string, string | null>, boolean][] = [
+    [{ plan: "trial", status: "trialing", trial_ends_at: past }, true],
+    [{ plan: "trial", status: "trialing", trial_ends_at: future }, false],
+    [{ plan: "pro", status: "active", trial_ends_at: past }, false],
+    [{ plan: "starter", status: "past_due", trial_ends_at: past }, false],
+    [{ plan: "pro", status: "canceled", trial_ends_at: past }, true], // a missed webhook close is caught too
+    [{ plan: "pro", status: "incomplete", trial_ends_at: past }, false],
+    [{ plan: "pro", status: "incomplete_expired", trial_ends_at: past }, true],
+  ];
+  for (const [ws, want] of cases) assert.equal(trialOver(ws, now), want, JSON.stringify(ws));
 });
