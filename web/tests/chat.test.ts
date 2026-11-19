@@ -64,3 +64,21 @@ test("isUuid", () => {
   assert.equal(isUuid("1; drop table"), false);
   assert.equal(isUuid(null), false);
 });
+
+test("loadWorkspace: the brand's tone comes with the workspace when the brand is on; no brand or no table means none", async () => {
+  const { loadWorkspace } = await import("../src/lib/teamStore.ts");
+  const { fakeDb } = await import("./server/fakeDb.ts");
+  const WS = "11111111-2222-4333-8444-555555555555";
+  const db = fakeDb();
+  db.tables.workspaces = [{ id: WS, name: "Ana's Bakery", website: "anas.example", plan: "trial", status: null, trial_ends_at: "2026-12-01T00:00:00Z", period_start: null }];
+  const load = () => loadWorkspace(db as never, WS);
+  assert.equal((await load())?.tone, null);
+  db.tables.brand_kits = [{ workspace_id: WS, tone: "Warm and simple", use_brand: true }];
+  assert.equal((await load())?.tone, "warm and simple");
+  db.tables.brand_kits = [{ workspace_id: WS, tone: "Warm and simple", use_brand: false }];
+  assert.equal((await load())?.tone, null);
+  // Another workspace's brand never comes along.
+  db.tables.brand_kits = [{ workspace_id: "other", tone: "loud", use_brand: true }];
+  assert.equal((await load())?.tone, null);
+  assert.equal(await loadWorkspace(db as never, "missing"), null);
+});

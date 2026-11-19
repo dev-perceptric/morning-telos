@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NewMessage, Pref, StoredMessage, TeamStore, TeamWorkspace, UsageRow } from "./agentLoop.ts";
 import { HISTORY } from "./agentLoop.ts";
+import { brandTone, type BrandRow } from "./brand.ts";
 import { isModelChoice } from "./models.ts";
 import { isAgentKey, type AgentKey } from "./team.ts";
 
@@ -16,10 +17,15 @@ const must = <T>(r: { data: T; error: { message: string } | null }): T => {
   return r.data;
 };
 
-/** The workspace fields the team needs: its name and website for the prompt, and its plan for the meter. */
+/**
+ * The workspace fields the team needs: its name, website and brand tone for the prompt, and its plan for the meter.
+ * A brand that can't be read (021_brand.sql not run yet, a hiccup) only leaves the tone out.
+ */
 export async function loadWorkspace(db: SupabaseClient, id: string): Promise<TeamWorkspace | null> {
   const row = must(await db.from("workspaces").select("id, name, website, plan, status, trial_ends_at, period_start").eq("id", id).maybeSingle()) as TeamWorkspace | null;
-  return row ?? null;
+  if (!row) return null;
+  const brand = await db.from("brand_kits").select("tone, use_brand").eq("workspace_id", id).maybeSingle();
+  return { ...row, tone: brand.error ? null : brandTone(brand.data as Pick<BrandRow, "tone" | "use_brand"> | null) };
 }
 
 /** True when the thread is in this workspace. */

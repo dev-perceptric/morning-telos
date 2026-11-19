@@ -2226,3 +2226,162 @@ test("staff_actions only takes known actions and object details", async (t) => {
   await assert.rejects(db.query("insert into staff_actions (staff_user_id, workspace_id, action, details) values ($1, $2, 'set_plan', '[1]')", [randomUUID(), ws]), /staff_actions_details_check/);
   await assert.rejects(db.query("insert into staff_actions (workspace_id, action) values ($1, 'set_plan')", [ws]), /null value/);
 });
+
+// ─────────────── the brand (021_brand.sql) ───────────────
+
+const BRAND_SQL = () => readFileSync(new URL("021_brand.sql", SQL_DIR), "utf8");
+const brandOf = async (ws: string) => (await db!.query("select primary_color, heading_font, tone, source, use_brand, updated_by from brand_kits where workspace_id = $1", [ws])).rows[0] ?? null;
+
+test("brand_kits: members read, owners and admins add, change and delete; editors, viewers, other workspaces and visitors can't", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("brand");
+  const other = await team("brand-other");
+  for (const u of [owner, admin]) {
+    await as(u, async (q) => {
+      await q("insert into brand_kits (workspace_id, primary_color, heading_font, tone) values ($1, '#1d4ed8', 'Lora', 'warm')", [ws]);
+      assert.equal((await q("update brand_kits set use_brand = false where workspace_id = $1", [ws])).rowCount, 1);
+      assert.equal((await q("delete from brand_kits where workspace_id = $1", [ws])).rowCount, 1);
+    });
+  }
+  await db.query("insert into brand_kits (workspace_id, primary_color, source) values ($1, '#1d4ed8', 'website'), ($2, '#dc2626', 'website')", [ws, other.ws]);
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => {
+      assert.deepEqual((await q("select workspace_id, primary_color from brand_kits")).rows, [{ workspace_id: ws, primary_color: "#1d4ed8" }], "only their own brand");
+    });
+  }
+  for (const u of [editor, viewer]) {
+    await as(u, async (q) => {
+      assert.equal((await q("update brand_kits set tone = 'loud' where workspace_id = $1", [ws])).rowCount, 0);
+      assert.equal((await q("delete from brand_kits where workspace_id = $1", [ws])).rowCount, 0);
+    });
+    await as(u, async (q) => {
+      await q("delete from brand_kits where workspace_id = $1", [ws]);
+      await assert.rejects(q("insert into brand_kits (workspace_id, tone) values ($1, 'x')", [ws]), /row-level security/);
+    });
+  }
+  await as(owner, async (q) => {
+    assert.equal((await q("update brand_kits set tone = 'mine now' where workspace_id = $1", [other.ws])).rowCount, 0);
+    assert.equal((await q("delete from brand_kits where workspace_id = $1", [other.ws])).rowCount, 0);
+  });
+  await as(owner, async (q) => {
+    await q("delete from brand_kits where workspace_id = $1", [other.ws]);
+    await assert.rejects(q("insert into brand_kits (workspace_id, tone) values ($1, 'x')", [other.ws]), /row-level security|duplicate key/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from brand_kits"), /permission denied/);
+  });
+  assert.equal((await db.query("select tone from brand_kits where workspace_id = $1", [other.ws])).rows[0].tone, null);
+});
+
+test("brand_kits: a person's change makes it theirs (manual); the switch alone doesn't; source and workspace can't be set by people", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin } = await team("brand-src");
+  await db.query("insert into brand_kits (workspace_id, primary_color, source) values ($1, '#1d4ed8', 'website')", [ws]);
+  await asCommit(admin, (q) => q("update brand_kits set use_brand = false where workspace_id = $1", [ws]));
+  assert.deepEqual(await brandOf(ws), { primary_color: "#1d4ed8", heading_font: null, tone: null, source: "website", use_brand: false, updated_by: admin.id });
+  await asCommit(owner, (q) => q("update brand_kits set heading_font = 'Lora' where workspace_id = $1", [ws]));
+  assert.equal((await brandOf(ws)).source, "manual");
+  assert.equal((await brandOf(ws)).updated_by, owner.id);
+  await as(owner, async (q) => {
+    await assert.rejects(q("update brand_kits set source = 'website' where workspace_id = $1", [ws]), /permission denied/);
+  });
+  await as(owner, async (q) => {
+    await assert.rejects(q("update brand_kits set workspace_id = workspace_id where workspace_id = $1", [ws]), /permission denied/);
+  });
+  await as(owner, async (q) => {
+    await assert.rejects(q("insert into brand_kits (workspace_id, source) values ($1, 'website')", [ws]), /permission denied/);
+  });
+});
+
+test("brand_kits: known values only, one per workspace, gone with the workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner } = await team("brand-shape");
+  for (const [col, val] of [
+    ["primary_color", "red"],
+    ["primary_color", "#ABCDEF"],
+    ["accent_color", "#12345"],
+    ["heading_font", "Lora; } body {"],
+    ["body_font", "x"],
+    ["logo_url", "http://a.example/l.png"],
+    ["logo_url", "javascript:alert(1)"],
+    ["tone", "two\nlines"],
+    ["tone", "x".repeat(81)],
+    ["tone", "  "],
+    ["source", "scraped"],
+  ] as const) {
+    await assert.rejects(db.query(`insert into brand_kits (workspace_id, ${col}) values ($1, $2)`, [ws, val]), /violates check constraint/, `${col}=${val}`);
+  }
+  await db.query("insert into brand_kits (workspace_id, logo_url) values ($1, 'https://a.example/l.png')", [ws]);
+  await assert.rejects(db.query("insert into brand_kits (workspace_id) values ($1)", [ws]), /duplicate key/);
+  await asCommit(owner, (q) => q("delete from workspaces where id = $1", [ws]));
+  assert.equal(await brandOf(ws), null);
+});
+
+test("save_site_brand: server only; saves the website's brand, keeps a manual one, removes a stale website one, keeps the switch", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin } = await team("brand-save");
+  for (const u of [owner, admin]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select save_site_brand($1, '{}'::jsonb)", [ws]), /permission denied/);
+    });
+  }
+  const save = (b: unknown) => asService(async (q) => (await q("select save_site_brand($1, $2::jsonb) r", [ws, b === null ? null : JSON.stringify(b)])).rows[0].r);
+  const found = { primary: "#b5462b", accent: "#2f7d6d", headingFont: "Playfair Display", bodyFont: "Work Sans", logoUrl: "https://anas.example/logo.png", tone: "warm and simple" };
+  assert.equal(await save(found), "saved");
+  const row = (await db.query("select primary_color, accent_color, heading_font, body_font, logo_url, tone, source, use_brand, updated_by from brand_kits where workspace_id = $1", [ws])).rows[0];
+  assert.deepEqual(row, { primary_color: "#b5462b", accent_color: "#2f7d6d", heading_font: "Playfair Display", body_font: "Work Sans", logo_url: "https://anas.example/logo.png", tone: "warm and simple", source: "website", use_brand: true, updated_by: null });
+  // The owner turned it off: a new scan updates the values and keeps the switch.
+  await asCommit(owner, (q) => q("update brand_kits set use_brand = false where workspace_id = $1", [ws]));
+  assert.equal(await save({ ...found, primary: "#1d4ed8", tone: null }), "saved");
+  assert.deepEqual(await brandOf(ws), { primary_color: "#1d4ed8", heading_font: "Playfair Display", tone: null, source: "website", use_brand: false, updated_by: owner.id });
+  // Nothing usable on the site any more: the website's brand goes.
+  assert.equal(await save(null), "removed");
+  assert.equal(await brandOf(ws), null);
+  // A brand people made is never replaced or removed by a scan.
+  await asCommit(admin, (q) => q("insert into brand_kits (workspace_id, primary_color) values ($1, '#7c3aed')", [ws]));
+  assert.equal(await save(found), "kept");
+  assert.equal(await save(null), "kept");
+  assert.equal((await brandOf(ws)).primary_color, "#7c3aed");
+  // Bad values from a scan are refused by the table's checks.
+  await db.query("delete from brand_kits where workspace_id = $1", [ws]);
+  await assert.rejects(save({ ...found, primary: "red" }), /violates check constraint/);
+});
+
+test("rescan_brand: owners and admins hand the brand back to the website and queue a scan; others can't", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("brand-rescan");
+  for (const u of [editor, viewer]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select rescan_brand($1)", [ws]), /You need admin access/);
+    });
+  }
+  await as(null, async (q) => {
+    await assert.rejects(q("select rescan_brand($1)", [ws]), /permission denied/);
+  });
+  await as(owner, async (q) => {
+    await assert.rejects(q("select rescan_brand($1)", [ws]), /Add your website in Settings first/);
+  });
+  await db.query("update workspaces set website = 'brand-rescan.example' where id = $1", [ws]);
+  await db.query("update jobs set done_at = now(), created_at = now() - interval '10 minutes' where workspace_id = $1 and kind = 'scan_website'", [ws]);
+  await asCommit(admin, (q) => q("insert into brand_kits (workspace_id, primary_color) values ($1, '#7c3aed')", [ws]));
+  assert.equal((await brandOf(ws)).source, "manual");
+  assert.equal(await asCommit(admin, async (q) => (await q("select rescan_brand($1) ok", [ws])).rows[0].ok), true);
+  assert.equal((await brandOf(ws)).source, "website");
+  assert.equal((await brandOf(ws)).primary_color, "#7c3aed", "the values stay until the scan replaces them");
+  assert.equal((await db.query("select count(*)::int n from jobs where workspace_id = $1 and kind = 'scan_website' and done_at is null", [ws])).rows[0].n, 1);
+  // One waiting already: no second scan.
+  assert.equal(await asCommit(owner, async (q) => (await q("select rescan_brand($1) ok", [ws])).rows[0].ok), false);
+});
+
+test("021_brand.sql queues one learn_brand job for each older workspace with a website and no brand, once", async (t) => {
+  if (!db) return t.skip("no test database");
+  const site = await team("brand-old");
+  const branded = await team("brand-old2");
+  const plain = await team("brand-old3");
+  await db.query("update workspaces set website = 'old.example' where id = any($1)", [[site.ws, branded.ws]]);
+  await db.query("insert into brand_kits (workspace_id, source) values ($1, 'website')", [branded.ws]);
+  await db.query(BRAND_SQL());
+  await db.query(BRAND_SQL());
+  const jobs = (await db.query("select workspace_id, max_attempts from jobs where kind = 'learn_brand' and workspace_id = any($1)", [[site.ws, branded.ws, plain.ws]])).rows;
+  assert.deepEqual(jobs, [{ workspace_id: site.ws, max_attempts: 1 }]);
+});

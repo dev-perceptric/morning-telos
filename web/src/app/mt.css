@@ -515,11 +515,58 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
 .ok-t{color:var(--green);font-size:13px}
 .boot{min-height:100vh;display:grid;place-items:center;color:var(--ink-4)}
 /* chat content */
-.md p{margin:0 0 8px}.md p:last-child{margin-bottom:0}
-.md ul,.md ol{margin:4px 0 8px 20px;display:grid;gap:3px}
+/* Markdown answers (src/lib/markdown.ts, drawn by Markdown in Chat.tsx). A brand sets --md-accent, --md-tint,
+   --md-tint-line and --md-head on the chat (answerTheme in src/lib/brand.ts, contrast checked). Without one, the
+   Morning Telos look. Body text always keeps the app's font and ink. */
+.md{--acc:var(--md-accent,var(--clay-2));--tint:var(--md-tint,var(--sunk));--tint-line:var(--md-tint-line,var(--line-2));--head:var(--md-head,var(--sans))}
+/* Space between blocks, so a long answer is easy to scan: more above a heading, less under it. */
+.md>*{margin:0}
+.md>*+*{margin-top:12px}
+.md>*+h2{margin-top:24px}
+.md>*+h3{margin-top:20px}
+.md>*+h4{margin-top:16px}
+.md>h2+*,.md>h3+*,.md>h4+*{margin-top:6px}
+.md>*+hr,.md>hr+*{margin-top:18px}
+.md h2,.md h3,.md h4{font-family:var(--head);color:var(--ink);font-weight:600;line-height:1.3;letter-spacing:-.005em}
+.md h2{font-size:18px}
+.md h3{font-size:16px}
+.md h4{font-size:14.5px}
+.md ul,.md ol{padding-left:22px;display:grid;gap:4px}
+.md ul{list-style:disc}
+.md ol{list-style:decimal}
+.md li{padding-left:2px}
+.md li::marker{color:var(--acc)}
+.md ol>li::marker{font-weight:600;font-variant-numeric:tabular-nums}
+.md li>ul,.md li>ol{margin-top:4px}
+.md li>ul{list-style:circle}
+.md b{font-weight:600;color:var(--ink)}
+.md b.n{color:var(--acc)}
+.md em{font-style:italic}
+.md a{color:var(--acc);text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--acc) 45%,transparent);text-underline-offset:2px}
+.md a:hover{text-decoration-color:currentColor}
 .md code{font:12.5px var(--mono);background:var(--sunk);padding:1px 5px;border-radius:5px}
-.md a{color:var(--clay-2);text-decoration:underline;text-underline-offset:2px}
-.md h4{font-size:14px;font-weight:600;margin:10px 0 4px}
+.md pre{background:var(--sunk);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;overflow-x:auto}
+.md pre code{background:none;padding:0;white-space:pre;overflow-wrap:normal}
+.md blockquote{border-left:3px solid var(--acc);background:var(--tint);border-radius:0 var(--r-sm) var(--r-sm) 0;padding:9px 14px;color:var(--ink-2)}
+.md blockquote>*+*{margin-top:6px}
+.md hr{border:0;border-top:1px solid var(--line)}
+/* A table sits in its own rounded box. Wider than the chat, it scrolls inside the box, never the page. */
+.md-table{max-width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);box-shadow:var(--sh);-webkit-overflow-scrolling:touch}
+.md table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.45}
+.md th,.md td{padding:9px 14px;text-align:left;vertical-align:top;border-top:1px solid var(--line);overflow-wrap:normal}
+.md th{background:var(--tint);border-top:0;border-bottom:1px solid var(--tint-line);font-weight:600;color:var(--ink);white-space:nowrap}
+.md tbody tr:first-child td{border-top:0}
+.md td{min-width:64px;color:var(--ink-2)}
+.md .al-r{text-align:right}
+.md .al-c{text-align:center}
+.md .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Settings, General, Brand */
+.brand-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,300px);gap:20px;align-items:start}
+.brand-sw{width:34px;height:34px;border-radius:9px;flex:none;background:var(--sunk);border:1px solid var(--line)}
+.brand-logo{width:40px;height:40px;border-radius:9px;flex:none;object-fit:contain;background:var(--sunk);border:1px solid var(--line)}
+.brand-prev{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:14px;font-size:13.5px;color:var(--ink-2);line-height:1.55;min-width:0}
+@media (max-width:900px){.brand-grid{grid-template-columns:1fr}}
+.md tbody tr:hover td{background:color-mix(in srgb,var(--tint) 45%,transparent)}
 .step{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-4);padding-left:42px}
 .step .spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--line-2);border-top-color:var(--clay);animation:spin .8s linear infinite}
 .step .dot2{width:6px;height:6px;border-radius:50%;background:var(--ink-4)}
@@ -703,12 +750,6 @@ button.row:disabled:hover{background:none}
 .trialbar+.hero{padding-top:28px}
 .msg .av{margin-top:1px}
 .msg .body .md{overflow-wrap:anywhere}
-.md ol{list-style:decimal}
-.md ul{list-style:disc}
-.md li{padding-left:2px}
-.md li::marker{color:var(--ink-4)}
-.md p+ul,.md p+ol{margin-top:-2px}
-.md b{font-weight:600}
 .handoff .av{width:18px;height:18px}
 .step .wrap{line-height:1.4}
 .th-h h1{flex:1;min-width:0}

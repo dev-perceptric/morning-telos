@@ -1,8 +1,10 @@
-// The scan_website job's handler for the worker (src/app/api/worker/route.ts): the real database, the safe fetch
-// and the Claude client around scanWebsite (src/lib/siteScan.ts).
+// The scan_website and learn_brand jobs' handlers for the worker (src/app/api/worker/route.ts): the real database,
+// the safe fetch and the Claude client around scanWebsite (src/lib/siteScan.ts) and learnBrandJob (src/lib/brandScan.ts).
 import Anthropic from "@anthropic-ai/sdk";
 import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { FoundBrand } from "./brand.ts";
+import { fetchCss, learnBrandJob, type BrandDeps } from "./brandScan.ts";
 import type { Handler } from "./jobs.ts";
 import { fetchPage } from "./siteFetch.ts";
 import { scanWebsite, usageRow, type AiUsage, type AskClaude } from "./siteScan.ts";
@@ -44,6 +46,23 @@ function meterWith(db: SupabaseClient) {
   };
 }
 
+/** The brand_kits row for one workspace (supabase/021_brand.sql), as the scan sees it. */
+function brandWith(db: SupabaseClient, ws: string | null): BrandDeps {
+  return {
+    fetchCss: (url) => fetchCss(url),
+    current: async () => {
+      const { data, error } = await db.from("brand_kits").select("source").eq("workspace_id", ws).maybeSingle();
+      if (error) throw new Error(/brand_kits/.test(error.message) ? "Run supabase/021_brand.sql in Supabase." : `Could not read the brand: ${error.message}`);
+      return ((data as { source: "website" | "manual" } | null)?.source ?? null);
+    },
+    save: async (brand: FoundBrand | null) => {
+      const { error } = await db.rpc("save_site_brand", { ws, p_brand: brand });
+      if (error) throw new Error(`Could not save the brand: ${error.message}`);
+    },
+    warn,
+  };
+}
+
 function warn(message: string) {
   console.error(message);
   Sentry.captureMessage(message, { level: "warning", tags: { job_kind: "scan_website" } });
@@ -68,9 +87,26 @@ export function knowledgeJobHandlers(db: SupabaseClient, env: Record<string, str
           if (error) throw new Error(/save_website_doc/.test(error.message) ? "Run supabase/012_knowledge.sql in Supabase." : `Could not save the website doc: ${error.message}`);
         },
         meter: meterWith(db),
+        brand: job.workspace_id ? brandWith(db, job.workspace_id) : undefined,
         warn,
         attempt: job.attempts,
         maxAttempts: job.max_attempts,
+      }),
+    // Once, for workspaces that had a website before brands existed (supabase/021_brand.sql).
+    learn_brand: (job) =>
+      learnBrandJob({
+        ...brandWith(db, job.workspace_id),
+        workspaceId: job.workspace_id,
+        workspace: async () => {
+          const { data, error } = await db.from("workspaces").select("website").eq("id", job.workspace_id).maybeSingle();
+          if (error) throw new Error(`Could not read the workspace: ${error.message}`);
+          return data as { website: string | null } | null;
+        },
+        fetchPage: (url) => fetchPage(url),
+        aboutDoc: async () => {
+          const { data } = await db.from("knowledge_docs").select("body").eq("workspace_id", job.workspace_id).eq("source", "website").maybeSingle();
+          return (data as { body: string } | null)?.body ?? null;
+        },
       }),
   };
 }

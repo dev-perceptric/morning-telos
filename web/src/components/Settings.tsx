@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppsSettings } from "./Apps";
+import { BrandSettings } from "./Brand";
 import { ExtensionSettings } from "./Extension";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/routes";
 import { ASSIGNABLE, can, cleanSettings, deleteConfirmMatches, inviteLink, memberActions, roleLabel, ROLES, type MemberRow, type Role } from "@/lib/workspace";
@@ -72,6 +73,7 @@ export function SettingsPage({
             <GeneralSettings key={ws.id} sb={sb} ws={ws} onChanged={onChanged} />
             <Account email={email} name={name} role={ws.role} />
           </div>
+          {can(ws.role, "editSettings") ? <BrandSettings key={`brand-${ws.id}`} sb={sb} ws={ws} /> : null}
           {ws.role === "owner" ? <EmailSettings key={`mail-${ws.id}`} sb={sb} ws={ws} userId={userId} /> : null}
           {can(ws.role, "deleteWorkspace") ? <DeleteWorkspace key={`del-${ws.id}`} sb={sb} ws={ws} onGone={onGone} /> : null}
           <p className="legal">

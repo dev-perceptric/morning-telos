@@ -3,7 +3,10 @@
 // from the site's own words. Without one, or when Claude can't help, the site's cleaned text is saved as
 // "Website notes" so the team still has something to read. Arrowsterr's onboarding research (RESEARCH_PROMPT in
 // src/lib/onboarding.ts) does the same first step for its brands.
+// The same scan learns the brand (colors, fonts, logo and tone) from the home page (src/lib/brandScan.ts).
 // Pure apart from what it is handed, so tests use fake pages and a fake Claude. src/lib/siteScanDb.ts wires it up.
+import { cleanTone } from "./brand.ts";
+import { learnBrand, type BrandDeps } from "./brandScan.ts";
 import type { JobResult } from "./jobs.ts";
 import { aboutTitle, capText, MAX_BODY, NOTES_TITLE } from "./knowledge.ts";
 import type { Page } from "./siteFetch.ts";
@@ -32,7 +35,8 @@ export function siteUrl(website: string | null | undefined): string | null {
   }
 }
 
-type ReadResult = { ok: true; pages: ScannedPage[] } | { ok: false; error: string; retryable: boolean };
+/** home: the home page's own HTML and address, for the brand. */
+type ReadResult = { ok: true; pages: ScannedPage[]; home: { html: string; url: string } } | { ok: false; error: string; retryable: boolean };
 
 /** The home page, then up to 5 of its own pages at once. Pages that fail are skipped; the home page must work. */
 export async function readSite(home: string, fetchPage: (url: string) => Promise<Page>): Promise<ReadResult> {
@@ -52,7 +56,7 @@ export async function readSite(home: string, fetchPage: (url: string) => Promise
     if (t.text || t.description) pages.push({ url: p.url, ...t });
   }
   if (!pages.length) return { ok: false, error: `${home} shows no text we can read (it may be built only with scripts).`, retryable: false };
-  return { ok: true, pages };
+  return { ok: true, pages, home: { html: first.html, url: first.url } };
 }
 
 // ─────────────── asking Claude ───────────────
@@ -69,10 +73,13 @@ export const ABOUT_FIELDS = [
 export type AboutKey = (typeof ABOUT_FIELDS)[number]["key"];
 export type About = Record<AboutKey, string>;
 
+/** The brand's tone in a few words, for the team's prompts (src/lib/brand.ts). Not a part of the About doc. */
+export const TONE_HINT = "3 to 6 plain words for the tone of the website's own writing, like: warm and simple, or formal and exact";
+
 export const ABOUT_SCHEMA = {
   type: "object",
-  properties: Object.fromEntries(ABOUT_FIELDS.map((f) => [f.key, { type: "string", description: f.hint }])),
-  required: ABOUT_FIELDS.map((f) => f.key),
+  properties: { ...Object.fromEntries(ABOUT_FIELDS.map((f) => [f.key, { type: "string", description: f.hint }])), tone: { type: "string", description: TONE_HINT } },
+  required: [...ABOUT_FIELDS.map((f) => f.key), "tone"],
   additionalProperties: false,
 };
 
@@ -87,7 +94,7 @@ Rules:
 
 /** The question for Claude: the business, then each page's words. */
 export function aboutRequest(business: string, site: string, pages: ScannedPage[]): { system: string; user: string; schema: typeof ABOUT_SCHEMA } {
-  const fields = ABOUT_FIELDS.map((f) => `- ${f.key}: ${f.hint}`).join("\n");
+  const fields = [...ABOUT_FIELDS.map((f) => `- ${f.key}: ${f.hint}`), `- tone: ${TONE_HINT}`].join("\n");
   const safe = (s: string) => s.replace(/<\/?page\b/gi, (m) => m.replace("<", "&lt;"));
   const body = pages
     .map((p) => `<page url="${p.url.replace(/"/g, "%22")}">\nTitle: ${safe(p.title)}\nDescription: ${safe(p.description)}\n\n${safe(p.text)}\n</page>`)
@@ -117,6 +124,16 @@ export function parseAbout(text: string): About | null {
   const rec = data as Record<string, unknown>;
   if (ABOUT_FIELDS.some((f) => rec[f.key] !== undefined && typeof rec[f.key] !== "string")) return null;
   return Object.fromEntries(ABOUT_FIELDS.map((f) => [f.key, tidy(rec[f.key])])) as About;
+}
+
+/** The tone in Claude's answer, cleaned, or null. */
+export function parseTone(text: string): string | null {
+  try {
+    const data = JSON.parse(text) as Record<string, unknown> | null;
+    return data && typeof data === "object" && !Array.isArray(data) ? cleanTone(tidy(data.tone)) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The About doc's text, in the old app's starter layout: one line per part, blank when the site doesn't say. */
@@ -178,6 +195,8 @@ export type ScanDeps = {
   meter: (u: AiUsage) => Promise<void>;
   /** Tells staff about a problem the customer can't fix. */
   warn: (message: string) => void;
+  /** Learning the brand from the home page. Left out, the scan only fills Knowledge. */
+  brand?: BrandDeps;
   /** This try (claims count as tries) and the most the job gets. */
   attempt: number;
   maxAttempts: number;
@@ -195,10 +214,16 @@ export async function scanWebsite(d: ScanDeps): Promise<JobResult> {
   const read = await readSite(home, d.fetchPage);
   if (!read.ok) return { status: read.retryable ? "retry" : "failed", error: read.error };
   const notes = () => d.save({ title: NOTES_TITLE, body: websiteNotes(read.pages), url: home });
+  // The brand is learned last, and a brand that fails never fails the scan.
+  const workspaceId = d.workspaceId;
+  const done = async (tone: string | null = null): Promise<JobResult> => {
+    if (d.brand) await learnBrand(workspaceId, read.home, tone, d.brand);
+    return { status: "done" };
+  };
 
   if (!d.claude) {
     await notes();
-    return { status: "done" };
+    return done();
   }
   const ask = aboutRequest(ws.name, home, read.pages);
   let answer: ClaudeAnswer;
@@ -209,7 +234,7 @@ export async function scanWebsite(d: ScanDeps): Promise<JobResult> {
     if ((e as { retryable?: boolean })?.retryable && d.attempt < d.maxAttempts) return { status: "retry", error: `Claude: ${message}` };
     d.warn(`Website scan for workspace ${d.workspaceId} saved Website notes: Claude failed (${message}).`);
     await notes();
-    return { status: "done" };
+    return done();
   }
   try {
     await d.meter(usageOf(d.workspaceId, answer));
@@ -220,8 +245,8 @@ export async function scanWebsite(d: ScanDeps): Promise<JobResult> {
   if (!about) {
     d.warn(`Website scan for workspace ${d.workspaceId} saved Website notes: Claude's answer was ${answer.stopReason === "refusal" ? "a refusal" : "not the JSON we asked for"}.`);
     await notes();
-    return { status: "done" };
+    return done();
   }
   await d.save({ title: aboutTitle(ws.name), body: aboutBody(ws.name, (ws.website ?? "").trim(), about), url: home });
-  return { status: "done" };
+  return done(parseTone(answer.text));
 }
