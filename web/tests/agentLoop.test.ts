@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import Anthropic from "@anthropic-ai/sdk";
 import {
+  CACHE_BREAKPOINTS,
+  callClaude,
+  stoppedTokens,
   handoffTool,
   historyFor,
   MAX_RUNS,
@@ -120,10 +123,12 @@ test("no tag: Athena answers with a cached prompt, medium effort and the refusal
   assert.equal(lastUser(p).role, "user");
   assert.equal(lastUser(p).content, "Plan my week");
   assert.deepEqual(r.said.map((m) => [m.role, m.agent, m.content]), [["agent", "chief", "Here is your week."]]);
+  // Without a router, an untagged message goes to Athena, and the screen hears so before she starts.
   assert.deepEqual(
     r.events.map((e) => e.type),
-    ["status", "message"],
+    ["route", "status", "message"],
   );
+  assert.deepEqual(r.events[0], { type: "route", agent: "chief", how: "lead", reason: "Answers general questions" });
   assert.equal(r.touched(), 1);
 });
 
@@ -266,6 +271,7 @@ test("tool_use handoff: Athena hands to Artemis, who runs next and sees the note
   assert.deepEqual(
     r.events.filter((e) => e.type !== "status"),
     [
+      { type: "route", agent: "chief", how: "lead", reason: "Answers general questions" },
       { type: "message", agent: "chief", text: "I asked Artemis to check." },
       { type: "handoff", from: "chief", to: "seo", note: "Check our AI visibility this week." },
       { type: "message", agent: "seo", text: "Your visibility is steady." },
@@ -494,6 +500,16 @@ test("tools from the registry: run in parallel, labels shown, all results in one
     r.events.filter((e) => e.type === "tool").map((e) => (e as { text: string }).text),
     ["Label zeta_read", "Label alpha_read", "Label broken"],
   );
+  assert.deepEqual(
+    r.events.filter((e) => e.type === "tool").map((e) => (e as { line?: string }).line),
+    ["Athena is working on Label zeta_read", "Athena is working on Label alpha_read", "Athena is working on Label broken"],
+  );
+  assert.deepEqual(
+    r.events.filter((e) => e.type === "tool").map((e) => (e as { used?: string }).used),
+    ["Label zeta_read", "Label alpha_read", "Label broken"],
+  );
+  // The reply keeps the tools it used, for the "Used: ..." note under it, after a reload too.
+  assert.deepEqual(r.messages.at(-1)!.meta.used, ["Label zeta_read", "Label alpha_read", "Label broken"]);
   // None of these tools change anything, so the prompt says the agent only reads.
   assert.match(calls[0].params.system![0].text as string, /Your tools only read/);
 });
@@ -522,7 +538,7 @@ test("a call saved for approval: the chat gets an approval event, and the reply 
   const ev = r.events.filter((e) => e.type === "approval" || e.type === "message");
   assert.deepEqual(ev, [
     { type: "approval", agent: "social", id: 7, title: "Create posts (Social media)" },
-    { type: "message", agent: "social", text: "I drafted 3 posts for you to approve." },
+    { type: "message", agent: "social", text: "I drafted 3 posts for you to approve.", used: ["create posts"] },
   ]);
   const reply = r.messages.at(-1)!;
   assert.deepEqual(reply.meta.approvals, [{ id: 7, title: "Create posts (Social media)" }]);
@@ -659,4 +675,248 @@ test("history: own replies are the assistant, teammates and notes are user text,
   const own = historyFor([{ role: "user", agent: null, content: "Hi" }, { role: "agent", agent: "web", content: "Hey" }], "web");
   assert.equal(own.at(-1)!.role, "user");
   assert.deepEqual(historyFor([], "web"), [{ role: "user", content: "Hephaestus, it's your turn. Answer the last message." }]);
+});
+
+// ─────────────── streaming ───────────────
+
+/**
+ * A fake Claude that streams, like the SDK's messages.stream(): each reply's text arrives a word at a time through
+ * on("text"), then finalMessage() gives the whole reply. `onPiece` runs after each word, so a test can press Stop.
+ */
+function streamingClaude(scripts: Partial<Record<AgentKey, Reply[]>>, o: { onPiece?: (n: number) => void } = {}) {
+  const calls: { agent: AgentKey; params: Params; signal?: AbortSignal }[] = [];
+  const client: LoopClient = {
+    beta: {
+      messages: {
+        create: async () => {
+          throw new Error("the loop should stream");
+        },
+        stream: (params, opts) => {
+          const agent = agentOf(params);
+          calls.push({ agent, params: structuredClone(params), signal: opts?.signal });
+          const next = scripts[agent]?.shift();
+          if (!next) throw new Error(`no scripted reply for ${agent}`);
+          let listener: ((d: string, s: string) => void) | null = null;
+          let current: Anthropic.Beta.BetaMessage | undefined;
+          const whole = { id: `msg_${calls.length}`, type: "message", role: "assistant", model: next.model ?? params.model, content: next.content, stop_reason: next.stop_reason, stop_sequence: null, usage: { ...USAGE, ...next.usage } } as unknown as Anthropic.Beta.BetaMessage;
+          return {
+            on(_event: "text", l: (d: string, s: string) => void) {
+              listener = l;
+              return this;
+            },
+            get currentMessage() {
+              return current;
+            },
+            async finalMessage() {
+              // message_start: the input tokens are known, the output count comes at the end.
+              current = { ...whole, content: [], usage: { ...whole.usage, output_tokens: 1 } } as Anthropic.Beta.BetaMessage;
+              const words = next.content
+                .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+                .map((b) => b.text)
+                .join("")
+                .match(/\S+\s*|\s+/g) ?? [];
+              let sofar = "";
+              for (let i = 0; i < words.length; i++) {
+                if (opts?.signal?.aborted) throw new Anthropic.APIUserAbortError();
+                sofar += words[i];
+                listener?.(words[i], sofar);
+                o.onPiece?.(i);
+                await Promise.resolve();
+              }
+              if (opts?.signal?.aborted) throw new Anthropic.APIUserAbortError();
+              return whole;
+            },
+          };
+        },
+      },
+    },
+  };
+  return { client, calls };
+}
+
+async function streamTurn(textIn: string, client: LoopClient, o: { signal?: AbortSignal; tools?: AgentTool[]; router?: Parameters<typeof runTurn>[1]["router"]; store?: ReturnType<typeof memoryStore> } = {}) {
+  const mem = o.store ?? memoryStore();
+  await mem.store.addMessage({ thread_id: "t-1", workspace_id: WS.id, role: "user", agent: null, content: textIn, meta: {} });
+  const events: ChatEvent[] = [];
+  await runTurn(
+    { workspace: WS, threadId: "t-1", text: textIn },
+    { client, store: mem.store, emit: (e) => events.push(e), now: () => NOW, signal: o.signal, router: o.router, tools: o.tools ? async () => ({ tools: o.tools!, missing: [] }) : undefined },
+  );
+  return { ...mem, events, said: mem.messages.filter((m) => m.role !== "user") };
+}
+
+test("streaming: the reply arrives as delta events, word by word, then the whole message is saved and sent once", async () => {
+  const { client, calls } = streamingClaude({ chief: [say("Your week looks **busy**. Start with Monday.")] });
+  const r = await streamTurn("Plan my week", client);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(
+    r.events.map((e) => e.type),
+    ["route", "status", "delta", "delta", "delta", "delta", "delta", "delta", "delta", "message"],
+  );
+  const deltas = r.events.filter((e): e is Extract<ChatEvent, { type: "delta" }> => e.type === "delta");
+  assert.equal(deltas.map((e) => e.text).join(""), "Your week looks **busy**. Start with Monday.");
+  assert.deepEqual(deltas[0], { type: "delta", agent: "chief", text: "Your ", start: true });
+  assert.ok(deltas.slice(1).every((e) => e.agent === "chief" && e.start === undefined));
+  assert.deepEqual(r.events.at(-1), { type: "message", agent: "chief", text: "Your week looks **busy**. Start with Monday." });
+  assert.deepEqual(r.said.map((m) => m.content), ["Your week looks **busy**. Start with Monday."]);
+  assert.equal(r.usage.length, 1);
+  assert.equal(r.usage[0].output_tokens, 200);
+});
+
+test("streaming with tools: the progress line, then the next step's text starts over, and the reply says what it used", async () => {
+  const tool: AgentTool = {
+    definition: { name: "arrowsterr__domain_overview", input_schema: { type: "object", properties: {} } },
+    label: "SEO and AI visibility: domain overview",
+    run: async () => ({ content: '{"visits": 1240}' }),
+  };
+  const { client } = streamingClaude({
+    seo: [{ content: [text("Let me look."), toolUse("1", "arrowsterr__domain_overview", { domain: "katalon.com" })], stop_reason: "tool_use" }, say("katalon.com gets **1,240** visits.")],
+  });
+  const r = await streamTurn("@Artemis check traffic of katalon.com", client, { tools: [tool] });
+  const seq = r.events.map((e) => (e.type === "delta" ? `delta${e.start ? "*" : ""}` : e.type === "tool" ? `tool:${e.line}` : e.type));
+  assert.deepEqual(seq, ["route", "status", "delta*", "delta", "delta", "tool:Artemis is checking katalon.com", "status", "delta*", "delta", "delta", "delta", "message"]);
+  const tl = r.events.find((e) => e.type === "tool")!;
+  assert.deepEqual(tl, { type: "tool", agent: "seo", text: "SEO and AI visibility: domain overview", line: "Artemis is checking katalon.com", used: "domain overview" });
+  assert.deepEqual(r.events.at(-1), { type: "message", agent: "seo", text: "katalon.com gets **1,240** visits.", used: ["domain overview"] });
+  assert.deepEqual(r.messages.at(-1)!.meta.used, ["domain overview"]);
+});
+
+test("Stop: the Claude call is aborted, what was written is saved with the Stopped note, and nobody else runs", async () => {
+  const ctrl = new AbortController();
+  const { client, calls } = streamingClaude(
+    {
+      chief: [{ content: [text("Here is the first part of a long plan that keeps going."), toolUse("h", "handoff", { teammate: "Artemis", note: "x" })], stop_reason: "tool_use" }],
+      seo: [say("never")],
+    },
+    { onPiece: (n) => n === 4 && ctrl.abort() },
+  );
+  const r = await streamTurn("Write a long plan", client, { signal: ctrl.signal });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].signal, ctrl.signal, "the signal reaches the Claude call");
+  assert.deepEqual(r.said.map((m) => [m.role, m.agent, m.content]), [["agent", "chief", "Here is the first part"]]);
+  assert.equal(r.said[0].meta.stopped, true);
+  assert.deepEqual(r.events.at(-1), { type: "message", agent: "chief", text: "Here is the first part", stopped: true });
+  assert.ok(!r.events.some((e) => e.type === "handoff"));
+  // The stopped call is metered: its input tokens, and the words written counted as output.
+  assert.equal(r.usage.length, 1);
+  assert.equal(r.usage[0].input_tokens, 1000);
+  assert.equal(r.usage[0].output_tokens, Math.ceil("Here is the first part".length / 4));
+  assert.equal(TEAM_MESSAGES.stopped, "Stopped");
+});
+
+test("Stop before any words: nothing is saved for the teammate, and the turn ends", async () => {
+  const ctrl = new AbortController();
+  ctrl.abort();
+  const { client, calls } = streamingClaude({ chief: [say("Hi")] });
+  const r = await streamTurn("Hello", client, { signal: ctrl.signal });
+  assert.equal(calls.length, 0);
+  assert.deepEqual(r.said, []);
+  assert.ok(!r.events.some((e) => e.type === "message"));
+});
+
+test("Stop while tools run: the tools finish, Claude isn't called again, and the earlier text is kept", async () => {
+  const ctrl = new AbortController();
+  const tool: AgentTool = {
+    definition: { name: "get_prompts", input_schema: { type: "object", properties: {} } },
+    label: "x",
+    run: async () => {
+      ctrl.abort();
+      return { content: "data" };
+    },
+  };
+  const { client, calls } = streamingClaude({ chief: [{ content: [text("Checking now."), toolUse("1", "get_prompts", {})], stop_reason: "tool_use" }, say("never")] });
+  const r = await streamTurn("Check", client, { signal: ctrl.signal, tools: [tool] });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(r.said.map((m) => [m.content, m.meta.stopped]), [["Checking now.", true]]);
+});
+
+test("caching: the tool list, the prompt and the thread are cached, in at most 4 breakpoints", async () => {
+  const tools: AgentTool[] = ["b_read", "a_read"].map((name) => ({ definition: { name, input_schema: { type: "object", properties: {} } }, label: name, run: async () => ({ content: "x" }) }));
+  const { client, calls } = streamingClaude({ chief: [say("Hi.")] });
+  const mem = memoryStore();
+  await mem.store.addMessage({ thread_id: "t-1", workspace_id: WS.id, role: "user", agent: null, content: "Hi", meta: {} });
+  await runTurn({ workspace: WS, threadId: "t-1", text: "Hi" }, { client, store: mem.store, emit: () => {}, now: () => NOW, tools: async () => ({ tools, missing: [] }), context: async () => ["<knowledge>x</knowledge>"] });
+  const p = calls[0].params;
+  const ts = p.tools as Anthropic.Beta.BetaTool[];
+  assert.deepEqual(ts.map((t) => [t.name, t.cache_control ?? null]), [["a_read", null], ["b_read", null], ["handoff", { type: "ephemeral" }]]);
+  // The shared definitions are not changed.
+  assert.equal((tools[0].definition as Anthropic.Beta.BetaTool).cache_control, undefined);
+  const sys = p.system as Anthropic.Beta.BetaTextBlockParam[];
+  const marks = ts.filter((t) => t.cache_control).length + sys.filter((s) => s.cache_control).length + (p.cache_control ? 1 : 0);
+  assert.equal(marks, CACHE_BREAKPOINTS);
+  assert.ok(marks <= 4);
+});
+
+test("a fake that can't stream still works: the loop calls create, with no deltas", async () => {
+  const { client } = fakeClaude({ chief: [say("Hi.")] });
+  const r = await streamTurn("Hello", client);
+  assert.ok(!r.events.some((e) => e.type === "delta"));
+  assert.deepEqual(r.events.at(-1), { type: "message", agent: "chief", text: "Hi." });
+});
+
+test("callClaude: a real error is thrown, not taken for a stop", async () => {
+  const client: LoopClient = {
+    beta: {
+      messages: {
+        create: async () => {
+          throw new Error("x");
+        },
+        stream: () => ({ on: () => undefined, finalMessage: async () => Promise.reject(new Anthropic.RateLimitError(429, {}, "slow", new Headers())), currentMessage: undefined }),
+      },
+    },
+  };
+  await assert.rejects(callClaude(client, { model: "m", max_tokens: 1, messages: [] }, () => {}, new AbortController().signal), Anthropic.RateLimitError);
+});
+
+test("stoppedTokens: never less than the API said, and counts the words written", () => {
+  assert.deepEqual(stoppedTokens(undefined, "abcdefgh"), { input: 0, output: 2, cacheRead: 0, cacheWrite: 0 });
+  const partial = { usage: { input_tokens: 10, output_tokens: 50, cache_read_input_tokens: 3, cache_creation_input_tokens: 4 } } as Anthropic.Beta.BetaMessage;
+  assert.deepEqual(stoppedTokens(partial, "abcd"), { input: 10, output: 50, cacheRead: 3, cacheWrite: 4 });
+});
+
+// ─────────────── routing in a turn ───────────────
+
+test("an untagged message goes to the teammate the router picks, and the router's tokens are metered", async () => {
+  const { client, calls } = streamingClaude({ social: [say("Aphrodite handles social media.")] });
+  const asked: unknown[] = [];
+  const router = async (p: unknown) => {
+    asked.push(p);
+    return { id: "r", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [{ type: "text", text: '{"agent":"Aphrodite","reason":"Social media"}' }], stop_reason: "end_turn", usage: { input_tokens: 150, output_tokens: 20, cache_read_input_tokens: 700, cache_creation_input_tokens: 0 } } as unknown as Anthropic.Beta.BetaMessage;
+  };
+  const r = await streamTurn("Who's responsible for the social media here", client, { router });
+  assert.equal(asked.length, 1);
+  assert.deepEqual(r.events[0], { type: "route", agent: "social", how: "router", reason: "Social media" });
+  assert.deepEqual(calls.map((c) => c.agent), ["social"]);
+  assert.equal(r.usage.length, 2);
+  assert.deepEqual(r.usage[0], { workspace_id: "ws-1", thread_id: "t-1", agent: null, model: "claude-haiku-5-5", input_tokens: 150, output_tokens: 20, cache_read_tokens: 700, cache_write_tokens: 0, cost_usd: costOf("claude-haiku-5-5", { input: 150, output: 20, cacheRead: 700, cacheWrite: 0 }) });
+  assert.equal(r.usage[1].agent, "social");
+});
+
+test("a router error means Athena answers, and the turn goes on", async () => {
+  const { client } = streamingClaude({ chief: [say("Hi.")] });
+  const r = await streamTurn("Hello", client, { router: async () => Promise.reject(new Error("down")) });
+  assert.deepEqual(r.events[0], { type: "route", agent: "chief", how: "fallback", reason: "Answers general questions" });
+  assert.equal(r.said[0].agent, "chief");
+});
+
+test("the thread loads once: the router and the first teammate read the same copy", async () => {
+  const { client } = streamingClaude({ chief: [say("Hi.")] });
+  const mem = memoryStore();
+  let loads = 0;
+  const history = mem.store.history;
+  mem.store.history = async (id) => (loads++, history(id));
+  await streamTurn("Hello", client, { store: mem, router: async () => Promise.reject(new Error("down")) });
+  assert.equal(loads, 1);
+});
+
+test("a paused teammate is never picked by the router", async () => {
+  const { client } = streamingClaude({ chief: [say("Hi.")] });
+  const seen: string[] = [];
+  const router = async (p: { messages: { content: unknown }[] }) => {
+    seen.push(String(p.messages[0].content));
+    return { id: "r", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [{ type: "text", text: '{"agent":"Aphrodite","reason":"x"}' }], stop_reason: "end_turn", usage: USAGE } as unknown as Anthropic.Beta.BetaMessage;
+  };
+  const r = await streamTurn("Post this", client, { router: router as never, store: memoryStore({ prefs: { social: { enabled: false } } }) });
+  assert.doesNotMatch(seen[0].split("\n")[0], /Aphrodite/);
+  assert.deepEqual(r.events[0], { type: "route", agent: "chief", how: "fallback", reason: "Answers general questions" });
 });

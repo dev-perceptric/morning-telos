@@ -790,3 +790,26 @@ button.row:disabled:hover{background:none}
 .home-c{display:flex;flex-direction:column;min-height:calc(100dvh - 120px)}
 .home-mid{flex:1;display:flex;flex-direction:column;justify-content:center;gap:24px;padding:24px 0 12vh}
 .home-q{font:400 clamp(26px,3.6vw,34px)/1.15 var(--serif);letter-spacing:-.02em;text-align:center;color:var(--ink)}
+
+/* Chat while a reply is written: Stop in Send's place, a soft cursor, the quiet line, answer actions, Jump to latest. */
+.send.stop{background:var(--ink)}
+.ico.fill rect{fill:currentColor}
+.md.writing>:is(p,h2,h3,h4):last-child::after,.md.writing>:is(ul,ol):last-child>li:last-child::after{content:"";display:inline-block;width:7px;height:1em;margin-left:3px;vertical-align:-2px;border-radius:2px;background:var(--ink-4);animation:caret 1.1s ease-in-out infinite}
+@keyframes caret{0%,100%{opacity:.15}50%{opacity:.55}}
+.live-line{flex-wrap:wrap;min-height:26px}
+.live-line .ask-else{margin-left:2px}
+.live-line .ask-menu{top:auto;bottom:calc(100% + 4px)}
+.used{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:12px;color:var(--ink-4)}
+.acts{display:flex;flex-wrap:wrap;align-items:center;gap:2px;margin:4px 0 0 -6px}
+.act{height:26px;min-width:26px;padding:0 6px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:12px;color:var(--ink-4)}
+.act:hover,.act[aria-expanded="true"]{background:var(--sunk);color:var(--ink)}
+.ask-else{position:relative;display:inline-flex}
+.ask-menu{position:absolute;left:0;top:calc(100% + 4px);width:240px;max-width:calc(100vw - 32px);max-height:320px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-lg);padding:6px;z-index:45;animation:in .15s var(--ease)}
+.ask-menu button{display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border-radius:8px;font-size:13px;text-align:left}
+.ask-menu button:hover,.ask-menu button:focus-visible{background:var(--sunk)}
+.ask-menu img{width:22px;height:22px;border-radius:50%;object-fit:cover;flex:none}
+.ask-menu b{display:block;font-weight:600;line-height:1.2}
+.ask-menu small{display:block;color:var(--ink-4);font-size:12px;line-height:1.2}
+.jump{position:absolute;left:50%;top:-30px;transform:translateX(-50%);height:30px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-lg);color:var(--ink-2);z-index:5;animation:in .15s var(--ease)}
+.jump:hover{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.md.writing>:is(p,h2,h3,h4):last-child::after,.md.writing>:is(ul,ol):last-child>li:last-child::after{animation:none;opacity:.35}}

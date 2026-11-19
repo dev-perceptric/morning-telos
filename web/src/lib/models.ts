@@ -21,7 +21,7 @@ export const MODELS: Record<ModelChoice, string> = {
 export const SERVER_FALLBACK = new Set(["claude-opus-5-5", "claude-sonnet-5-5"]);
 export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
-/** Per reply. The calls are not streamed, and 16,000 keeps each one well under the SDK's request timeout. */
+/** Per reply. Replies stream now, so this is a cap on length, not a guard against timeouts. Chat answers are short. */
 export const MAX_TOKENS = 16000;
 /** Opus 5.5 defaults to medium too, but it is set on every call so a model change doesn't change it. */
 export const EFFORT = "medium" as const;

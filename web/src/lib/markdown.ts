@@ -285,3 +285,48 @@ export function parseMarkdown(src: string, depth = 0): Block[] {
   flush();
   return out;
 }
+
+// ─────────────── a reply as it streams ───────────────
+
+/** A line that is only a mark so far: "-", "1.", "##", ">", "|", "`". It shows once words follow. */
+const BARE_MARK = /^\s*([-*+>#]+|\d+[.)]?|`{1,3}|\|[\s|:-]*)\s*$/;
+
+/**
+ * A reply that is still being written, made safe to draw: a half-written line or table row waits until it is
+ * whole, a table header waits for its |---| line (so it never shows as a line of pipes first), an open **bold**
+ * or `code` is closed, and a half-written link shows only its words. Drawing the result with parseMarkdown never
+ * jumps between layouts as more text arrives. Pure.
+ */
+export function partialMarkdown(src: string): string {
+  const text = String(src ?? "").replace(/\r\n?/g, "\n");
+  const lines = text.split("\n");
+  // The last line is still being written unless the text ends with a line break.
+  const open = lines.length > 0 && !text.endsWith("\n");
+  if (open) {
+    const last = lines[lines.length - 1];
+    if (last.trimStart().startsWith("|") || BARE_MARK.test(last)) lines.pop();
+  }
+  // Drop the empty line a trailing break leaves, so the checks below see the last real line.
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+
+  // A table being written: the pipe lines at the end. A header alone waits for its |---| line.
+  let start = lines.length;
+  while (start > 0 && lines[start - 1].trimStart().startsWith("|")) start--;
+  const block = lines.slice(start);
+  if (block.length === 1) lines.pop();
+  // A |---| line that isn't whole yet (too few columns): the table waits for it.
+  else if (block.length >= 2 && !delimiterRow(block[1].trim()) && /^\s*\|[\s|:-]*$/.test(block[1])) lines.splice(start);
+
+  // Inside the last line: close an open **bold** and `code`, and show a half-written link as its words.
+  if (open && lines.length) {
+    let last = lines[lines.length - 1];
+    // A ``` fence is a code block, which parseMarkdown already draws open to the end.
+    if (!/^\s*```/.test(last)) {
+      last = last.replace(/\[([^\]\n]*)(\]\([^)\s]*)?$/, "$1");
+      if ((last.match(/\*\*/g) ?? []).length % 2) last = /\*\*$/.test(last) ? last.slice(0, -2) : `${last}**`;
+      if ((last.match(/`/g) ?? []).length % 2) last = /`$/.test(last) ? last.slice(0, -1) : `${last}\``;
+    }
+    lines[lines.length - 1] = last;
+  }
+  return lines.join("\n");
+}

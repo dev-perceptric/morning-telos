@@ -8,13 +8,18 @@ import { brainTools, teamContext } from "@/lib/brainServer";
 import { teamClient } from "@/lib/claude";
 import { loadRoutine, startRoutineThread } from "@/lib/routinesServer";
 import { adminClient, roleGate } from "@/lib/serverAuth";
-import { loadWorkspace, teamStore, threadInWorkspace, threadTitle } from "@/lib/teamStore";
+import { claudeRouter } from "@/lib/router";
+import { lastUserText, loadWorkspace, teamStore, threadInWorkspace, threadTitle } from "@/lib/teamStore";
 import { teamTools } from "@/lib/teamTools";
 import { LEAD, type AgentKey } from "@/lib/team";
 import { NEEDS } from "@/lib/workspace";
 
 // Chat with the AI team (editors and up). Saves the person's message, then streams the turn as NDJSON, one event
-// per line: {type:"thread"} first, then status, tool, handoff and message events, then {type:"done"}.
+// per line: {type:"thread"} first, then route (who answers), status, delta (the reply as it is written), tool,
+// handoff and message events, then {type:"done"}. An untagged message goes to the teammate the router picks
+// (src/lib/router.ts). Cancelling the request (the Stop button) stops the reply and saves what was written.
+// With again (Retry, Ask someone else) the thread's last message from the person is answered again and nothing new
+// is saved for the person.
 // With routineId (Run now on the Routines page) it starts the routine's own chat instead: "Routine: <title>", the
 // routine's instruction as the message, and its teammate answers (src/lib/routinesServer.ts).
 // Every teammate gets Knowledge, Memory and its Skills (src/lib/brainServer.ts). A skill picked with /name in the
@@ -53,7 +58,7 @@ async function chat(request: Request) {
   const ws = workspaceId as string;
   const read = readChat(body);
   if (!read.ok) return fail(read.error, 400);
-  const { agent, model, routineId } = read.value;
+  const { agent, model, routineId, again } = read.value;
   const page = readPage(body.page);
   if (!page.ok) return fail(page.error, 400);
   const shot = readScreenshot(body.screenshot);
@@ -75,7 +80,12 @@ async function chat(request: Request) {
     const routine = routineId ? await loadRoutine(db, ws, routineId) : null;
     if (routineId && !routine) return fail(CHAT_MESSAGES.badRoutine, 404);
     if (limited(ws)) return fail(CHAT_MESSAGES.tooMany, 429);
-    if (routine) {
+    if (again && threadId) {
+      // Retry and Ask someone else answer what the person already sent. Nothing new is saved for them.
+      const last = await lastUserText(db, ws, threadId);
+      if (!last) return fail(CHAT_MESSAGES.nothingToRetry, 400);
+      text = last;
+    } else if (routine) {
       text = routine.instruction;
       forced = routine.agent;
       threadId = await startRoutineThread(db, routine, { userId: who.userId, email: who.email ?? who.userId, now: true });
@@ -98,6 +108,9 @@ async function chat(request: Request) {
   const words = text;
   const encoder = new TextEncoder();
   let open = true;
+  // Stop: the person cancelled the request, so the stream is cancelled (cancel() below). The reply stops and what
+  // was written is saved, marked Stopped. request.signal isn't used: it can fire once the response starts.
+  const stopped = new AbortController();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const emit = (e: ChatEvent) => {
@@ -105,14 +118,20 @@ async function chat(request: Request) {
         try {
           controller.enqueue(encoder.encode(ndjsonLine(e)));
         } catch {
+          // Nobody is reading any more: same as Stop.
           open = false;
+          stopped.abort();
         }
       };
       emit({ type: "thread", id: thread });
       try {
-        // The turn finishes and is saved even if the person closes the page.
-        await runTurn({ workspace: team, threadId: thread, text: words, forced, model, shot: screenshot }, {
-          client: teamClient(),
+        // A cancelled request stops the reply. What was written so far is still saved.
+        const client = teamClient();
+        await runTurn({ workspace: team, threadId: thread, text: words, forced, model, shot: again ? null : screenshot }, {
+          client,
+          // Picks who answers an untagged message: Claude Haiku 5.5, cut off after 1.5 seconds (then Athena).
+          router: client ? claudeRouter(client) : null,
+          signal: stopped.signal,
           store: teamStore(db, ws),
           // Arrowsterr and Capybaroar through this workspace's brand keys (changes wait for approval), Knowledge
           // search, and use_skill and remember (src/lib/brainServer.ts).
@@ -131,6 +150,7 @@ async function chat(request: Request) {
     },
     cancel() {
       open = false;
+      stopped.abort();
     },
   });
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });

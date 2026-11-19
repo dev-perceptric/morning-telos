@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { register } from "node:module";
 import { beforeEach, test } from "node:test";
 import { fakeDb } from "./fakeDb.ts";
-import { claude } from "./stubs/claude.ts";
+import { claude, isRouter, routerReply } from "./stubs/claude.ts";
 import { auth } from "./stubs/serverAuth.ts";
 
 register("./tsResolve.mjs", import.meta.url);
@@ -79,6 +79,8 @@ beforeEach(() => {
     beta: {
       messages: {
         create: async (p: Req) => {
+          // An untagged message is routed first. Athena takes it, as before routing.
+          if (isRouter(p)) return routerReply("Athena");
           requests.push(structuredClone(p));
           const r = replies.shift() ?? text("Here is the plan.");
           return { id: "m", type: "message", role: "assistant", model: p.model, ...r, usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } };
@@ -220,9 +222,11 @@ test("Run now: a new routine chat streams, with the routine's own words and team
   const id = ev[0].id;
   assert.deepEqual(
     ev.map((e) => e.type),
-    ["thread", "status", "message", "done"],
+    ["thread", "route", "status", "message", "done"],
   );
-  assert.deepEqual(ev[2], { type: "message", agent: "social", text: "Here is the plan." });
+  // A routine's teammate is picked by the routine, so the router isn't asked.
+  assert.deepEqual(ev[1], { type: "route", agent: "social", how: "forced", reason: "Picked by you" });
+  assert.deepEqual(ev[3], { type: "message", agent: "social", text: "Here is the plan." });
   const t = db.tables.threads.find((x) => x.id === id)!;
   assert.deepEqual([t.title, t.created_by], ["Routine: Plan posts", "editor1"]);
   assert.equal(db.tables.messages[0].content, "Plan next week's posts with /plan-weekly-posts");
