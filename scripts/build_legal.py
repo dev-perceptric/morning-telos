@@ -66,6 +66,8 @@ PRIVACY = """
 <p>You can see and edit your information in the app, download what you've written, and delete your workspace in Settings. For anything else, email <a href="mailto:meet@morningtelos.com">meet@morningtelos.com</a>.</p>
 <h2>Cookies</h2>
 <p>The app uses one cookie to keep you logged in. Our website doesn't use tracking cookies.</p>
+<h2 id="chrome-extension">The Chrome extension</h2>
+<ul><li><b>Only on your click:</b> it reads a web page only when you click a button or a right-click item in it, never in the background.</li><li><b>What it sends:</b> what you chose to share (the page's address, title and words, text you selected, a screenshot if you asked for one, or the open email in Gmail) goes to your own workspace, where your AI team uses it to answer you.</li><li><b>What we keep:</b> page text is saved with your chat, like any message, and is deleted with it. Screenshots are used for that one answer and are not stored.</li><li><b>What it never reads:</b> pages with a password box, bank and payment pages, password managers and Chrome's own pages.</li><li><b>What it never does:</b> it never clicks, submits or sends anything on a page. You send every email yourself.</li><li><b>Sign-in:</b> you sign in on chat.morningtelos.com. The extension keeps its sign-in in its own storage, and Sign out removes it.</li></ul>
 """
 
 

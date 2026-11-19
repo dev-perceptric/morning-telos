@@ -22,7 +22,8 @@ import type { Workspace } from "./Settings";
 import { ErrorText, Notice, to } from "./ui";
 
 type Item =
-  | { kind: "user"; text: string }
+  /** page: what the person attached from the Chrome extension (meta.page), shown as a link under their words. */
+  | { kind: "user"; text: string; page?: { url: string; title: string } | null }
   | { kind: "agent"; agent: AgentKey; text: string; error?: boolean; blocked?: string }
   | { kind: "note"; agent: AgentKey; text: string; full?: boolean }
   | { kind: "tool"; agent: AgentKey; text: string }
@@ -413,7 +414,11 @@ const approvalsIn = (meta: Record<string, unknown> | null): Item[] =>
 
 const toItems = (m: MessageRow): Item[] => {
   const agent = isAgentKey(m.agent) ? m.agent : "chief";
-  if (m.role === "user") return [{ kind: "user", text: m.content }];
+  if (m.role === "user") {
+    const p = m.meta?.page as { url?: unknown; title?: unknown } | undefined;
+    const page = p && typeof p.url === "string" && /^https?:\/\//.test(p.url) ? { url: p.url, title: typeof p.title === "string" && p.title ? p.title : p.url } : null;
+    return [{ kind: "user", text: m.content, page }];
+  }
   // A note about an approval ("Approved and done: ...") is shown whole. A handoff note shows who handed it to whom.
   if (m.role === "note") return [{ kind: "note", agent, text: m.content, full: m.meta?.approval !== undefined }];
   return [{ kind: "agent", agent, text: m.content, error: Boolean(m.meta?.error), blocked: typeof m.meta?.blocked === "string" ? m.meta.blocked : undefined }, ...approvalsIn(m.meta)];
@@ -613,6 +618,14 @@ function ItemView({ item, sb, ws }: { item: Item; sb: SupabaseClient; ws: Worksp
       <div className="msg me">
         <div className="bubble">
           <WithTags text={item.text} />
+          {item.page ? (
+            <small className="mt-1 block text-[12px] text-ink-4 wrap">
+              From a page:{" "}
+              <a className="link" href={item.page.url} target="_blank" rel="noopener noreferrer nofollow">
+                {item.page.title}
+              </a>
+            </small>
+          ) : null}
         </div>
       </div>
     );
