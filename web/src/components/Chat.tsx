@@ -7,14 +7,17 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import type { ChatEvent } from "@/lib/agentLoop";
+import type { ChatEvent, StoredMessage } from "@/lib/agentLoop";
 import { readLines } from "@/lib/chat";
+import { IDLE, LIVE_WORDS, started as startLive, step, type Live } from "@/lib/liveReply";
 import { answerTheme, BRAND_COLUMNS, DEFAULT_THEME, type AnswerTheme, type BrandRow } from "@/lib/brand";
-import { parseMarkdown, type Block, type Inline, type List, type Table } from "@/lib/markdown";
+import { parseMarkdown, partialMarkdown, type Block, type Inline, type List, type Table } from "@/lib/markdown";
 import { MODEL_CHOICES, type ModelChoice } from "@/lib/models";
 import { PLANS, type PaidPlan } from "@/lib/plans";
+import { usedNote } from "@/lib/progress";
+import { quickRoute } from "@/lib/router";
 import { insertSkill, matchSkills, menuAgent, skillsFor, slashQuery, type SkillRow } from "@/lib/skills";
-import { agentFace, AGENTS, agentByGod, insertMention, isAgentKey, LEAD, mentionMatches, mentionQuery, type AgentKey } from "@/lib/team";
+import { agentFace, AGENTS, agentByGod, insertMention, isAgentKey, LEAD, mentionMatches, mentionQuery, workingAgents, type AgentKey } from "@/lib/team";
 import { can } from "@/lib/workspace";
 import { ApprovalCard } from "./Approvals";
 import { Icon } from "./icons";
@@ -25,7 +28,8 @@ import { ErrorText, Notice, to } from "./ui";
 type Item =
   /** page: what the person attached from the Chrome extension (meta.page), shown as a link under their words. */
   | { kind: "user"; text: string; page?: { url: string; title: string } | null }
-  | { kind: "agent"; agent: AgentKey; text: string; error?: boolean; blocked?: string }
+  /** stopped: the person pressed Stop while it was written. used: the tools it used, for the "Used: ..." note. */
+  | { kind: "agent"; agent: AgentKey; text: string; error?: boolean; blocked?: string; stopped?: boolean; used?: string[] }
   | { kind: "note"; agent: AgentKey; text: string; full?: boolean }
   | { kind: "tool"; agent: AgentKey; text: string }
   | { kind: "approval"; id: number; title: string };
@@ -172,11 +176,12 @@ function BlockView({ b }: { b: Block }) {
 /**
  * A reply: paragraphs, headings, lists, quotes, rules, code and tables, with bold, italic, code and links. Built from
  * data (src/lib/markdown.ts), never HTML. Its colors and heading font come from the CSS variables around it
- * (useAnswerTheme), or the Morning Telos look.
+ * (useAnswerTheme), or the Morning Telos look. `writing`: the reply is still coming, so a soft cursor follows it
+ * (pass the text through partialMarkdown first).
  */
-export function Markdown({ text }: { text: string }) {
+export function Markdown({ text, writing }: { text: string; writing?: boolean }) {
   return (
-    <div className="md">
+    <div className={writing ? "md writing" : "md"}>
       {parseMarkdown(text).map((b, i) => (
         <BlockView key={i} b={b} />
       ))}
@@ -289,6 +294,7 @@ export function Composer({
   rows = 1,
   model,
   onModel,
+  onStop,
 }: {
   id?: string;
   value: string;
@@ -307,6 +313,8 @@ export function Composer({
   rows?: number;
   model?: ModelChoice;
   onModel?: (m: ModelChoice) => void;
+  /** While busy, Stop takes Send's place and calls this. */
+  onStop?: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [query, setQuery] = useState<{ kind: "mention" | "skill"; q: string } | null>(null);
@@ -473,9 +481,15 @@ export function Composer({
           <span className="at">@</span>Tag
         </button>
         {model && onModel ? <ModelPicker value={model} onChange={onModel} /> : null}
-        <button type="submit" className="send" aria-label={busy ? "Working" : "Send"} disabled={disabled || busy}>
-          {busy ? <span className="spin" aria-hidden /> : <Icon name="up" />}
-        </button>
+        {busy && onStop ? (
+          <button type="button" className="send stop" aria-label="Stop" title="Stop" onClick={onStop}>
+            <Icon name="stop" className="fill" />
+          </button>
+        ) : (
+          <button type="submit" className="send" aria-label={busy ? "Working" : "Send"} disabled={disabled || busy}>
+            {busy ? <span className="spin" aria-hidden /> : <Icon name="up" />}
+          </button>
+        )}
       </div>
     </form>
   );
@@ -519,17 +533,25 @@ const toItems = (m: MessageRow): Item[] => {
   }
   // A note about an approval ("Approved and done: ...") is shown whole. A handoff note shows who handed it to whom.
   if (m.role === "note") return [{ kind: "note", agent, text: m.content, full: m.meta?.approval !== undefined }];
-  return [{ kind: "agent", agent, text: m.content, error: Boolean(m.meta?.error), blocked: typeof m.meta?.blocked === "string" ? m.meta.blocked : undefined }, ...approvalsIn(m.meta)];
+  const used = Array.isArray(m.meta?.used) ? (m.meta.used as unknown[]).filter((u): u is string => typeof u === "string") : undefined;
+  return [{ kind: "agent", agent, text: m.content, error: Boolean(m.meta?.error), blocked: typeof m.meta?.blocked === "string" ? m.meta.blocked : undefined, stopped: m.meta?.stopped === true, used }, ...approvalsIn(m.meta)];
 };
 
-/** POST /api/chat and read its NDJSON stream. Calls onEvent for each line. Throws the route's error message. */
-async function streamChat(sb: SupabaseClient, body: Record<string, unknown>, onEvent: (e: ChatEvent) => void) {
+/**
+ * POST /api/chat and read its NDJSON stream. Calls onEvent for each line. Throws the route's error message.
+ * Aborting `signal` (Stop) cancels the request; the server then stops the reply and saves what was written.
+ */
+async function streamChat(sb: SupabaseClient, body: Record<string, unknown>, onEvent: (e: ChatEvent) => void, signal: AbortSignal) {
   const token = (await sb.auth.getSession()).data.session?.access_token;
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(body),
-  }).catch(() => null);
+    signal,
+  }).catch((e) => {
+    if (signal.aborted) throw e;
+    return null;
+  });
   if (!res) throw new Error("Couldn't reach the server. Check your connection and try again.");
   if (!res.ok || !res.body) {
     const out = (await res.json().catch(() => ({}))) as { error?: string };
@@ -549,7 +571,20 @@ async function streamChat(sb: SupabaseClient, body: Record<string, unknown>, onE
   readLines(`${buffer}\n`).events.forEach(onEvent);
 }
 
-/** One chat. Loads its messages, sends new ones and shows replies as they arrive. `start` is the first message of a new chat. */
+/** The thread on screen as the router reads it, for the line shown before the server answers. */
+const asHistory = (items: Item[]): StoredMessage[] =>
+  items.flatMap((x): StoredMessage[] =>
+    x.kind === "user" ? [{ role: "user", agent: null, content: x.text }] : x.kind === "agent" ? [{ role: "agent", agent: x.agent, content: x.text, meta: x.error || x.blocked ? { error: true } : null }] : [],
+  );
+
+/** Close enough to the bottom to count as reading the newest message. */
+const NEAR_BOTTOM = 80;
+const atBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - NEAR_BOTTOM;
+
+/** What send() can be told: a routine to start, a teammate to ask, or to answer the last message again. */
+type SendOpts = { routine?: { id: string; title: string }; agent?: AgentKey; again?: boolean };
+
+/** One chat. Loads its messages, sends new ones and shows replies as they are written. `start` is the first message of a new chat. */
 export function ThreadPage({
   sb,
   ws,
@@ -571,23 +606,72 @@ export function ThreadPage({
 }) {
   const editor = can(ws.role, "chat");
   const [items, setItems] = useState<Item[]>([]);
+  // The items as of the last render, for send() to read without waiting for a render.
+  const itemsRef = useRef<Item[]>(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   const [title, setTitle] = useState("");
-  const [status, setStatus] = useState<{ agent: AgentKey; text: string } | null>(null);
+  // The reply being written (src/lib/liveReply.ts). Deltas land in the ref and reach the screen once a frame.
+  const [live, setLive] = useState<Live>(IDLE);
+  const liveRef = useRef<Live>(IDLE);
+  const frame = useRef<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(Boolean(id));
+  const [jump, setJump] = useState(false);
   // The thread this page is showing. A new chat learns its id from the stream, and the address changes without a reload.
   const thread = useRef<string | null>(id);
-  const bottom = useRef<HTMLDivElement>(null);
+  const stopper = useRef<AbortController | null>(null);
+  const running = useRef<Promise<void> | null>(null);
+  // Stay at the newest message while a reply is written, unless the person scrolls up to read.
+  const pinned = useRef(true);
   const skills = useSkillRows(sb, ws.id);
   const theme = useAnswerTheme(sb, ws.id);
   // The / menu shows the skills of whoever answered last, when the reply tags nobody.
   const lastAgent = [...items].reverse().find((x): x is Extract<Item, { kind: "agent" }> => x.kind === "agent")?.agent ?? LEAD;
+  const lastUser = [...items].reverse().find((x): x is Extract<Item, { kind: "user" }> => x.kind === "user")?.text ?? "";
+
+  const show = useCallback((next: Live, now = false) => {
+    liveRef.current = next;
+    if (now) {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+      frame.current = null;
+      setLive(next);
+      return;
+    }
+    if (frame.current === null)
+      frame.current = requestAnimationFrame(() => {
+        frame.current = null;
+        setLive(liveRef.current);
+      });
+  }, []);
+  useEffect(() => () => void (frame.current !== null && cancelAnimationFrame(frame.current)), []);
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [items, status]);
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (atBottom()) pinned.current = true;
+      else if (y < lastY) pinned.current = false;
+      lastY = y;
+      setJump(!pinned.current && !atBottom());
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (pinned.current) window.scrollTo({ top: document.documentElement.scrollHeight, behavior: busy ? "auto" : "smooth" });
+    else setJump(true);
+  }, [items, live, busy]);
+
+  const toLatest = () => {
+    pinned.current = true;
+    setJump(false);
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+  };
 
   // Load a thread opened from a link. Not one this page just started: its messages are already on screen.
   useEffect(() => {
@@ -613,53 +697,100 @@ export function ThreadPage({
   }, [sb, ws.id, id]);
 
   const send = useCallback(
-    async (text: string, routine?: { id: string; title: string }) => {
+    async (text: string, opts: SendOpts = {}) => {
+      const { routine, agent, again } = opts;
+      const ctrl = new AbortController();
+      stopper.current = ctrl;
       setBusy(true);
       setError("");
-      setDraft("");
-      setItems((xs) => [...xs, { kind: "user", text }]);
+      pinned.current = true;
+      if (!again) {
+        setDraft("");
+        setItems((xs) => [...xs, { kind: "user", text }]);
+      }
       if (!thread.current) setTitle(routine ? `Routine: ${routine.title}` : text.replace(/\s+/g, " ").trim());
+      // The first feedback comes at once: who answers, when the screen can tell, or "Finding the right teammate".
+      show(startLive(routine ? null : quickRoute(text, asHistory(itemsRef.current), workingAgents(), agent)), true);
       // Approval cards wait for the reply that prepared them, so they show under it, as they do after a reload.
       let waiting: Item[] = [];
-      try {
-        await streamChat(sb, { workspaceId: ws.id, threadId: thread.current, text, ...(model && model !== "auto" ? { model } : {}), ...(routine ? { routineId: routine.id } : {}) }, (e) => {
-          if (e.type === "thread") {
-            if (thread.current !== e.id) {
-              thread.current = e.id;
-              onThread(e.id);
-              navigate(`/chat/${e.id}`, true);
-            }
-          } else if (e.type === "status") setStatus({ agent: e.agent, text: e.text });
-          else if (e.type === "tool") setItems((xs) => [...xs, { kind: "tool", agent: e.agent, text: e.text }]);
-          else if (e.type === "approval") waiting.push({ kind: "approval", id: e.id, title: e.title });
-          else if (e.type === "handoff") {
-            setStatus(null);
-            setItems((xs) => [...xs, { kind: "note", agent: e.from, text: `${AGENTS[e.from].god} handed this to ${AGENTS[e.to].god}: ${e.note}` }]);
-          } else if (e.type === "message") {
-            setStatus(null);
-            const cards = waiting;
-            waiting = [];
-            setItems((xs) => [...xs, { kind: "agent", agent: e.agent, text: e.text, error: e.error, blocked: e.blocked }, ...cards]);
-          }
-        });
-      } catch (err) {
-        setError(message(err));
-      }
-      if (waiting.length) setItems((xs) => [...xs, ...waiting]);
-      setStatus(null);
-      setBusy(false);
+      const body = {
+        workspaceId: ws.id,
+        threadId: thread.current,
+        text,
+        ...(model && model !== "auto" ? { model } : {}),
+        ...(routine ? { routineId: routine.id } : {}),
+        ...(agent ? { agent } : {}),
+        ...(again ? { again: true } : {}),
+      };
+      const work = (async () => {
+        try {
+          await streamChat(
+            sb,
+            body,
+            (e) => {
+              if (e.type === "thread") {
+                if (thread.current !== e.id) {
+                  thread.current = e.id;
+                  onThread(e.id);
+                  navigate(`/chat/${e.id}`, true);
+                }
+                return;
+              }
+              if (e.type === "approval") return void waiting.push({ kind: "approval", id: e.id, title: e.title });
+              if (e.type === "handoff") setItems((xs) => [...xs, { kind: "note", agent: e.from, text: `${AGENTS[e.from].god} handed this to ${AGENTS[e.to].god}: ${e.note}` }]);
+              if (e.type === "message") {
+                const used = e.used ?? liveRef.current.used;
+                const cards = waiting;
+                waiting = [];
+                setItems((xs) => [...xs, { kind: "agent", agent: e.agent, text: e.text, error: e.error, blocked: e.blocked, stopped: e.stopped, used }, ...cards]);
+              }
+              const next = step(liveRef.current, e);
+              // A finished reply leaves the screen in the same frame its message arrives, so nothing shows twice.
+              show(next, e.type === "message" || e.type === "handoff" || e.type === "route");
+            },
+            ctrl.signal,
+          );
+        } catch (err) {
+          if (ctrl.signal.aborted) {
+            // Stopped: what was written stays on screen, marked Stopped, as the server saves it.
+            const now = liveRef.current;
+            if (now.answering && now.text.trim()) setItems((xs) => [...xs, { kind: "agent", agent: now.answering!, text: now.text.trim(), stopped: true, used: now.used }]);
+          } else setError(message(err));
+        }
+        if (waiting.length) setItems((xs) => [...xs, ...waiting]);
+        show(IDLE, true);
+        if (stopper.current === ctrl) stopper.current = null;
+        setBusy(false);
+      })();
+      running.current = work;
+      await work;
     },
-    [sb, ws.id, onThread, model],
+    [sb, ws.id, onThread, model, show],
+  );
+
+  const stop = useCallback(() => stopper.current?.abort(), []);
+  /** Ask a teammate to answer the last message again: Retry (the same one) or Ask someone else. */
+  const askAgain = useCallback(
+    async (k: AgentKey) => {
+      if (!lastUser) return;
+      stopper.current?.abort();
+      await running.current;
+      send(lastUser, { agent: k, again: true });
+    },
+    [lastUser, send],
   );
 
   // A new chat from Home: send its first message once.
-  const started = useRef(false);
+  const sentStart = useRef(false);
   useEffect(() => {
-    if (id || !start || started.current) return;
-    started.current = true;
+    if (id || !start || sentStart.current) return;
+    sentStart.current = true;
     onStarted();
-    send(start.text, start.routineId ? { id: start.routineId, title: start.title ?? "" } : undefined);
+    send(start.text, start.routineId ? { routine: { id: start.routineId, title: start.title ?? "" } } : {});
   }, [id, start, onStarted, send]);
+
+  const lastAnswer = busy ? -1 : items.reduce((at, x, i) => (x.kind === "agent" && !x.blocked ? i : at), -1);
+  const canAgain = editor && Boolean(lastUser);
 
   return (
     <div className="thread">
@@ -678,28 +809,44 @@ export function ThreadPage({
         <h1>{title || (loading ? "" : "New chat")}</h1>
       </div>
       <ThemeFont theme={theme} />
-      <div className="msgs" aria-live="polite" style={theme.vars as React.CSSProperties}>
+      <div className="msgs" aria-live="polite" aria-busy={busy} style={theme.vars as React.CSSProperties}>
         {loading ? <div className="step">Opening the chat...</div> : null}
         {!loading && !items.length && !busy && !error ? <div className="step">No messages yet.</div> : null}
         {items.map((it, i) => (
-          <ItemView key={i} item={it} sb={sb} ws={ws} />
+          <ItemView key={i} item={it} sb={sb} ws={ws} last={i === lastAnswer} canAgain={canAgain} onAgain={askAgain} />
         ))}
-        {status ? (
-          <div className="step" role="status">
+        {live.answering && live.text ? (
+          <div className="msg">
+            <Face agent={live.answering} />
+            <div className="body">
+              <div className="who">
+                {AGENTS[live.answering].god} <span>· {AGENTS[live.answering].name}</span>
+              </div>
+              <Markdown text={partialMarkdown(live.text)} writing />
+            </div>
+          </div>
+        ) : null}
+        {busy && live.line ? (
+          <div className="step live-line" role="status">
             <span className="spin" />
-            <span>
-              {AGENTS[status.agent].god}: {status.text.replace(/\.+$/, "").toLowerCase()}...
-            </span>
+            <span className="wrap">{live.line}</span>
+            {live.answering && canAgain ? <AskElse current={live.answering} onPick={askAgain} /> : null}
           </div>
         ) : null}
         {error ? <ErrorText>{error}</ErrorText> : null}
-        <div ref={bottom} />
       </div>
       <div className="dock">
+        {jump ? (
+          <button type="button" className="jump" onClick={toLatest}>
+            <Icon name="down" small />
+            {LIVE_WORDS.jump}
+          </button>
+        ) : null}
         <Composer
           value={draft}
           onChange={setDraft}
           onSend={(t) => send(t)}
+          onStop={stop}
           busy={busy}
           disabled={!editor}
           placeholder={editor ? "Reply, or type @ to pull in a teammate, / for a skill" : "Viewers can read chats but can't send messages."}
@@ -711,7 +858,81 @@ export function ThreadPage({
   );
 }
 
-function ItemView({ item, sb, ws }: { item: Item; sb: SupabaseClient; ws: Workspace }) {
+/** A small menu of the other teammates who can take work. Picking one asks them the same message. */
+function AskElse({ current, onPick }: { current: AgentKey; onPick: (k: AgentKey) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  return (
+    <span ref={box} className="ask-else">
+      <button type="button" className="act" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {LIVE_WORDS.askElse}
+        <Icon name="down" small />
+      </button>
+      {open ? (
+        <div className="ask-menu" role="menu" aria-label={LIVE_WORDS.askElse}>
+          {workingAgents()
+            .filter((k) => k !== current)
+            .map((k) => (
+              <button
+                key={k}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onPick(k);
+                }}
+              >
+                <Face agent={k} size={22} />
+                <span>
+                  <b>{AGENTS[k].god}</b>
+                  <small>{AGENTS[k].name}</small>
+                </span>
+              </button>
+            ))}
+        </div>
+      ) : null}
+    </span>
+  );
+}
+
+/** Copy an answer's words. Says Copied for a moment. */
+function CopyButton({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(false), 1500);
+    return () => clearTimeout(t);
+  }, [done]);
+  return (
+    <button
+      type="button"
+      className="act"
+      aria-label={done ? LIVE_WORDS.copied : LIVE_WORDS.copy}
+      title={done ? LIVE_WORDS.copied : LIVE_WORDS.copy}
+      onClick={() => {
+        navigator.clipboard?.writeText(text).then(
+          () => setDone(true),
+          () => {},
+        );
+      }}
+    >
+      <Icon name={done ? "tick" : "copy"} small />
+    </button>
+  );
+}
+
+function ItemView({ item, sb, ws, last, canAgain, onAgain }: { item: Item; sb: SupabaseClient; ws: Workspace; last?: boolean; canAgain?: boolean; onAgain?: (k: AgentKey) => void }) {
   if (item.kind === "approval") return <ApprovalCard sb={sb} ws={ws} id={item.id} title={item.title} />;
   if (item.kind === "user")
     return (
@@ -744,6 +965,7 @@ function ItemView({ item, sb, ws }: { item: Item; sb: SupabaseClient; ws: Worksp
       </div>
     );
   const a = AGENTS[item.agent];
+  const used = usedNote(item.used ?? []);
   return (
     <div className={`msg${item.error ? " err" : ""}`}>
       <Face agent={item.agent} />
@@ -752,7 +974,34 @@ function ItemView({ item, sb, ws }: { item: Item; sb: SupabaseClient; ws: Worksp
           {a.god} <span>· {a.name}</span>
         </div>
         <Markdown text={item.text} />
+        {item.stopped || used ? (
+          <div className="used">
+            {item.stopped ? <span>{LIVE_WORDS.stopped}</span> : null}
+            {used ? <span>{used}</span> : null}
+          </div>
+        ) : null}
         {item.blocked === "expired" || item.blocked === "allowance" ? <PickPlan sb={sb} ws={ws} /> : null}
+        {!item.blocked && !item.error ? (
+          <div className="acts">
+            <CopyButton text={item.text} />
+            {last && canAgain && onAgain ? (
+              <>
+                <button type="button" className="act" aria-label={LIVE_WORDS.retry} title={LIVE_WORDS.retry} onClick={() => onAgain(item.agent)}>
+                  <Icon name="refresh" small />
+                </button>
+                <AskElse current={item.agent} onPick={onAgain} />
+              </>
+            ) : null}
+          </div>
+        ) : null}
+        {item.error && last && canAgain && onAgain ? (
+          <div className="acts">
+            <button type="button" className="act" onClick={() => onAgain(item.agent)}>
+              <Icon name="refresh" small />
+              {LIVE_WORDS.retry}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

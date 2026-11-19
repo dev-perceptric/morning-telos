@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { delimiterRow, inlineMd, isNumber, numericColumn, parseMarkdown, plainText, safeHref, splitRow, MAX_COLS, MAX_ROWS, type Block } from "../src/lib/markdown.ts";
+import { delimiterRow, inlineMd, isNumber, numericColumn, parseMarkdown, partialMarkdown, plainText, safeHref, splitRow, MAX_COLS, MAX_ROWS, type Block, type Table } from "../src/lib/markdown.ts";
 
 test("parseMarkdown: paragraphs keep their lines, blank lines split them", () => {
   assert.deepEqual(parseMarkdown("Hi there.\nSecond line.\n\nNew paragraph."), [
@@ -184,4 +184,77 @@ test("fenced code is kept as it is", () => {
     { kind: "code", text: "| a | b |\n**not bold**" },
     { kind: "p", lines: [T("after")] },
   ]);
+});
+
+// ─────────────── a reply as it streams ───────────────
+
+const RICH = `Your traffic is up **12%** this month.
+
+### What changed
+
+- More people found the **menu page**
+- Two new keywords: \`sourdough\` and [rye bread](https://anasbakery.com/rye)
+  - Both from Google
+
+| Month | Visits | Change |
+|:------|-------:|:------:|
+| Sep | 1,240 | +4% |
+| Oct | 1,390 | +12% |
+
+> Keep posting weekly.
+
+\`\`\`
+code here
+\`\`\`
+
+1. Add a page
+2. Ask Artemis again
+
+---
+End.`;
+
+test("partialMarkdown: every prefix of a long reply parses without throwing", () => {
+  for (let i = 0; i <= RICH.length; i++) {
+    const part = RICH.slice(0, i);
+    assert.doesNotThrow(() => parseMarkdown(partialMarkdown(part)), `at ${i}`);
+  }
+  // A whole reply comes through as it was, apart from the last line break.
+  assert.equal(partialMarkdown(`${RICH}\n`), RICH);
+});
+
+test("partialMarkdown: a table header waits for its |---| line, and a half row waits until it is whole", () => {
+  const head = "Here are the numbers.\n\n| Month | Visits |\n";
+  assert.deepEqual(parseMarkdown(partialMarkdown(head)).map((b) => b.kind), ["p"]);
+  assert.doesNotMatch(JSON.stringify(parseMarkdown(partialMarkdown(head))), /Month/);
+  assert.deepEqual(parseMarkdown(partialMarkdown(`${head}|---|-`)).map((b) => b.kind), ["p"]);
+  const rows = `${head}|---|---|\n| Sep | 1,240 |\n| Oct | 1,3`;
+  const blocks = parseMarkdown(partialMarkdown(rows));
+  assert.deepEqual(blocks.map((b) => b.kind), ["p", "table"]);
+  const t = blocks[1] as Table;
+  assert.equal(t.rows.length, 1, "the half-written row isn't drawn yet");
+  // Every prefix of a table is either text above it or a table: never a line of pipes.
+  const full = `${head}|---|---|\n| Sep | 1,240 |\n| Oct | 1,390 |\n`;
+  for (let i = head.length - 20; i <= full.length; i++) {
+    const kinds = parseMarkdown(partialMarkdown(full.slice(0, i)));
+    assert.ok(!JSON.stringify(kinds).includes("| Month"), `pipes shown at ${i}`);
+  }
+});
+
+test("partialMarkdown: open bold and code are closed, a half link shows its words, a bare mark waits", () => {
+  assert.equal(partialMarkdown("Visits are **1,24"), "Visits are **1,24**");
+  assert.equal(partialMarkdown("Visits are **"), "Visits are ");
+  assert.equal(partialMarkdown("Run `npm te"), "Run `npm te`");
+  assert.equal(partialMarkdown("See [the menu](https://anas"), "See the menu");
+  assert.equal(partialMarkdown("See [the me"), "See the me");
+  assert.equal(partialMarkdown("Steps:\n1."), "Steps:");
+  assert.equal(partialMarkdown("Steps:\n-"), "Steps:");
+  assert.equal(partialMarkdown("Intro\n##"), "Intro");
+  assert.equal(partialMarkdown(""), "");
+  // A finished line keeps its marks as written.
+  assert.equal(partialMarkdown("Visits are **1,240**\n"), "Visits are **1,240**");
+});
+
+test("partialMarkdown: an open code block stays a code block while it is written", () => {
+  const blocks = parseMarkdown(partialMarkdown("Try this:\n\n```\nconst a = `x"));
+  assert.deepEqual(blocks.map((b) => b.kind), ["p", "code"]);
 });

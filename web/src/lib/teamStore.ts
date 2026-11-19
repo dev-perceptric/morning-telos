@@ -35,6 +35,13 @@ export async function threadInWorkspace(db: SupabaseClient, workspaceId: string,
   return Boolean(row);
 }
 
+/** The person's last message in a thread of this workspace, for Retry and Ask someone else. Null when there is none. */
+export async function lastUserText(db: SupabaseClient, workspaceId: string, threadId: string): Promise<string | null> {
+  if (!isUuid(threadId)) return null;
+  const row = must(await db.from("messages").select("content").eq("thread_id", threadId).eq("workspace_id", workspaceId).eq("role", "user").order("id", { ascending: false }).limit(1).maybeSingle()) as { content?: string } | null;
+  return typeof row?.content === "string" && row.content.trim() ? row.content : null;
+}
+
 /** A thread's title: the first message on one line, cut to 70 letters at a word. */
 export function threadTitle(text: string): string {
   const one = text.replace(/\s+/g, " ").trim();

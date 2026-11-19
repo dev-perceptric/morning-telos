@@ -5,13 +5,35 @@ import { CHAT_MESSAGES, inlineParts, MAX_MESSAGE, ndjsonLine, rateLimiter, readC
 import { isUuid, threadTitle } from "../src/lib/teamStore.ts";
 
 test("readChat: trims the text, keeps known agents and models, drops the rest", () => {
-  assert.deepEqual(readChat({ text: "  hi  ", threadId: "t", agent: "seo", model: "haiku" }), { ok: true, value: { text: "hi", threadId: "t", agent: "seo", model: "haiku", routineId: null } });
-  assert.deepEqual(readChat({ text: "hi", agent: "zeus", model: "gpt", threadId: 5 }), { ok: true, value: { text: "hi", threadId: null, agent: null, model: null, routineId: null } });
-  assert.deepEqual(readChat({ text: "hi", routineId: "r1" }), { ok: true, value: { text: "hi", threadId: null, agent: null, model: null, routineId: "r1" } });
+  assert.deepEqual(readChat({ text: "  hi  ", threadId: "t", agent: "seo", model: "haiku" }), { ok: true, value: { text: "hi", threadId: "t", agent: "seo", model: "haiku", routineId: null, again: false } });
+  assert.deepEqual(readChat({ text: "hi", agent: "zeus", model: "gpt", threadId: 5 }), { ok: true, value: { text: "hi", threadId: null, agent: null, model: null, routineId: null, again: false } });
+  assert.deepEqual(readChat({ text: "hi", routineId: "r1" }), { ok: true, value: { text: "hi", threadId: null, agent: null, model: null, routineId: "r1", again: false } });
   assert.deepEqual(readChat({ text: "   " }), { ok: false, error: CHAT_MESSAGES.empty });
   assert.deepEqual(readChat({}), { ok: false, error: CHAT_MESSAGES.empty });
   assert.deepEqual(readChat({ text: "x".repeat(MAX_MESSAGE + 1) }), { ok: false, error: CHAT_MESSAGES.tooLong });
   assert.equal(readChat({ text: "x".repeat(MAX_MESSAGE) }).ok, true);
+});
+
+test("readChat: again (Retry, Ask someone else) needs a thread, is only true, and never goes with a routine", () => {
+  const v = (b: Record<string, unknown>) => {
+    const r = readChat({ text: "hi", ...b });
+    assert.ok(r.ok);
+    return r.value.again;
+  };
+  assert.equal(v({ threadId: "t", again: true }), true);
+  assert.equal(v({ again: true }), false);
+  assert.equal(v({ threadId: "t", again: "yes" }), false);
+  assert.equal(v({ threadId: "t", routineId: "r", again: true }), false);
+});
+
+test("ndjson: the new events (route, delta, stopped message) go through the reader whole", () => {
+  const evs = [
+    { type: "route", agent: "social", how: "router", reason: "Social media" },
+    { type: "delta", agent: "social", text: "Hi \"there\"\n", start: true },
+    { type: "message", agent: "social", text: "Hi", stopped: true, used: ["domain overview"] },
+  ] as const;
+  const all = evs.map((e) => ndjsonLine(e)).join("");
+  assert.deepEqual(readLines(all).events, evs);
 });
 
 test("ndjson: each event is one line, and the reader keeps a half line for the next chunk", () => {

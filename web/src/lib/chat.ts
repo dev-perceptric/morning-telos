@@ -11,10 +11,15 @@ export const CHAT_MESSAGES = {
   badThread: "That chat was not found.",
   badRoutine: "That routine was not found.",
   tooMany: "That's a lot of messages this hour. Try again soon.",
+  nothingToRetry: "There is no message to answer again in this chat.",
 } as const;
 
-/** routineId: Run now on the Routines page. The routine's own words and teammate are used, in a new chat. */
-export type ChatRequest = { text: string; threadId: string | null; agent: AgentKey | null; model: ModelChoice | null; routineId: string | null };
+/**
+ * routineId: Run now on the Routines page. The routine's own words and teammate are used, in a new chat.
+ * again: Retry or Ask someone else. The thread's last message from the person is answered again (by `agent`), and
+ * no new message is saved.
+ */
+export type ChatRequest = { text: string; threadId: string | null; agent: AgentKey | null; model: ModelChoice | null; routineId: string | null; again: boolean };
 
 /** Checks the body of POST /api/chat. Unknown agents and models are ignored, not errors. */
 export function readChat(body: Record<string, unknown>): { ok: true; value: ChatRequest } | { ok: false; error: string } {
@@ -23,7 +28,8 @@ export function readChat(body: Record<string, unknown>): { ok: true; value: Chat
   if (text.length > MAX_MESSAGE) return { ok: false, error: CHAT_MESSAGES.tooLong };
   const threadId = typeof body.threadId === "string" && body.threadId ? body.threadId : null;
   const routineId = typeof body.routineId === "string" && body.routineId ? body.routineId : null;
-  return { ok: true, value: { text, threadId, agent: isAgentKey(body.agent) ? body.agent : null, model: isModelChoice(body.model) ? body.model : null, routineId } };
+  const again = body.again === true && Boolean(threadId) && !routineId;
+  return { ok: true, value: { text, threadId, agent: isAgentKey(body.agent) ? body.agent : null, model: isModelChoice(body.model) ? body.model : null, routineId, again } };
 }
 
 /** At most `max` messages per workspace in `windowMs`. Kept in memory, like the old app's limited(). */
