@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Morning Telos",
+  "version": "1.0.0",
+  "description": "Chat with your Morning Telos AI team next to any page. Attach the page on a click, draft Gmail replies and approve work.",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": { "default_title": "Morning Telos", "default_icon": { "16": "icons/16.png", "32": "icons/32.png" } },
+  "side_panel": { "default_path": "src/sidepanel.html" },
+  "background": { "service_worker": "src/background.js", "type": "module" },
+  "permissions": ["sidePanel", "storage", "contextMenus", "activeTab", "scripting", "alarms"],
+  "host_permissions": ["https://chat.morningtelos.com/*", "https://db.morningtelos.com/*", "https://mail.google.com/*"],
+  "content_scripts": [{ "matches": ["https://chat.morningtelos.com/*"], "js": ["src/content-app.js"], "run_at": "document_start" }],
+  "commands": {
+    "_execute_action": { "suggested_key": { "default": "Alt+Shift+J", "mac": "Alt+Shift+J" }, "description": "Open Morning Telos" }
+  }
+}

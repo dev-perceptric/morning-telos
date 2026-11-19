@@ -115,6 +115,8 @@ test("page routes", () => {
   assert.deepEqual(parseRoute("/memory/"), { page: "memory" });
   assert.deepEqual(parseRoute("/settings/skills"), { page: "settings", tab: "skills" });
   assert.deepEqual(parseRoute("/settings/apps"), { page: "settings", tab: "apps" });
+  assert.deepEqual(parseRoute("/settings/extension"), { page: "settings", tab: "extension" });
+  assert.equal(routePath({ page: "settings", tab: "extension" }), "/settings/extension");
   assert.equal(routePath({ page: "settings", tab: "apps" }), "/settings/apps");
   assert.deepEqual(parseRoute("/nope"), { page: "home" });
   // The staff console, and one workspace in it.

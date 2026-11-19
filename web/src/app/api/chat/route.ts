@@ -2,6 +2,8 @@ import * as Sentry from "@sentry/nextjs";
 import { randomUUID } from "node:crypto";
 import { runTurn, type ChatEvent, type TeamWorkspace } from "@/lib/agentLoop";
 import { CHAT_MESSAGES, ndjsonLine, rateLimiter, readChat } from "@/lib/chat";
+import { preflight, refuseOtherExtension, withCors } from "@/lib/cors";
+import { pageForStore, readPage, readScreenshot } from "@/lib/pageContext";
 import { brainTools, teamContext } from "@/lib/brainServer";
 import { teamClient } from "@/lib/claude";
 import { loadRoutine, startRoutineThread } from "@/lib/routinesServer";
@@ -19,6 +21,9 @@ import { NEEDS } from "@/lib/workspace";
 // message goes into that turn.
 // Threads and messages are read by the screen straight from Supabase, where row level security lets every member
 // read their own workspace's chats (supabase/011_ai_team.sql). Writes come through here, as the server.
+// The Chrome extension calls this too, with its own bearer token, and only its origin gets CORS (src/lib/cors.ts).
+// It can send `page` (a web page, an email or selected text) and `screenshot`: the page is saved on the message and
+// goes to Claude as outside data, the screenshot only goes with this turn (src/lib/pageContext.ts).
 export const dynamic = "force-dynamic";
 
 // 60 messages an hour per workspace, the same as the old app.
@@ -29,9 +34,17 @@ function log(message: string) {
   Sentry.captureMessage(message, { level: "warning", tags: { area: "chat" } });
 }
 
-const fail = (error: string, status: number) => Response.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
+export const OPTIONS = (request: Request) => preflight(request);
 
 export async function POST(request: Request) {
+  const refused = refuseOtherExtension(request);
+  if (refused) return refused;
+  return withCors(request, await chat(request));
+}
+
+const fail = (error: string, status: number) => Response.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
+
+async function chat(request: Request) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const workspaceId = body.workspaceId;
   const { gate } = roleGate(request, workspaceId);
@@ -41,6 +54,12 @@ export async function POST(request: Request) {
   const read = readChat(body);
   if (!read.ok) return fail(read.error, 400);
   const { agent, model, routineId } = read.value;
+  const page = readPage(body.page);
+  if (!page.ok) return fail(page.error, 400);
+  const shot = readScreenshot(body.screenshot);
+  if (!shot.ok) return fail(shot.error, 400);
+  // A screenshot only comes with a page, and never with a routine.
+  const screenshot = page.value && !routineId ? shot.value : null;
   let text = read.value.text;
   let forced: AgentKey | null = agent;
   const db = adminClient();
@@ -66,7 +85,7 @@ export async function POST(request: Request) {
         const { error } = await db.from("threads").insert({ id: threadId, workspace_id: ws, title: threadTitle(text), created_by: who.userId });
         if (error) throw new Error(error.message);
       }
-      const { error } = await db.from("messages").insert({ thread_id: threadId, workspace_id: ws, role: "user", agent: null, content: text, meta: { user: who.email ?? who.userId } });
+      const { error } = await db.from("messages").insert({ thread_id: threadId, workspace_id: ws, role: "user", agent: null, content: text, meta: { user: who.email ?? who.userId, ...(page.value ? { page: pageForStore(page.value) } : {}) } });
       if (error) throw new Error(error.message);
     }
   } catch (e) {
@@ -92,7 +111,7 @@ export async function POST(request: Request) {
       emit({ type: "thread", id: thread });
       try {
         // The turn finishes and is saved even if the person closes the page.
-        await runTurn({ workspace: team, threadId: thread, text: words, forced, model }, {
+        await runTurn({ workspace: team, threadId: thread, text: words, forced, model, shot: screenshot }, {
           client: teamClient(),
           store: teamStore(db, ws),
           // Arrowsterr and Capybaroar through this workspace's brand keys (changes wait for approval), Knowledge

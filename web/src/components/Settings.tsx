@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppsSettings } from "./Apps";
+import { ExtensionSettings } from "./Extension";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/routes";
 import { ASSIGNABLE, can, cleanSettings, deleteConfirmMatches, inviteLink, memberActions, roleLabel, ROLES, type MemberRow, type Role } from "@/lib/workspace";
 import { initial } from "@/lib/home";
@@ -89,6 +90,8 @@ export function SettingsPage({
         <AppsSettings key={`apps-${ws.id}`} sb={sb} ws={ws} />
       ) : tab === "skills" ? (
         <SkillsSettings key={`skills-${ws.id}`} sb={sb} ws={ws} />
+      ) : tab === "extension" ? (
+        <ExtensionSettings sb={sb} />
       ) : (
         <SocialSettings key={`social-${ws.id}`} sb={sb} ws={ws} />
       )}

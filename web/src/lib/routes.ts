@@ -2,7 +2,7 @@
 import { isAgentKey, type AgentKey } from "./team.ts";
 import { inviteTokenFromPath } from "./workspace.ts";
 
-export type SettingsTab = "general" | "members" | "social" | "apps" | "skills";
+export type SettingsTab = "general" | "members" | "social" | "apps" | "skills" | "extension";
 export type Route =
   | { page: "home" }
   | { page: "thread"; id: string | null }
@@ -26,6 +26,7 @@ export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "social", label: "Social accounts" },
   { id: "apps", label: "Apps" },
   { id: "skills", label: "Skills" },
+  { id: "extension", label: "Chrome extension" },
 ];
 
 export function parseRoute(path: string): Route {
@@ -37,6 +38,7 @@ export function parseRoute(path: string): Route {
   if (p === "/settings/social") return { page: "settings", tab: "social" };
   if (p === "/settings/apps") return { page: "settings", tab: "apps" };
   if (p === "/settings/skills") return { page: "settings", tab: "skills" };
+  if (p === "/settings/extension") return { page: "settings", tab: "extension" };
   if (p === "/team") return { page: "team" };
   // One teammate's own page, like the current app's #agent/<key>.
   const agent = /^\/team\/([a-z]+)$/.exec(p);

@@ -1,0 +1,31 @@
+{
+  "_about": "Text for the Chrome Web Store form (Developer Dashboard). Copy each field into the form field of the same name. Upload morning-telos-1.0.0.zip from `npm run build`.",
+  "name": "Morning Telos",
+  "version": "1.0.0",
+  "summary": "Chat with your Morning Telos AI team next to any page. Attach the page on a click, draft Gmail replies and approve work.",
+  "description": "Morning Telos for Chrome puts your AI team in a side panel next to the page you are on.\n\nChat with your team. Open the panel from the toolbar button or with Alt+Shift+J. Type @ to tag a teammate, the same team as in the app: Athena, Hermes, Hestia, Hora, Iris, Aphrodite, Artemis and Hephaestus. Every chat is saved in your workspace, and one click opens it in Morning Telos.\n\nUse the page you are on. Click Use this page to add the page's address, title and words to your next message. You can add a screenshot too. Quick actions do common jobs in one click: Check this site (Artemis looks up its Google traffic and best keywords), Save as a lead (Hermes pulls the business and contact details and saves them to your CRM after you approve), and Summarize this page (Athena).\n\nWork with selected text. Right-click any text you select to Ask Morning Telos, Rewrite this, or Save to Knowledge.\n\nDraft replies in Gmail. When a reply box is open, click Draft a reply. Hestia or Hermes writes it from the open email. Click Put in reply box to add it. You read it, change it and send it yourself.\n\nApprove work. The toolbar icon shows how many changes are waiting for your OK. Approve or deny them in the panel.\n\nYou stay in control. The extension reads a page only when you click, never in the background. It never reads pages with a password box, bank and payment pages, password managers or Chrome's own pages. It never clicks, submits or sends anything for you. You sign in on chat.morningtelos.com, and the extension never asks for your password.\n\nYou need a Morning Telos account. Start a free trial at morningtelos.com.",
+  "category": "Productivity",
+  "language": "English",
+  "single_purpose": "Chat with your Morning Telos AI team in a side panel, with the page you choose to share as context, and approve the work your team prepares.",
+  "permissions": {
+    "sidePanel": "Shows the Morning Telos chat, approvals and settings in Chrome's side panel next to the page.",
+    "storage": "Keeps this browser's sign-in, the picked workspace and the open chat in the extension's own storage.",
+    "contextMenus": "Adds Ask Morning Telos, Rewrite this and Save to Knowledge to the right-click menu for selected text.",
+    "activeTab": "Reads the page you are on only when you click the toolbar button, a panel button or a right-click item. Also takes the screenshot you ask for.",
+    "scripting": "Runs the page reader in the tab you clicked on, and puts a reply you chose into Gmail's reply box. Nothing runs on a page until you click.",
+    "alarms": "Checks once a minute, only while you are signed in, how many approvals are waiting, for the number on the toolbar icon.",
+    "host_chat.morningtelos.com": "Talks to your Morning Telos workspace: chat, approvals and Knowledge. Also where you connect this browser from your signed-in account.",
+    "host_db.morningtelos.com": "Morning Telos sign-in. Keeps this browser signed in and signs it out when you click Sign out.",
+    "host_mail.google.com": "Sees whether a Gmail reply box is open, reads the open email when you click Draft a reply, and puts the reply into the box when you click Put in reply box. It never sends email."
+  },
+  "remote_code": "No. All code is in the package.",
+  "data_use": {
+    "collected": ["Personally identifiable information (your email address, to sign you in)", "Authentication information (sign-in tokens, kept in the extension)", "Website content (the page, email or text you choose to share, and screenshots you ask for)"],
+    "certify": ["Not sold to third parties", "Not used or transferred for purposes unrelated to the single purpose", "Not used or transferred to determine creditworthiness or for lending"]
+  },
+  "privacy_policy_url": "https://morningtelos.com/privacy/#chrome-extension",
+  "privacy_note": "The Morning Telos Chrome extension reads a web page only when you click a button or a right-click item in it, never in the background. It sends what you chose to share (the page's address, title and words, any text you selected, a screenshot if you asked for one, or the open email in Gmail) to your own Morning Telos workspace, where your AI team uses it to answer you. Screenshots are used for that one answer and are not stored. Page text is saved with your chat in your workspace, like any message, and is deleted with it. The extension never reads pages with a password box, bank and payment pages, password managers or Chrome's own pages. It never clicks, submits or sends anything on a page. It keeps your sign-in in the extension's own storage, and Sign out removes it. We don't sell this data or use it for ads.",
+  "screenshots": "1280x800: the side panel chat beside a website; Use this page with a page attached; the Gmail reply draft with Put in reply box; the Approvals tab; the right-click menu on selected text.",
+  "icon": "icons/128.png",
+  "visibility": "Unlisted first, for our own team, then Public."
+}
