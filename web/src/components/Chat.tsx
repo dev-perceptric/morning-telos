@@ -9,7 +9,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { ChatEvent } from "@/lib/agentLoop";
 import { readLines } from "@/lib/chat";
-import { parseMarkdown, type Inline } from "@/lib/markdown";
+import { answerTheme, BRAND_COLUMNS, DEFAULT_THEME, type AnswerTheme, type BrandRow } from "@/lib/brand";
+import { parseMarkdown, type Block, type Inline, type List, type Table } from "@/lib/markdown";
 import { MODEL_CHOICES, type ModelChoice } from "@/lib/models";
 import { PLANS, type PaidPlan } from "@/lib/plans";
 import { insertSkill, matchSkills, menuAgent, skillsFor, slashQuery, type SkillRow } from "@/lib/skills";
@@ -59,7 +60,12 @@ function Inlines({ parts }: { parts: Inline[] }) {
     <>
       {parts.map((p, i) =>
         p.kind === "bold" ? (
-          <b key={i}>{p.text}</b>
+          // A bold number ("**1,240**", "**+18%**") takes the accent color.
+          <b key={i} className={/\d/.test(p.text) ? "n" : undefined}>
+            {p.text}
+          </b>
+        ) : p.kind === "italic" ? (
+          <em key={i}>{p.text}</em>
         ) : p.kind === "code" ? (
           <code key={i}>{p.text}</code>
         ) : p.kind === "link" ? (
@@ -74,44 +80,136 @@ function Inlines({ parts }: { parts: Inline[] }) {
   );
 }
 
-/** A reply: paragraphs, lists, headings, bold, code and links. Built from data (src/lib/markdown.ts), never HTML. */
+function ListView({ list }: { list: List }) {
+  const items = list.items.map((it, j) => (
+    <li key={j}>
+      <Inlines parts={it.parts} />
+      {it.sub ? <ListView list={it.sub} /> : null}
+    </li>
+  ));
+  return list.kind === "ul" ? <ul>{items}</ul> : <ol start={list.start}>{items}</ol>;
+}
+
+const ALIGN = { left: undefined, center: "al-c", right: "al-r" } as const;
+
+/** A table in its own box, which scrolls sideways on a phone instead of making the page wider. */
+function TableView({ t }: { t: Table }) {
+  const cls = (i: number) => [ALIGN[t.align[i]], t.numeric[i] ? "num" : ""].filter(Boolean).join(" ") || undefined;
+  return (
+    // A table wider than the chat scrolls, so it takes focus to scroll with the keyboard.
+    <div className="md-table" role="region" aria-label="Table" tabIndex={0}>
+      <table>
+        <thead>
+          <tr>
+            {t.head.map((h, i) => (
+              <th key={i} scope="col" className={cls(i)}>
+                <Inlines parts={h} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {t.rows.map((r, j) => (
+            <tr key={j}>
+              {r.map((c, i) => (
+                <td key={i} className={cls(i)}>
+                  <Inlines parts={c} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function BlockView({ b }: { b: Block }) {
+  switch (b.kind) {
+    case "p":
+      return (
+        <p>
+          {b.lines.map((l, j) => (
+            <Fragment key={j}>
+              {j ? <br /> : null}
+              <Inlines parts={l} />
+            </Fragment>
+          ))}
+        </p>
+      );
+    case "h": {
+      const H = (`h${b.level}` as "h2" | "h3" | "h4");
+      return (
+        <H>
+          <Inlines parts={b.parts} />
+        </H>
+      );
+    }
+    case "ul":
+    case "ol":
+      return <ListView list={b} />;
+    case "quote":
+      return (
+        <blockquote>
+          {b.blocks.map((x, i) => (
+            <BlockView key={i} b={x} />
+          ))}
+        </blockquote>
+      );
+    case "hr":
+      return <hr />;
+    case "code":
+      return (
+        <pre>
+          <code>{b.text}</code>
+        </pre>
+      );
+    case "table":
+      return <TableView t={b} />;
+  }
+}
+
+/**
+ * A reply: paragraphs, headings, lists, quotes, rules, code and tables, with bold, italic, code and links. Built from
+ * data (src/lib/markdown.ts), never HTML. Its colors and heading font come from the CSS variables around it
+ * (useAnswerTheme), or the Morning Telos look.
+ */
 export function Markdown({ text }: { text: string }) {
   return (
     <div className="md">
-      {parseMarkdown(text).map((b, i) =>
-        b.kind === "p" ? (
-          <p key={i}>
-            {b.lines.map((l, j) => (
-              <Fragment key={j}>
-                {j ? <br /> : null}
-                <Inlines parts={l} />
-              </Fragment>
-            ))}
-          </p>
-        ) : b.kind === "h" ? (
-          <h4 key={i}>
-            <Inlines parts={b.parts} />
-          </h4>
-        ) : b.kind === "ul" ? (
-          <ul key={i}>
-            {b.items.map((it, j) => (
-              <li key={j}>
-                <Inlines parts={it} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <ol key={i} start={b.start}>
-            {b.items.map((it, j) => (
-              <li key={j}>
-                <Inlines parts={it} />
-              </li>
-            ))}
-          </ol>
-        ),
-      )}
+      {parseMarkdown(text).map((b, i) => (
+        <BlockView key={i} b={b} />
+      ))}
     </div>
   );
+}
+
+/**
+ * How answers look in this workspace: its brand (supabase/021_brand.sql) when "Use my brand in answers" is on, or
+ * the Morning Telos look. Read as the signed-in person, so row level security decides. No brand, or a table that
+ * isn't there yet, is the default.
+ */
+export function useAnswerTheme(sb: SupabaseClient, workspaceId: string): AnswerTheme {
+  const [theme, setTheme] = useState<AnswerTheme>(DEFAULT_THEME);
+  useEffect(() => {
+    let live = true;
+    sb.from("brand_kits")
+      .select(BRAND_COLUMNS)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (live) setTheme(error ? DEFAULT_THEME : answerTheme(data as BrandRow | null));
+      });
+    return () => {
+      live = false;
+    };
+  }, [sb, workspaceId]);
+  return theme;
+}
+
+/** The brand's heading font, from Google Fonts only (answerTheme checks the name). React puts the link in the head once. */
+export function ThemeFont({ theme }: { theme: AnswerTheme }) {
+  return theme.fontHref ? <link rel="stylesheet" href={theme.fontHref} precedence="brand" /> : null;
 }
 
 // ─────────────── the message box ───────────────
@@ -483,6 +581,7 @@ export function ThreadPage({
   const thread = useRef<string | null>(id);
   const bottom = useRef<HTMLDivElement>(null);
   const skills = useSkillRows(sb, ws.id);
+  const theme = useAnswerTheme(sb, ws.id);
   // The / menu shows the skills of whoever answered last, when the reply tags nobody.
   const lastAgent = [...items].reverse().find((x): x is Extract<Item, { kind: "agent" }> => x.kind === "agent")?.agent ?? LEAD;
 
@@ -578,7 +677,8 @@ export function ThreadPage({
         </a>
         <h1>{title || (loading ? "" : "New chat")}</h1>
       </div>
-      <div className="msgs" aria-live="polite">
+      <ThemeFont theme={theme} />
+      <div className="msgs" aria-live="polite" style={theme.vars as React.CSSProperties}>
         {loading ? <div className="step">Opening the chat...</div> : null}
         {!loading && !items.length && !busy && !error ? <div className="step">No messages yet.</div> : null}
         {items.map((it, i) => (

@@ -72,7 +72,7 @@ test("aboutRequest asks for facts from the site only, with every page and the bu
   assert.match(r.user, /<page url="https:\/\/anas\.example\/">\nTitle: Home\nDescription: Fresh bread\n\nWe bake bread\.\n<\/page>/);
   assert.equal(r.user.match(/<\/page>/g)?.length, 2, "page text can't close the page tag");
   for (const f of ABOUT_FIELDS) assert.ok(r.user.includes(`- ${f.key}: `), f.key);
-  assert.deepEqual(r.schema.required, ["sell", "customers", "area", "voice", "prices", "contact"]);
+  assert.deepEqual(r.schema.required, ["sell", "customers", "area", "voice", "prices", "contact", "tone"]);
   assert.equal(r.schema.additionalProperties, false);
 });
 

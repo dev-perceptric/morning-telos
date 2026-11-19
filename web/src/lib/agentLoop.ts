@@ -17,6 +17,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { aiBlock, CAP_MESSAGES, costOf, spendWindowStart, tokensOf, type MeterWorkspace } from "./meter.ts";
 import { EFFORT, FALLBACK_BETA, MAX_TOKENS, modelFor, SERVER_FALLBACK, type ModelChoice } from "./models.ts";
+import { cleanTone } from "./brand.ts";
 import { PAGE_RULE, pageBlock, storedPage, type Screenshot } from "./pageContext.ts";
 import { AGENTS, agentByGod, LEAD, ORDER, parseMentions, workingAgents, type AgentKey } from "./team.ts";
 
@@ -34,7 +35,8 @@ export type Trust = 0 | 1 | 2;
 export type Pref = { enabled: boolean; trust: Trust; model: ModelChoice };
 export const DEFAULT_PREF: Pref = { enabled: true, trust: 0, model: "auto" };
 
-export type TeamWorkspace = MeterWorkspace & { id: string; name: string; website: string | null };
+/** tone: the brand's tone when "Use my brand in answers" is on (supabase/021_brand.sql), else null. */
+export type TeamWorkspace = MeterWorkspace & { id: string; name: string; website: string | null; tone?: string | null };
 
 export type StoredMessage = { role: "user" | "agent" | "note"; agent: AgentKey | null; content: string; meta?: Record<string, unknown> | null };
 export type NewMessage = { thread_id: string; workspace_id: string; role: "user" | "agent" | "note"; agent: AgentKey | null; content: string; meta: Record<string, unknown> };
@@ -150,7 +152,25 @@ const TOOL_RULES: Record<WriteMode, string> = {
   none: "Your tools only read. You can't change anything in the business's apps. If the job needs a change, hand it to the teammate who can, or say what to do.",
 };
 
-export function systemPrompt(ws: { name: string; website: string | null }, key: AgentKey, o: { tools: boolean; writes?: WriteMode; missing: string[]; teammates: AgentKey[] }): string {
+/** How every answer is laid out, so it reads well in chat (src/lib/markdown.ts draws it). In every teammate's prompt. */
+export const FORMAT_GUIDE = [
+  "Lead with the answer in one or two sentences.",
+  "When the answer is long, split it into short sections with ### headings.",
+  "Use a Markdown table for numbers over time or for comparing things side by side. No more than one table per idea.",
+  "Put the key numbers in **bold**.",
+  "Use short bullets, not long paragraphs. No walls of text.",
+  "End with one clear next step or one question.",
+];
+
+/** The line that asks the team to write in the brand's tone, or null when there is none. */
+export function toneRule(tone: string | null | undefined): string | null {
+  const t = cleanTone(tone);
+  return t
+    ? `The business's tone is "${t}". In chat with the owner, stay plain and clear with a light touch of that tone. In anything written for customers (emails, posts, pages, replies), follow that tone closely.`
+    : null;
+}
+
+export function systemPrompt(ws: { name: string; website: string | null; tone?: string | null }, key: AgentKey, o: { tools: boolean; writes?: WriteMode; missing: string[]; teammates: AgentKey[] }): string {
   const a = AGENTS[key];
   const team = ORDER.filter((k) => k !== key)
     .map((k) => `- ${AGENTS[k].god}: ${AGENTS[k].name}.${AGENTS[k].soon ? " (Coming soon, can't take work yet.)" : o.teammates.includes(k) ? ` ${AGENTS[k].job}` : " (Paused right now.)"}`)
@@ -168,6 +188,7 @@ export function systemPrompt(ws: { name: string; website: string | null }, key: 
     // The teammate's own rules (team.ts), like which app to connect and what Hestia hands to the owner.
     ...(a.rules ?? []),
     "Write in plain English at a 9th grade level. Short sentences. No em dashes. Keep replies short and easy to skim.",
+    toneRule(ws.tone),
   ].filter(Boolean);
   return `You are ${a.god}, the ${a.name} on the AI team of ${ws.name}${ws.website ? ` (${ws.website})` : ""}. ${a.job}
 You work only for ${ws.name}.${o.tools ? " Your tools are already limited to this business's own data." : ""}
@@ -176,7 +197,10 @@ Your teammates:
 ${team}
 
 How you work:
-${rules.map((r) => `- ${r}`).join("\n")}`;
+${rules.map((r) => `- ${r}`).join("\n")}
+
+How to format answers:
+${FORMAT_GUIDE.map((r) => `- ${r}`).join("\n")}`;
 }
 
 /** The handoff tool: name a teammate and say what they should do. They run right after this agent's reply. */
