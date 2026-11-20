@@ -6,7 +6,7 @@
 //
 // Every word on a card is shown as text (React escapes it); nothing is put in as HTML. A card's buttons only send a
 // message as the person, decide an approval through POST /api/approvals/:id, or start a goal or a plan, which the
-// browser saves as the signed-in person (row level security: editors and up, supabase/022_goals.sql).
+// browser saves as the signed-in person (row level security: editors and up, supabase/023_goals.sql).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";

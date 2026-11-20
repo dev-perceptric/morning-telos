@@ -104,3 +104,10 @@ test("loadWorkspace: the brand's tone comes with the workspace when the brand is
   assert.equal((await load())?.tone, null);
   assert.equal(await loadWorkspace(db as never, "missing"), null);
 });
+
+test("readChat: a message can be only files, and Retry can answer one; nothing at all is still empty", () => {
+  assert.deepEqual(readChat({ text: "  ", files: ["x"] }), { ok: true, value: { text: "", threadId: null, agent: null, model: null, routineId: null, again: false } });
+  assert.deepEqual(readChat({ text: "", threadId: "t", again: true }), { ok: true, value: { text: "", threadId: "t", agent: null, model: null, routineId: null, again: true } });
+  assert.deepEqual(readChat({ text: "", files: [] }), { ok: false, error: CHAT_MESSAGES.empty });
+  assert.deepEqual(readChat({ text: "", again: true }), { ok: false, error: CHAT_MESSAGES.empty }, "again needs a thread");
+});

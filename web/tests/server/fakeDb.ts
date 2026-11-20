@@ -100,5 +100,29 @@ export function fakeDb(uniques: Record<string, string[]> = {}, o: { autoId?: str
     return { data: fn(args), error: null };
   }
 
-  return { tables, writes, failNext, rpcs, from, rpc };
+  /** Supabase Storage: "<bucket>/<path>" → the file. failUpload makes the next upload fail. */
+  const objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
+  const store = { failUpload: "" };
+  const storage = {
+    from: (bucket: string) => ({
+      upload: async (path: string, body: Uint8Array, o: { contentType?: string; upsert?: boolean } = {}) => {
+        writes.push({ table: `storage:${bucket}`, op: "upload", payload: path });
+        if (store.failUpload) {
+          const message = store.failUpload;
+          store.failUpload = "";
+          return { data: null, error: { message } };
+        }
+        if (objects.has(`${bucket}/${path}`) && !o.upsert) return { data: null, error: { message: "The resource already exists" } };
+        objects.set(`${bucket}/${path}`, { bytes: new Uint8Array(body), contentType: o.contentType ?? "application/octet-stream" });
+        return { data: { path }, error: null };
+      },
+      download: async (path: string) => {
+        const f = objects.get(`${bucket}/${path}`);
+        if (!f) return { data: null, error: { message: "Object not found" } };
+        return { data: new Blob([f.bytes], { type: f.contentType }), error: null };
+      },
+    }),
+  };
+
+  return { tables, writes, failNext, rpcs, from, rpc, storage, objects, store };
 }

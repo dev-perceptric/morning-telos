@@ -8,6 +8,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { ChatEvent, StoredMessage } from "@/lib/agentLoop";
+import { ACCEPT, BUCKET, checkFile, FILE_MESSAGES, filesOnMessage, fitFiles, formatSize, pastedName, wordsFor, type FileKind, type StoredFile } from "@/lib/attachments";
 import { readLines } from "@/lib/chat";
 import { IDLE, LIVE_WORDS, started as startLive, step, type Live } from "@/lib/liveReply";
 import { answerTheme, BRAND_COLUMNS, DEFAULT_THEME, type AnswerTheme, type BrandRow } from "@/lib/brand";
@@ -18,19 +19,25 @@ import { MODEL_CHOICES, type ModelChoice } from "@/lib/models";
 import { PLANS, type PaidPlan } from "@/lib/plans";
 import { usedNote } from "@/lib/progress";
 import { quickRoute } from "@/lib/router";
+import { checkUpload, UPLOAD_TYPES } from "@/lib/knowledge";
+import { micError, MIC_WORDS, speechLang, speechRecognition, spokenText, withSpoken, type Recognition } from "@/lib/speech";
+import { attachFile, saveToKnowledge } from "@/lib/uploads";
 import { insertSkill, matchSkills, menuAgent, skillsFor, slashQuery, type SkillRow } from "@/lib/skills";
 import { agentFace, AGENTS, agentByGod, insertMention, isAgentKey, LEAD, mentionMatches, mentionQuery, workingAgents, type AgentKey } from "@/lib/team";
 import { can } from "@/lib/workspace";
 import { ApprovalCard } from "./Approvals";
 import { AnswerCards, CardsProvider, GoalPin, type CardsEnv } from "./Cards";
-import { Icon } from "./icons";
+import { Icon, type IconName } from "./icons";
 import { callApi, message, navigate } from "./nav";
 import type { Workspace } from "./Settings";
 import { ErrorText, Notice, to } from "./ui";
 
 type Item =
-  /** page: what the person attached from the Chrome extension (meta.page), shown as a link under their words. */
-  | { kind: "user"; text: string; page?: { url: string; title: string } | null }
+  /**
+   * page: what the person attached from the Chrome extension (meta.page), shown as a link under their words.
+   * files: files attached from the message box (meta.files), shown above their words.
+   */
+  | { kind: "user"; text: string; page?: { url: string; title: string } | null; files?: StoredFile[] }
   /** stopped: the person pressed Stop while it was written. used: the tools it used, for the "Used: ..." note. cards: answer cards under it. */
   | { kind: "agent"; agent: AgentKey; text: string; error?: boolean; blocked?: string; stopped?: boolean; used?: string[]; cards?: Card[] }
   | { kind: "note"; agent: AgentKey; text: string; full?: boolean }
@@ -277,10 +284,117 @@ function ModelPicker({ value, onChange }: { value: ModelChoice; onChange: (m: Mo
   );
 }
 
+/** The + menu at the left of the message box: attach files to the message, or save a file to Knowledge. */
+function PlusMenu({ disabled, onAttach, onKnowledge }: { disabled?: boolean; onAttach: () => void; onKnowledge: () => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const items = useRef<(HTMLButtonElement | null)[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    items.current[0]?.focus();
+    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [open]);
+  const close = (focus = true) => {
+    setOpen(false);
+    if (focus) button.current?.focus();
+  };
+  const pick = (run: () => void) => {
+    close(false);
+    run();
+  };
+  const choices: [string, IconName, () => void][] = [
+    ["Attach files", "clip", onAttach],
+    ["Save a file to Knowledge", "book", onKnowledge],
+  ];
+  return (
+    <span
+      ref={box}
+      className="plus-wrap"
+      onKeyDown={(e) => {
+        if (!open) return;
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          close();
+        } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const at = items.current.findIndex((b) => b === document.activeElement);
+          const next = (at + (e.key === "ArrowDown" ? 1 : choices.length - 1)) % choices.length;
+          items.current[next < 0 ? 0 : next]?.focus();
+        }
+      }}
+      onBlur={(e) => {
+        if (open && !box.current?.contains(e.relatedTarget as Node)) setOpen(false);
+      }}
+    >
+      <button ref={button} type="button" className="tool-b plus" aria-label="Add files" title="Add files" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(!open)}>
+        <Icon name="plus" />
+      </button>
+      {open ? (
+        <div className="plus-menu" role="menu" aria-label="Add files">
+          {choices.map(([text, icon, run], i) => (
+            <button
+              key={text}
+              ref={(b) => {
+                items.current[i] = b;
+              }}
+              type="button"
+              role="menuitem"
+              onClick={() => pick(run)}
+            >
+              <Icon name={icon} small />
+              {text}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </span>
+  );
+}
+
+/** A file being attached to the message: uploading until `file` is set. `preview`: a local picture of an image. */
+type Pending = { key: string; name: string; size: number; kind: FileKind; preview: string | null; file: StoredFile | null };
+/** One short line under the box: an error, or what is happening. */
+type Line = { text: string; error?: boolean };
+
+const KNOWLEDGE_ACCEPT = UPLOAD_TYPES.join(",");
+
+/** The files attached to a message the box is about to send, as chips: a picture for images, the name and size, and an x. */
+function PendingFiles({ files, onRemove }: { files: Pending[]; onRemove: (key: string) => void }) {
+  return (
+    <ul className="c-files" aria-label="Attached files">
+      {files.map((p) => (
+        <li key={p.key} className={`fchip${p.file ? "" : " up"}`}>
+          {p.preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={p.preview} alt="" />
+          ) : (
+            <span className="fi" aria-hidden>
+              <Icon name="file" small />
+            </span>
+          )}
+          <span className="fn">
+            <b>{p.name}</b>
+            <small>{p.file ? formatSize(p.size) : "Uploading..."}</small>
+          </span>
+          <button type="button" className="fx" aria-label={`Remove ${p.name}`} title="Remove" onClick={() => onRemove(p.key)}>
+            <Icon name="close" small />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
- * A message box like the current app's: one rounded box, @ Tag (and the model on Home) at the bottom left and a round
- * send button. Typing @ opens a menu of teammates, and / a menu of the tagged teammate's skills (Athena's, or
- * `agent`'s, when nobody is tagged). Enter sends and Shift+Enter starts a new line.
+ * A message box like the current app's: one rounded box, + (attach files or save one to Knowledge), @ Tag (and the
+ * model on Home) at the bottom left, and the mic and a round send button at the right. Typing @ opens a menu of
+ * teammates, and / a menu of the tagged teammate's skills (Athena's, or `agent`'s, when nobody is tagged). Enter
+ * sends and Shift+Enter starts a new line. Files can also be dropped on the box or pasted (images). The mic types
+ * what the person says (src/lib/speech.ts) and stands where Send is while the box is empty, like Lindy.
  */
 export function Composer({
   id = "composer",
@@ -298,11 +412,13 @@ export function Composer({
   model,
   onModel,
   onStop,
+  attach,
 }: {
   id?: string;
   value: string;
   onChange: (v: string) => void;
-  onSend: (text: string) => void;
+  /** The words, and the files already uploaded for this message. */
+  onSend: (text: string, files: StoredFile[]) => void;
   disabled?: boolean;
   busy?: boolean;
   placeholder: string;
@@ -318,15 +434,36 @@ export function Composer({
   onModel?: (m: ModelChoice) => void;
   /** While busy, Stop takes Send's place and calls this. */
   onStop?: () => void;
+  /** Where files go. Without it there is no + button. */
+  attach?: { sb: SupabaseClient; workspaceId: string };
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const pickRef = useRef<HTMLInputElement>(null);
+  const knowRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState<{ kind: "mention" | "skill"; q: string } | null>(null);
   const [pick, setPick] = useState(0);
+  const [pending, setPendingState] = useState<Pending[]>([]);
+  // The files as of the last change, for uploads that finish later.
+  const pendingRef = useRef<Pending[]>([]);
+  const [line, setLine] = useState<Line | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  // Voice typing: the browser's own recognition, or null (no mic).
+  const [Recognizer] = useState(() => (typeof window === "undefined" ? null : speechRecognition(window)));
+  const listener = useRef<Recognition | null>(null);
+  const [listening, setListening] = useState(false);
   const skillAgent = menuAgent(value, agent);
   const people = query?.kind === "mention" ? mentionMatches(query.q) : [];
   const found = query?.kind === "skill" ? matchSkills(skillsFor(skillAgent, skills), query.q).slice(0, 8) : [];
   const count = people.length || found.length;
   const open = count > 0;
+  const uploading = pending.filter((p) => !p.file).length;
+  const canAttach = Boolean(attach) && !disabled;
+
+  const setPending = useCallback((next: (xs: Pending[]) => Pending[]) => {
+    pendingRef.current = next(pendingRef.current);
+    setPendingState(pendingRef.current);
+  }, []);
 
   // Grow with the text, up to a limit, like the current app.
   useEffect(() => {
@@ -335,6 +472,15 @@ export function Composer({
     ta.style.height = "auto";
     ta.style.height = `${Math.min(ta.scrollHeight, 220)}px`;
   }, [value]);
+
+  // Leaving the page stops listening and lets go of the image previews.
+  useEffect(
+    () => () => {
+      listener.current?.abort();
+      pendingRef.current.forEach((p) => p.preview && URL.revokeObjectURL(p.preview));
+    },
+    [],
+  );
 
   const look = (ta: HTMLTextAreaElement) => {
     const before = ta.value.slice(0, ta.selectionStart);
@@ -364,10 +510,94 @@ export function Composer({
     if (people.length) choose(people[Math.min(i, people.length - 1)]);
     else if (found.length) chooseSkill(found[Math.min(i, found.length - 1)].name);
   };
+
+  const token = async () => (attach ? ((await attach.sb.auth.getSession()).data.session?.access_token ?? null) : null);
+
+  /** Check new files, show them as chips and upload each one. Too many, too big or the wrong kind is one short line. */
+  const addFiles = (list: File[]) => {
+    if (!attach || disabled || !list.length) return;
+    const checked = list.map((f) => ({ f, c: checkFile(f.name, f.size) }));
+    const bad = checked.find((x) => !x.c.ok);
+    const fit = fitFiles(pendingRef.current, checked.filter((x) => x.c.ok).map((x) => x.f));
+    setLine(bad && !bad.c.ok ? { text: bad.c.error, error: true } : fit.error ? { text: fit.error, error: true } : null);
+    for (const f of fit.take) {
+      const kind = checkFile(f.name, f.size);
+      if (!kind.ok) continue;
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const preview = kind.kind === "image" ? URL.createObjectURL(f) : null;
+      setPending((xs) => [...xs, { key, name: f.name, size: f.size, kind: kind.kind, preview, file: null }]);
+      token()
+        .then((t) => attachFile(t, attach.workspaceId, f))
+        .then(
+          (file) => setPending((xs) => xs.map((p) => (p.key === key ? { ...p, file, name: file.name } : p))),
+          (e) => {
+            if (preview) URL.revokeObjectURL(preview);
+            setPending((xs) => xs.filter((p) => p.key !== key));
+            setLine({ text: message(e), error: true });
+          },
+        );
+    }
+  };
+  const remove = (key: string) => {
+    const p = pendingRef.current.find((x) => x.key === key);
+    if (p?.preview) URL.revokeObjectURL(p.preview);
+    setPending((xs) => xs.filter((x) => x.key !== key));
+    ref.current?.focus();
+  };
+  const toKnowledge = async (f: File) => {
+    if (!attach) return;
+    const check = checkUpload(f.name, f.size);
+    if (!check.ok) return setLine({ text: check.error, error: true });
+    setSaving(true);
+    setLine({ text: "Saving to Knowledge..." });
+    try {
+      setLine({ text: await saveToKnowledge(await token(), attach.workspaceId, f) });
+    } catch (e) {
+      setLine({ text: message(e), error: true });
+    }
+    setSaving(false);
+  };
+
+  const stopListening = () => listener.current?.stop();
+  const listen = () => {
+    if (listener.current) return stopListening();
+    if (!Recognizer || disabled) return;
+    const r = new Recognizer();
+    r.lang = speechLang(navigator);
+    r.continuous = true;
+    r.interimResults = true;
+    // What was typed before the mic went on stays, and the spoken words follow it.
+    const before = value;
+    r.onresult = (e) => onChange(withSpoken(before, spokenText(e.results)));
+    r.onerror = (e) => {
+      const m = micError(e.error);
+      if (m) setLine({ text: m, error: true });
+    };
+    r.onend = () => {
+      listener.current = null;
+      setListening(false);
+      ref.current?.focus();
+    };
+    try {
+      r.start();
+      listener.current = r;
+      setListening(true);
+      setLine(null);
+    } catch {
+      setLine({ text: micError("") ?? "", error: true });
+    }
+  };
+
   const send = () => {
     const t = value.trim();
-    if (!t || disabled || busy) return;
-    onSend(t);
+    const files = pending.flatMap((p) => (p.file ? [p.file] : []));
+    if ((!t && !pending.length) || disabled || busy) return;
+    if (uploading) return setLine({ text: FILE_MESSAGES.uploading, error: true });
+    stopListening();
+    onSend(t, files);
+    pending.forEach((p) => p.preview && URL.revokeObjectURL(p.preview));
+    setPending(() => []);
+    setLine(null);
     setQuery(null);
   };
   const tag = () => {
@@ -380,12 +610,33 @@ export function Composer({
     });
   };
 
+  const empty = !value.trim() && !pending.length;
+  const mic = Boolean(Recognizer) && !disabled;
+  // With nothing to send, the mic stands where Send is.
+  const showSend = !(mic && empty && !busy) || listening;
+  const shown: Line | null = line ?? (uploading ? { text: uploading === 1 ? "Uploading 1 file..." : `Uploading ${uploading} files...` } : listening ? { text: MIC_WORDS.listening } : null);
+
   return (
     <form
-      className={`composer${down ? " down" : ""}${disabled ? " off" : ""}`}
+      className={`composer${down ? " down" : ""}${disabled ? " off" : ""}${dragging ? " drop" : ""}`}
       onSubmit={(e) => {
         e.preventDefault();
         send();
+      }}
+      onDragOver={(e) => {
+        if (!canAttach || !e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        if (!dragging) setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!canAttach || !e.dataTransfer.files.length) return;
+        e.preventDefault();
+        setDragging(false);
+        addFiles([...e.dataTransfer.files]);
       }}
     >
       {open && people.length ? (
@@ -438,6 +689,7 @@ export function Composer({
           ))}
         </div>
       ) : null}
+      {pending.length ? <PendingFiles files={pending} onRemove={remove} /> : null}
       <label className="sr" htmlFor={id}>
         Message your team
       </label>
@@ -455,6 +707,14 @@ export function Composer({
         }}
         onClick={(e) => look(e.currentTarget)}
         onBlur={() => setTimeout(() => setQuery(null), 150)}
+        onPaste={(e) => {
+          if (!canAttach) return;
+          const images = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/"));
+          if (!images.length) return;
+          // A picture alone is attached. Pasted words still go in the box.
+          if (!e.clipboardData.getData("text/plain")) e.preventDefault();
+          addFiles(images.map((f) => new File([f], pastedName(f.type, f.name), { type: f.type })));
+        }}
         onKeyDown={(e) => {
           if (open) {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -480,20 +740,68 @@ export function Composer({
         }}
       />
       <div className="ctools">
+        {attach ? (
+          <>
+            <PlusMenu disabled={disabled || saving} onAttach={() => pickRef.current?.click()} onKnowledge={() => knowRef.current?.click()} />
+            <input
+              ref={pickRef}
+              type="file"
+              multiple
+              accept={ACCEPT}
+              hidden
+              tabIndex={-1}
+              onChange={(e) => {
+                addFiles([...(e.target.files ?? [])]);
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={knowRef}
+              type="file"
+              accept={KNOWLEDGE_ACCEPT}
+              hidden
+              tabIndex={-1}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) toKnowledge(f);
+              }}
+            />
+          </>
+        ) : null}
         <button type="button" className="tool-b" onClick={tag} disabled={disabled}>
           <span className="at">@</span>Tag
         </button>
         {model && onModel ? <ModelPicker value={model} onChange={onModel} /> : null}
-        {busy && onStop ? (
-          <button type="button" className="send stop" aria-label="Stop" title="Stop" onClick={onStop}>
-            <Icon name="stop" className="fill" />
-          </button>
-        ) : (
-          <button type="submit" className="send" aria-label={busy ? "Working" : "Send"} disabled={disabled || busy}>
-            {busy ? <span className="spin" aria-hidden /> : <Icon name="up" />}
-          </button>
-        )}
+        <span className="c-end">
+          {mic ? (
+            <button
+              type="button"
+              className={`mic${listening ? " on" : ""}${showSend ? "" : " solo"}`}
+              aria-pressed={listening}
+              aria-label={listening ? MIC_WORDS.stop : MIC_WORDS.start}
+              title={listening ? MIC_WORDS.stop : MIC_WORDS.start}
+              onClick={listen}
+            >
+              <Icon name="mic" />
+            </button>
+          ) : null}
+          {busy && onStop ? (
+            <button type="button" className="send stop" aria-label="Stop" title="Stop" onClick={onStop}>
+              <Icon name="stop" className="fill" />
+            </button>
+          ) : showSend ? (
+            <button type="submit" className="send" aria-label={busy ? "Working" : "Send"} disabled={disabled || busy}>
+              {busy ? <span className="spin" aria-hidden /> : <Icon name="up" />}
+            </button>
+          ) : null}
+        </span>
       </div>
+      {shown ? (
+        <p className={`c-line${shown.error ? " err" : ""}`} role={shown.error ? "alert" : "status"}>
+          {shown.text}
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -517,7 +825,7 @@ export function useSkillRows(sb: SupabaseClient, workspaceId: string): SkillRow[
 }
 
 /** The first message of a new chat: typed on Home, or a routine started with Run now. */
-export type StartChat = { text: string; routineId?: string; title?: string };
+export type StartChat = { text: string; routineId?: string; title?: string; files?: StoredFile[] };
 
 // ─────────────── a thread ───────────────
 
@@ -532,7 +840,7 @@ const toItems = (m: MessageRow): Item[] => {
   if (m.role === "user") {
     const p = m.meta?.page as { url?: unknown; title?: unknown } | undefined;
     const page = p && typeof p.url === "string" && /^https?:\/\//.test(p.url) ? { url: p.url, title: typeof p.title === "string" && p.title ? p.title : p.url } : null;
-    return [{ kind: "user", text: m.content, page }];
+    return [{ kind: "user", text: m.content, page, files: filesOnMessage(m.meta) }];
   }
   // A note about an approval ("Approved and done: ...") is shown whole. A handoff note shows who handed it to whom.
   // A goal's Monday check-in shows one short line.
@@ -587,7 +895,7 @@ const NEAR_BOTTOM = 80;
 const atBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - NEAR_BOTTOM;
 
 /** What send() can be told: a routine to start, a teammate to ask, or to answer the last message again. */
-type SendOpts = { routine?: { id: string; title: string }; agent?: AgentKey; again?: boolean };
+type SendOpts = { routine?: { id: string; title: string }; agent?: AgentKey; again?: boolean; files?: StoredFile[] };
 
 /** One chat. Loads its messages, sends new ones and shows replies as they are written. `start` is the first message of a new chat. */
 export function ThreadPage({
@@ -642,7 +950,8 @@ export function ThreadPage({
   const [goalTick, setGoalTick] = useState(0);
   // The / menu shows the skills of whoever answered last, when the reply tags nobody.
   const lastAgent = [...items].reverse().find((x): x is Extract<Item, { kind: "agent" }> => x.kind === "agent")?.agent ?? LEAD;
-  const lastUser = [...items].reverse().find((x): x is Extract<Item, { kind: "user" }> => x.kind === "user")?.text ?? "";
+  const lastUserItem = [...items].reverse().find((x): x is Extract<Item, { kind: "user" }> => x.kind === "user");
+  const lastUser = lastUserItem?.text ?? "";
 
   const show = useCallback((next: Live, now = false) => {
     liveRef.current = next;
@@ -710,6 +1019,7 @@ export function ThreadPage({
   const send = useCallback(
     async (text: string, opts: SendOpts = {}) => {
       const { routine, agent, again } = opts;
+      const files = again || routine ? [] : (opts.files ?? []);
       const ctrl = new AbortController();
       stopper.current = ctrl;
       setBusy(true);
@@ -717,9 +1027,9 @@ export function ThreadPage({
       pinned.current = true;
       if (!again) {
         setDraft("");
-        setItems((xs) => [...xs, { kind: "user", text }]);
+        setItems((xs) => [...xs, { kind: "user", text, files }]);
       }
-      if (!thread.current) setTitle(routine ? `Routine: ${routine.title}` : text.replace(/\s+/g, " ").trim());
+      if (!thread.current) setTitle(routine ? `Routine: ${routine.title}` : wordsFor(text, files).replace(/\s+/g, " ").trim());
       // The first feedback comes at once: who answers, when the screen can tell, or "Finding the right teammate".
       show(startLive(routine ? null : quickRoute(text, asHistory(itemsRef.current), workingAgents(), agent)), true);
       // Approval cards wait for the reply that prepared them, so they show under it, as they do after a reload.
@@ -735,6 +1045,7 @@ export function ThreadPage({
         ...(routine ? { routineId: routine.id } : {}),
         ...(agent ? { agent } : {}),
         ...(again ? { again: true } : {}),
+        ...(files.length ? { files: files.map((f) => f.path) } : {}),
       };
       const work = (async () => {
         try {
@@ -798,12 +1109,12 @@ export function ThreadPage({
   /** Ask a teammate to answer the last message again: Retry (the same one) or Ask someone else. */
   const askAgain = useCallback(
     async (k: AgentKey) => {
-      if (!lastUser) return;
+      if (!lastUserItem) return;
       stopper.current?.abort();
       await running.current;
       send(lastUser, { agent: k, again: true });
     },
-    [lastUser, send],
+    [lastUserItem, lastUser, send],
   );
 
   // A new chat from Home: send its first message once.
@@ -812,11 +1123,11 @@ export function ThreadPage({
     if (id || !start || sentStart.current) return;
     sentStart.current = true;
     onStarted();
-    send(start.text, start.routineId ? { routine: { id: start.routineId, title: start.title ?? "" } } : {});
+    send(start.text, start.routineId ? { routine: { id: start.routineId, title: start.title ?? "" } } : { files: start.files });
   }, [id, start, onStarted, send]);
 
   const lastAnswer = busy ? -1 : items.reduce((at, x, i) => (x.kind === "agent" && !x.blocked ? i : at), -1);
-  const canAgain = editor && Boolean(lastUser);
+  const canAgain = editor && Boolean(lastUserItem);
   // A card's answer is the person's next message after its reply. The last reply's cards are open until then.
   const answers = items.map((_, i) => {
     const next = items.slice(i + 1).find((x): x is Extract<Item, { kind: "user" }> => x.kind === "user");
@@ -883,8 +1194,9 @@ export function ThreadPage({
         <Composer
           value={draft}
           onChange={setDraft}
-          onSend={(t) => send(t)}
+          onSend={(t, files) => send(t, { files })}
           onStop={stop}
+          attach={editor ? { sb, workspaceId: ws.id } : undefined}
           busy={busy}
           disabled={!editor}
           placeholder={editor ? "Reply, or type @ to pull in a teammate, / for a skill" : "Viewers can read chats but can't send messages."}
@@ -970,13 +1282,74 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** A short-lived link to a chat file, made as the signed-in person: storage's row level security decides. */
+function useFileLink(sb: SupabaseClient, path: string): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    sb.storage
+      .from(BUCKET)
+      .createSignedUrl(path, 60 * 60)
+      .then(({ data }) => {
+        if (live && data?.signedUrl) setUrl(data.signedUrl);
+      });
+    return () => {
+      live = false;
+    };
+  }, [sb, path]);
+  return url;
+}
+
+function SentFile({ sb, file }: { sb: SupabaseClient; file: StoredFile }) {
+  const url = useFileLink(sb, file.path);
+  if (file.kind === "image")
+    return url ? (
+      <a className="sthumb" href={url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${file.name}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={file.name} />
+      </a>
+    ) : (
+      <span className="sthumb wait" aria-label={file.name} role="img" />
+    );
+  const body = (
+    <>
+      <span className="fi" aria-hidden>
+        <Icon name="file" small />
+      </span>
+      <span className="fn">
+        <b>{file.name}</b>
+        <small>{[file.kind === "pdf" ? "PDF" : "Text", formatSize(file.size)].filter(Boolean).join(", ")}</small>
+      </span>
+    </>
+  );
+  return url ? (
+    <a className="fchip sent" href={url} target="_blank" rel="noopener noreferrer">
+      {body}
+    </a>
+  ) : (
+    <span className="fchip sent">{body}</span>
+  );
+}
+
+/** The files the person sent with a message, above their words. */
+function SentFiles({ sb, files }: { sb: SupabaseClient; files: StoredFile[] }) {
+  return (
+    <div className="s-files">
+      {files.map((f) => (
+        <SentFile key={f.path} sb={sb} file={f} />
+      ))}
+    </div>
+  );
+}
+
 function ItemView({ item, sb, ws, last, canAgain, onAgain, answer = null }: { item: Item; sb: SupabaseClient; ws: Workspace; last?: boolean; canAgain?: boolean; onAgain?: (k: AgentKey) => void; answer?: string | null }) {
   if (item.kind === "approval") return <ApprovalCard sb={sb} ws={ws} id={item.id} title={item.title} />;
   if (item.kind === "user")
     return (
       <div className="msg me">
         <div className="bubble">
-          <WithTags text={item.text} />
+          {item.files?.length ? <SentFiles sb={sb} files={item.files} /> : null}
+          {item.text ? <WithTags text={item.text} /> : null}
           {item.page ? (
             <small className="mt-1 block text-[12px] text-ink-4 wrap">
               From a page:{" "}

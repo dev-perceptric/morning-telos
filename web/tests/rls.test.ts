@@ -2386,7 +2386,64 @@ test("021_brand.sql queues one learn_brand job for each older workspace with a w
   assert.deepEqual(jobs, [{ workspace_id: site.ws, max_attempts: 1 }]);
 });
 
-// ─────────────── goals, plan steps and the Monday check-in (022_goals.sql) ───────────────
+// ─────────────── chat files (022_chat_files.sql) ───────────────
+
+test("chat-files: a private bucket with the app's size and type limits", async (t) => {
+  if (!db) return t.skip("no test database");
+  const b = (await db.query("select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'chat-files'")).rows[0];
+  assert.equal(b.public, false);
+  assert.equal(Number(b.file_size_limit), 10 * 1024 * 1024);
+  assert.deepEqual([...b.allowed_mime_types].sort(), ["application/pdf", "image/gif", "image/jpeg", "image/png", "image/webp", "text/csv", "text/markdown", "text/plain"]);
+});
+
+test("chat-files: members read their own workspace's files, nobody else does, and nobody writes through the API", async (t) => {
+  if (!db) return t.skip("no test database");
+  const a = await team("files-a");
+  const b = await team("files-b");
+  const stranger = await signUp("files-stranger@example.com");
+  const mine = `${a.ws}/${randomUUID()}/menu.pdf`;
+  const theirs = `${b.ws}/${randomUUID()}/secret.png`;
+  // The server writes with the service key, which skips row level security.
+  await db.query("insert into storage.objects (bucket_id, name) values ('chat-files', $1), ('chat-files', $2), ('chat-files', 'not-a-workspace/x/y.txt')", [mine, theirs]);
+  // A message that lists a file, the way POST /api/chat saves it.
+  const thread = (await db.query("insert into threads (workspace_id, title, created_by) values ($1, 'Files', $2) returning id", [a.ws, a.owner.id])).rows[0].id;
+  await db.query("insert into messages (thread_id, workspace_id, role, agent, content, meta) values ($1, $2, 'user', null, 'Look', $3)", [thread, a.ws, { files: [{ path: mine, size: 10 }] }]);
+
+  for (const u of [a.owner, a.admin, a.editor, a.viewer]) {
+    await as(u, async (q) => {
+      const names = (await q("select name from storage.objects where bucket_id = 'chat-files' order by name")).rows.map((r) => r.name);
+      assert.deepEqual(names, [mine], u.email);
+      assert.equal((await q("select meta from messages where thread_id = $1", [thread])).rows[0].meta.files[0].path, mine);
+    });
+  }
+  for (const u of [b.owner, stranger, null]) {
+    await as(u, async (q) => {
+      assert.equal((await q("select name from storage.objects where name = $1", [mine])).rowCount, 0, u?.email ?? "signed out");
+      // Signed-out visitors have no rights on messages at all.
+      if (u) assert.equal((await q("select meta from messages where thread_id = $1", [thread])).rowCount, 0);
+    });
+  }
+  // Uploads, renames and deletes only come from the server.
+  for (const u of [a.owner, a.editor]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into storage.objects (bucket_id, name) values ('chat-files', $1)", [`${a.ws}/${randomUUID()}/x.png`]), /row-level security/);
+    });
+    await as(u, async (q) => {
+      assert.equal((await q("update storage.objects set name = $1 where name = $2", [`${a.ws}/x/moved.pdf`, mine])).rowCount, 0);
+      assert.equal((await q("delete from storage.objects where name = $1", [mine])).rowCount, 0);
+    });
+  }
+  assert.equal((await db.query("select count(*)::int n from storage.objects where name = $1", [mine])).rows[0].n, 1);
+});
+
+test("chat_file_workspace: the first folder when it is a workspace id, else null", async (t) => {
+  if (!db) return t.skip("no test database");
+  const ws = randomUUID();
+  const r = (await db.query("select chat_file_workspace($1) a, chat_file_workspace('x/y/z.png') b, chat_file_workspace('') c, chat_file_workspace($2) d", [`${ws}/${randomUUID()}/a.png`, `${ws.toUpperCase()}/a/b.png`])).rows[0];
+  assert.deepEqual(r, { a: ws, b: null, c: null, d: ws });
+});
+
+// ─────────────── goals, plan steps and the Monday check-in (023_goals.sql) ───────────────
 
 const threadIn = async (ws: string, by: User) => (await db!.query("insert into threads (workspace_id, title, created_by) values ($1, 'Grow on LinkedIn', $2) returning id", [ws, by.id])).rows[0].id as string;
 const GOAL_INSERT = "insert into goals (workspace_id, thread_id, card_id, agent, metric, title, target, unit, due_date) values ($1, $2, $3, 'social', 'followers', 'Grow LinkedIn by', 150, 'followers', '2027-01-31') returning id, created_by, status, current";

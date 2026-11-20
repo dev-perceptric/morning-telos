@@ -1,5 +1,5 @@
 // The Monday check-in for one goal: the worker's goal_checkin job (queued by queue_goal_checkins(),
-// supabase/022_goals.sql). The goal's owner reads the number from real data where a product gives it, then posts the
+// supabase/023_goals.sql). The goal's owner reads the number from real data where a product gives it, then posts the
 // check-in in the goal's chat: the number, what the team did, and the one change for next week. It runs like a
 // routine (src/lib/routinesServer.ts): the same turn, tools and AI meter, and it is skipped when the goal is no
 // longer active, the owner is paused or can't take work, or the plan or the AI allowance is used up.

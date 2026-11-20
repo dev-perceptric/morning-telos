@@ -6,6 +6,7 @@
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import type { StoredFile } from "@/lib/attachments";
 import { identify, inWorkspace, isRecent, pageView, resetAnalytics, trackOnce } from "@/lib/analytics";
 import { initial, paletteMatch, type PaletteItem } from "@/lib/home";
 import type { ModelChoice } from "@/lib/models";
@@ -29,6 +30,7 @@ import { SettingsPage, type Workspace } from "./Settings";
 import { StaffPage, useIsStaff } from "./Staff";
 import { ConnectSocialCard } from "./Social";
 import { AgentPage, TeamPage } from "./Team";
+import { UseCasesPage } from "./UseCases";
 import { btnPrimary, btnSecondary, Drawer, ErrorText, Frame, input, label, Notice, to } from "./ui";
 
 // An invite token waits here from the moment the link is opened until the person is signed in.
@@ -217,6 +219,7 @@ function useChrome(sb: SupabaseClient, workspaceId: string, key: string): Chrome
 type NavItem = { page: string; label: string; path: string; icon: IconName; count?: boolean };
 const MAIN_NAV: NavItem[] = [
   { page: "home", label: "Home", path: "/", icon: "home" },
+  { page: "useCases", label: "Use cases", path: "/use-cases", icon: "idea" },
   { page: "approvals", label: "Approvals", path: "/approvals", icon: "inbox", count: true },
   { page: "team", label: "Team", path: "/team", icon: "team" },
   { page: "routines", label: "Routines", path: "/routines", icon: "clock" },
@@ -228,8 +231,9 @@ const SETUP_NAV: NavItem[] = [
   { page: "settings", label: "Settings", path: "/settings", icon: "gear" },
 ];
 // The phone's bottom bar, like the current app: four pages and More.
-const TAB_NAV = [MAIN_NAV[0], MAIN_NAV[1], MAIN_NAV[2], SETUP_NAV[0]];
-const MORE_NAV = [MAIN_NAV[3], SETUP_NAV[1], SETUP_NAV[2], SETUP_NAV[3]];
+const navItem = (page: string) => [...MAIN_NAV, ...SETUP_NAV].find((n) => n.page === page)!;
+const TAB_NAV = ["home", "approvals", "team", "knowledge"].map(navItem);
+const MORE_NAV = ["useCases", "routines", "memory", "billing", "settings"].map(navItem);
 // Only for Morning Telos staff (STAFF_EMAILS on the server). Everyone else never sees it.
 const STAFF_NAV: NavItem = { page: "staff", label: "Staff", path: "/staff", icon: "shield" };
 
@@ -289,11 +293,11 @@ function Frame2({
   // The workspace's first chat, once (the chat list may still be loading, so the mark keeps it from counting twice).
   const firstChat = chrome.threads.length === 0;
   const wsId = ws.id;
-  const startChat = useCallback((text: string) => {
+  const startChat = useCallback((text: string, files: StoredFile[] = []) => {
     if (firstChat) trackOnce(`firstchat.${wsId}`, "first_chat_sent");
     setDraft("");
     setOwnThread(null);
-    setStart({ text });
+    setStart({ text, files });
     navigate("/chat");
   }, [firstChat, wsId]);
   // Run now on the Routines page: a new chat that streams the routine.
@@ -432,6 +436,8 @@ function Frame2({
                 onStarted={started}
                 onThread={threadMade}
               />
+            ) : route.page === "useCases" ? (
+              <UseCasesPage ws={ws} onTry={startChat} />
             ) : route.page === "team" ? (
               <TeamPage sb={sb} ws={ws} onAsk={ask} />
             ) : route.page === "agent" ? (
@@ -450,7 +456,7 @@ function Frame2({
               <ApprovalsPage sb={sb} ws={ws} id={route.id} onDecided={reload} />
             ) : (
               <>
-                <Home sb={sb} ws={ws} name={name} draft={draft} onDraft={setDraft} onStart={startChat} model={model} onModel={setModel} />
+                <Home sb={sb} ws={ws} name={name} userId={session.user.id} draft={draft} onDraft={setDraft} onStart={startChat} model={model} onModel={setModel} />
                 <ConnectSocialCard sb={sb} ws={ws} />
               </>
             )}
@@ -517,7 +523,7 @@ function Frame2({
   );
 }
 
-const TITLES: Record<string, string> = { home: "Home", thread: "Chat", team: "Team", knowledge: "Knowledge", routines: "Routines", memory: "Memory", approvals: "Approvals", settings: "Settings", billing: "Billing", invite: "Invite", staff: "Staff" };
+const TITLES: Record<string, string> = { home: "Home", useCases: "Use cases", thread: "Chat", team: "Team", knowledge: "Knowledge", routines: "Routines", memory: "Memory", approvals: "Approvals", settings: "Settings", billing: "Billing", invite: "Invite", staff: "Staff" };
 const pageTitle = (r: Route) => (r.page === "agent" ? AGENTS[r.key].god : TITLES[r.page]);
 
 /** Put the cursor in Home's message box once Home is on screen. */
@@ -584,6 +590,7 @@ function WorkspaceButton({ list, ws, onPick }: { list: Workspace[]; ws: Workspac
 
 const PAGES: PaletteItem[] = [
   { label: "Home", group: "Pages", path: "/" },
+  { label: "Use cases", group: "Pages", path: "/use-cases", keywords: "ideas results start" },
   { label: "Approvals", group: "Pages", path: "/approvals" },
   { label: "Team", group: "Pages", path: "/team" },
   { label: "Routines", group: "Pages", path: "/routines", keywords: "schedule" },

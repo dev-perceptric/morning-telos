@@ -1,5 +1,5 @@
 // Goals: a target the team works toward (a metric, a number, a unit, a due date, the teammate who owns it and the
-// chat it lives in), and its plan's steps (supabase/022_goals.sql). The person starts a goal from a goal card and
+// chat it lives in), and its plan's steps (supabase/023_goals.sql). The person starts a goal from a goal card and
 // a plan from a plan card (src/components/Cards.tsx); teammates move the steps and log the number with
 // update_step and log_progress (src/lib/cardTools.ts); a job on Monday posts a check-in in each active goal's chat
 // (src/lib/goalsServer.ts). Pure and shared with the browser: the number from real data, the progress card, the

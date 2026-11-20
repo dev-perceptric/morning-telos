@@ -1,4 +1,4 @@
-// Goals and plan steps in the database (supabase/022_goals.sql), for the card tools and the Monday check-in, with
+// Goals and plan steps in the database (supabase/023_goals.sql), for the card tools and the Monday check-in, with
 // the server's client. The browser starts goals and plans itself, as the signed-in person, through row level
 // security; only the server moves steps and writes a goal's number. Every query names the workspace (CLAUDE.md:
 // server code checks the workspace too). Not "server-only", so the tests load it; only server code imports it.
@@ -9,7 +9,7 @@ import { GOAL_COLUMNS, goalOf, STEP_COLUMNS, type GoalRow, type StepRow } from "
 
 const MISSING = /goals|goal_steps/;
 const must = <T>(r: { data: T; error: { message: string } | null }, what: string): T => {
-  if (r.error) throw new Error(MISSING.test(r.error.message) && /exist|find/.test(r.error.message) ? "Run supabase/022_goals.sql in Supabase." : `${what}: ${r.error.message}`);
+  if (r.error) throw new Error(MISSING.test(r.error.message) && /exist|find/.test(r.error.message) ? "Run supabase/023_goals.sql in Supabase." : `${what}: ${r.error.message}`);
   return r.data;
 };
 
