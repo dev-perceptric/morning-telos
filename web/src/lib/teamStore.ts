@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NewMessage, Pref, StoredMessage, TeamStore, TeamWorkspace, UsageRow } from "./agentLoop.ts";
 import { HISTORY } from "./agentLoop.ts";
+import { storedFiles } from "./attachments.ts";
 import { brandTone, type BrandRow } from "./brand.ts";
 import { isModelChoice } from "./models.ts";
 import { isAgentKey, type AgentKey } from "./team.ts";
@@ -38,8 +39,10 @@ export async function threadInWorkspace(db: SupabaseClient, workspaceId: string,
 /** The person's last message in a thread of this workspace, for Retry and Ask someone else. Null when there is none. */
 export async function lastUserText(db: SupabaseClient, workspaceId: string, threadId: string): Promise<string | null> {
   if (!isUuid(threadId)) return null;
-  const row = must(await db.from("messages").select("content").eq("thread_id", threadId).eq("workspace_id", workspaceId).eq("role", "user").order("id", { ascending: false }).limit(1).maybeSingle()) as { content?: string } | null;
-  return typeof row?.content === "string" && row.content.trim() ? row.content : null;
+  const row = must(await db.from("messages").select("content, meta").eq("thread_id", threadId).eq("workspace_id", workspaceId).eq("role", "user").order("id", { ascending: false }).limit(1).maybeSingle()) as { content?: string; meta?: Record<string, unknown> | null } | null;
+  if (typeof row?.content !== "string") return null;
+  // A message of only files has no words, and can still be answered again.
+  return row.content.trim() || storedFiles(row.meta, workspaceId).length ? row.content : null;
 }
 
 /** A thread's title: the first message on one line, cut to 70 letters at a word. */
