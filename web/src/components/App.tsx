@@ -28,7 +28,7 @@ import { message, navigate, readLocal, useRoute, writeLocal } from "./nav";
 import { RoutinesPage } from "./Routines";
 import { SettingsPage, type Workspace } from "./Settings";
 import { StaffPage, useIsStaff } from "./Staff";
-import { ConnectSocialCard } from "./Social";
+import { ConnectSocialCard, SocialReturn } from "./Social";
 import { AgentPage, TeamPage } from "./Team";
 import { UseCasesPage } from "./UseCases";
 import { btnPrimary, btnSecondary, Drawer, ErrorText, Frame, input, label, Notice, to } from "./ui";
@@ -238,7 +238,7 @@ const MORE_NAV = ["useCases", "routines", "memory", "billing", "settings"].map(n
 const STAFF_NAV: NavItem = { page: "staff", label: "Staff", path: "/staff", icon: "shield" };
 
 /** Which nav item a page lights up: a chat is Home's, a teammate is Team's. */
-const navPage = (page: string) => (page === "thread" ? "home" : page === "agent" ? "team" : page);
+const navPage = (page: string) => (page === "thread" ? "home" : page === "agent" ? "team" : page === "socialReturn" ? "settings" : page);
 
 function go(e: React.MouseEvent, path: string) {
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -423,7 +423,9 @@ function Frame2({
                 </button>
               </div>
             ) : null}
-            {route.page === "settings" ? (
+            {route.page === "socialReturn" ? (
+              <SocialReturn sb={sb} ws={ws} onPick={onPick} onNotice={onNotice} />
+            ) : route.page === "settings" ? (
               <SettingsPage sb={sb} ws={ws} userId={session.user.id} tab={route.tab} onChanged={onChanged} onGone={onGone} email={email} name={name} onLogout={logout} />
             ) : route.page === "thread" ? (
               <ThreadPage

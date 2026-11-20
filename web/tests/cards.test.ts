@@ -177,7 +177,7 @@ test("the card screens never put text in as HTML, and approve buttons only go th
   assert.doesNotMatch(src, /capybaroar|create_posts|\/api\/mcp|composio\.dev/i, "a card never posts or sends by itself");
   assert.match(src, /approvalRequest\(/);
   const routes = [...src.matchAll(/callApi<[^>]*>\(\s*sb,\s*("[^"]+"|req\.path)/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(routes)].sort(), ['"/api/apps/connect"', '"/api/apps/wordpress"', '"/api/social/connect-link"', "req.path"].sort());
+  assert.deepEqual([...new Set(routes)].sort(), ['"/api/apps/connect"', '"/api/apps/wordpress"', "req.path"].sort());
   assert.deepEqual(approvalRequest("ws-1", 7, "approve", { posts: [{ text: "x" }] }), { path: "/api/approvals/7", body: { workspaceId: "ws-1", action: "approve", input: { posts: [{ text: "x" }] } } });
   assert.deepEqual(approvalRequest("ws-1", 7, "deny", { posts: [] }), { path: "/api/approvals/7", body: { workspaceId: "ws-1", action: "deny" } }, "a skip never sends details");
   assert.deepEqual(approvalRequest("ws-1", 7, "approve"), { path: "/api/approvals/7", body: { workspaceId: "ws-1", action: "approve" } });

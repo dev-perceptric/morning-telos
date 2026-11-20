@@ -54,10 +54,12 @@ import { appLogo } from "@/lib/composio/catalog";
 import { GOAL_COLUMNS, goalOf, STEP_COLUMNS, type GoalRow, type StepRow } from "@/lib/goals";
 import { STATUS_LABEL, type ApprovalStatus } from "@/lib/approvals";
 import { AGENTS, type AgentKey } from "@/lib/team";
+import { networkName, sameNetwork } from "@/lib/socialChannels";
 import { can } from "@/lib/workspace";
 import { Icon } from "./icons";
 import { callApi, message, navigate } from "./nav";
 import type { Workspace } from "./Settings";
+import { NetworkChooser } from "./Social";
 import { ErrorText } from "./ui";
 
 type StepStatus = StepRow["status"];
@@ -331,10 +333,11 @@ function ChartView({ card }: { card: ChartCard }) {
 // ─────────────── connect ───────────────
 
 /** True when the app is connected now, read as the signed-in person. */
-async function isConnected(sb: SupabaseClient, ws: string, app: string): Promise<boolean> {
+async function isConnected(sb: SupabaseClient, ws: string, app: string, network = ""): Promise<boolean> {
   if (app === "social") {
-    const r = await sb.from("social_channels").select("channel_id", { count: "exact", head: true }).eq("workspace_id", ws).eq("status", "connected");
-    return !r.error && (r.count ?? 0) > 0;
+    // One network when the person picked one in the chooser, else any.
+    const r = await sb.from("social_channels").select("network").eq("workspace_id", ws).eq("status", "connected");
+    return !r.error && ((r.data ?? []) as { network: string }[]).some((c) => !network || sameNetwork(c.network, network));
   }
   if (app === "wordpress") {
     const r = await sb.from("wordpress_sites").select("status").eq("workspace_id", ws).maybeSingle();
@@ -355,6 +358,8 @@ function Connect({ card, answered }: { card: ConnectCard; answered: boolean }) {
   const [error, setError] = useState("");
   const [site, setSite] = useState("");
   const [already, setAlready] = useState(false);
+  // The network picked in the chooser (social only), so the chat carries on once that one is in.
+  const [network, setNetwork] = useState("");
   const { sb, ws, reply } = env;
 
   useEffect(() => {
@@ -373,10 +378,10 @@ function Connect({ card, answered }: { card: ConnectCard; answered: boolean }) {
     const look = async () => {
       if (!live) return;
       if (Date.now() > until) return setState("idle");
-      if (await isConnected(sb, ws.id, card.app)) {
+      if (await isConnected(sb, ws.id, card.app, network)) {
         if (!live) return;
         setState("done");
-        reply(`${name} is connected. Please carry on.`, card.agent);
+        reply(`${network ? networkName(network) : name} is connected. Please carry on.`, card.agent);
       }
     };
     const t = setInterval(look, 4000);
@@ -387,7 +392,7 @@ function Connect({ card, answered }: { card: ConnectCard; answered: boolean }) {
       clearInterval(t);
       document.removeEventListener("visibilitychange", back);
     };
-  }, [state, sb, ws.id, card.app, card.agent, name, reply]);
+  }, [state, sb, ws.id, card.app, card.agent, name, network, reply]);
 
   const open = async () => {
     setError("");
@@ -396,9 +401,7 @@ function Connect({ card, answered }: { card: ConnectCard; answered: boolean }) {
     const tab = window.open("", "_blank");
     try {
       const { url } =
-        card.app === "social"
-          ? await callApi<{ url: string }>(sb, "/api/social/connect-link", { workspaceId: ws.id })
-          : card.app === "wordpress"
+        card.app === "wordpress"
             ? await callApi<{ url: string }>(sb, "/api/apps/wordpress", { workspaceId: ws.id, action: "connect", site })
             : await callApi<{ url: string }>(sb, "/api/apps/connect", { workspaceId: ws.id, toolkit: card.app });
       if (tab) {
@@ -413,7 +416,7 @@ function Connect({ card, answered }: { card: ConnectCard; answered: boolean }) {
     }
   };
 
-  if (state === "done") return <Done>{name} connected. Carrying on.</Done>;
+  if (state === "done") return <Done>{network ? networkName(network) : name} connected. Carrying on.</Done>;
   return (
     <Shell title={card.title ?? "One step"} note={card.note} accent label={`Connect ${name}`}>
       <div className="aconn">
@@ -430,7 +433,21 @@ function Connect({ card, answered }: { card: ConnectCard; answered: boolean }) {
       {already && (answered || state === "idle") ? (
         <Done>{name} is connected.</Done>
       ) : !allowed ? (
-        <p className="acard-hint">Ask {card.app === "social" ? "an editor, admin or the owner" : "an admin or the owner"} to connect {name}.</p>
+        <p className="acard-hint">Ask an admin or the owner to connect {name}.</p>
+      ) : card.app === "social" ? (
+        // Our own chooser of networks. The sign-in opens in a new tab and this card waits for the account.
+        <div className="acard-b col">
+          <NetworkChooser
+            sb={sb}
+            ws={ws}
+            from={{ to: "chat", thread: env.threadId ?? "", agent: card.agent }}
+            onOpened={(n) => {
+              setNetwork(n);
+              setState("waiting");
+            }}
+          />
+          {state === "waiting" ? <span className="acard-hint">Finish in the new tab. We carry on when it&apos;s done.</span> : null}
+        </div>
       ) : (
         <div className="acard-b">
           {card.app === "wordpress" ? (

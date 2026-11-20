@@ -30,7 +30,7 @@ test("which roles can do which workspace action", () => {
     changeRole: ["owner", "admin"],
     removeMember: ["owner", "admin"],
     deleteWorkspace: ["owner"],
-    connectSocial: ["owner", "admin", "editor"],
+    connectSocial: ["owner", "admin"],
     readChats: ["owner", "admin", "editor", "viewer"],
     chat: ["owner", "admin", "editor"],
     changeTeam: ["owner", "admin"],
@@ -109,6 +109,10 @@ test("page routes", () => {
   assert.deepEqual(parseRoute("/settings/"), { page: "settings", tab: "general" });
   assert.deepEqual(parseRoute("/settings/members"), { page: "settings", tab: "members" });
   assert.deepEqual(parseRoute("/settings/social"), { page: "settings", tab: "social" });
+  // Where a network's sign-in comes back to (src/lib/connectFlow.ts).
+  assert.deepEqual(parseRoute("/settings/social/return"), { page: "socialReturn" });
+  assert.deepEqual(parseRoute("/settings/social/return/"), { page: "socialReturn" });
+  assert.equal(routePath({ page: "socialReturn" }), "/settings/social/return");
   assert.deepEqual(parseRoute("/knowledge"), { page: "knowledge" });
   assert.deepEqual(parseRoute("/knowledge/"), { page: "knowledge" });
   assert.deepEqual(parseRoute("/routines"), { page: "routines" });
