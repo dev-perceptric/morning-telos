@@ -37,7 +37,7 @@ test("policies check roles through has_role or the signed-in user", () => {
 });
 
 test("server-only tables have no policies", () => {
-  for (const t of ["stripe_events", "services", "jobs", "webhook_events", "ai_usage", "email_log", "staff_actions", "wordpress_logins"]) {
+  for (const t of ["stripe_events", "services", "jobs", "webhook_events", "ai_usage", "email_log", "staff_actions", "wordpress_logins", "team_email_threads", "team_email_messages", "team_email_inbound", "team_email_drops", "approval_links"]) {
     assert.ok(tables.some((x) => x.name === t), `${t} not found`);
     assert.doesNotMatch(sql, new RegExp(`create policy "[^"]+" on public\\.${t}\\b`), `${t} is server-only but has a policy`);
   }

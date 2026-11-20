@@ -24,6 +24,7 @@ import { aiBlock, CAP_MESSAGES, costOf, spendWindowStart, tokensOf, type MeterWo
 import { EFFORT, FALLBACK_BETA, MAX_TOKENS, modelFor, SERVER_FALLBACK, type ModelChoice } from "./models.ts";
 import { cleanTone } from "./brand.ts";
 import { PAGE_RULE, pageBlock, storedPage, type Screenshot } from "./pageContext.ts";
+import { emailBlock, storedEmail } from "./teamEmail.ts";
 import { progressLine, usedName } from "./progress.ts";
 import { ROUTER_MODEL, routeMessage, SKIP_META, type RouteHow, type RouterAsk } from "./router.ts";
 import { AGENTS, agentByGod, LEAD, ORDER, parseMentions, workingAgents, type AgentKey } from "./team.ts";
@@ -270,6 +271,7 @@ export function handoffTool(teammates: AgentKey[]): Anthropic.Beta.BetaTool {
  * role are joined, the first is always the person's, and the last always asks this agent to answer.
  * A page the person attached from the Chrome extension (meta.page) follows their words inside an outside_data block
  * (src/lib/pageContext.ts). `shot`, this turn's screenshot, goes as an image on the turn with the newest page.
+ * A message that came by email (meta.email) goes the same way: the email inside an outside_data block.
  */
 export function historyFor(rows: StoredMessage[], key: AgentKey, shot?: Screenshot | null): Anthropic.Beta.BetaMessageParam[] {
   const turns: { role: "user" | "assistant"; text: string; page?: boolean }[] = [];
@@ -277,12 +279,14 @@ export function historyFor(rows: StoredMessage[], key: AgentKey, shot?: Screensh
   for (const m of rows.slice(-HISTORY)) {
     if (!m.content?.trim() || SKIP_META.some((f) => m.meta?.[f])) continue;
     const page = m.role === "user" ? storedPage(m.meta) : null;
+    // A message that came by email (src/lib/teamEmail.ts) goes to Claude inside an outside_data block.
+    const email = m.role === "user" ? storedEmail(m.meta) : null;
     const t =
       m.role === "agent" && m.agent === key
         ? { role: "assistant" as const, text: m.content }
         : m.role === "agent"
           ? { role: "user" as const, text: `${m.agent ? AGENTS[m.agent].god : "Teammate"}: ${m.content}` }
-          : { role: "user" as const, text: page ? `${m.content}\n\n${pageBlock(page)}` : m.content };
+          : { role: "user" as const, text: email ? emailBlock(email, m.content) : page ? `${m.content}\n\n${pageBlock(page)}` : m.content };
     const last = turns[turns.length - 1];
     if (last && last.role === t.role) last.text += `\n\n${t.text}`;
     else turns.push(t);

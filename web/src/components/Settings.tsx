@@ -15,6 +15,7 @@ import { initial } from "@/lib/home";
 import { callApi, message, navigate } from "./nav";
 import { SkillsSettings } from "./Skills";
 import { SocialSettings } from "./Social";
+import { TeamEmailSettings } from "./TeamEmail";
 import { ErrorText, input, label, Notice, PageHead, Switch } from "./ui";
 
 export type Workspace = { id: string; name: string; website: string | null; timezone: string; plan: string; status: string | null; trial_ends_at: string; created_at?: string; role: Role };
@@ -74,6 +75,7 @@ export function SettingsPage({
             <Account email={email} name={name} role={ws.role} />
           </div>
           {can(ws.role, "editSettings") ? <BrandSettings key={`brand-${ws.id}`} sb={sb} ws={ws} /> : null}
+          <TeamEmailSettings key={`team-email-${ws.id}`} sb={sb} ws={ws} userId={userId} />
           {ws.role === "owner" ? <EmailSettings key={`mail-${ws.id}`} sb={sb} ws={ws} userId={userId} /> : null}
           {can(ws.role, "deleteWorkspace") ? <DeleteWorkspace key={`del-${ws.id}`} sb={sb} ws={ws} onGone={onGone} /> : null}
           <p className="legal">

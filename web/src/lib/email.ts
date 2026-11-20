@@ -37,3 +37,51 @@ export async function sendBuilt(to: string[], mail: Email, d: ResendDeps, extra:
   if (!res.ok) throw new Error(`Resend returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return true;
 }
+
+// ─────────────── received email (the email door, src/lib/teamEmailInbound.ts) ───────────────
+
+export const RESEND_RECEIVING_URL = "https://api.resend.com/emails/receiving";
+
+/** The parts of a received email we read. Resend's GET /emails/receiving/{id}. */
+export type ReceivedEmail = {
+  id: string;
+  from: string;
+  to: string[];
+  cc: string[];
+  received_for: string[];
+  subject: string;
+  text: string | null;
+  html: string | null;
+  headers: Record<string, unknown>;
+  message_id: string | null;
+  authentication: { spf?: string | null; dkim?: string | null; dmarc?: string | null } | null;
+  attachments: { id: string; filename: string; content_type: string; size?: number }[];
+};
+
+const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
+/** Reads one received email: its text, HTML, headers and attachment names. Throws when Resend says no. */
+export async function getReceivedEmail(id: string, d: Pick<ResendDeps, "key" | "fetch">): Promise<ReceivedEmail> {
+  if (!d.key) throw new Error("RESEND_API_KEY is not set.");
+  if (!/^[A-Za-z0-9-]{1,100}$/.test(id)) throw new Error("That is not a Resend email id.");
+  const res = await d.fetch(`${RESEND_RECEIVING_URL}/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${d.key}` }, signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) throw new Error(`Resend returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const e = (await res.json()) as Record<string, unknown>;
+  const auth = e.authentication && typeof e.authentication === "object" ? (e.authentication as ReceivedEmail["authentication"]) : null;
+  return {
+    id: String(e.id ?? id),
+    from: String(e.from ?? ""),
+    to: strs(e.to),
+    cc: strs(e.cc),
+    received_for: strs(e.received_for),
+    subject: typeof e.subject === "string" ? e.subject : "",
+    text: typeof e.text === "string" ? e.text : null,
+    html: typeof e.html === "string" ? e.html : null,
+    headers: e.headers && typeof e.headers === "object" && !Array.isArray(e.headers) ? (e.headers as Record<string, unknown>) : {},
+    message_id: typeof e.message_id === "string" ? e.message_id : null,
+    authentication: auth,
+    attachments: (Array.isArray(e.attachments) ? e.attachments : [])
+      .filter((a): a is Record<string, unknown> => Boolean(a) && typeof a === "object")
+      .map((a) => ({ id: String(a.id ?? ""), filename: String(a.filename ?? "file"), content_type: String(a.content_type ?? ""), size: typeof a.size === "number" ? a.size : undefined })),
+  };
+}

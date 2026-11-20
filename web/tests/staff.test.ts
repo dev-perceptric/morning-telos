@@ -148,6 +148,9 @@ test("summarize: workspaces by plan in force, trials ending, failed jobs and AI 
   assert.equal(s.failedJobs, 3);
   assert.equal(s.aiMonth, 10.46);
   assert.equal(summarize([], { failedJobs: 0, aiTotal: null }, NOW).aiMonth, 0);
+  assert.equal(s.droppedEmails, 0, "no count before the email door's table exists");
+  assert.equal(summarize([], { failedJobs: 0, aiTotal: 0, droppedEmails: 12 }, NOW).droppedEmails, 12);
+  assert.equal(summarize([], { failedJobs: 0, aiTotal: 0, droppedEmails: Number.NaN }, NOW).droppedEmails, 0);
 });
 
 test("isFailedJob: not done and every attempt used", () => {
