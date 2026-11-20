@@ -1,6 +1,6 @@
-// What Home and the app's frame say: the greeting, the trial pill, the idea list, the Finish setup steps and the
-// search palette's matches. Ported from the old app's renderHome and renderPal (app/public/app.js). Pure, so tests
-// check the words.
+// What Home and the app's frame say: the greeting, the trial pill, the idea list, the ways to reach the team, the
+// Slack banner, the Finish setup rows and the search palette's matches. Ported from the old app's renderHome and
+// renderPal (app/public/app.js). Pure, so tests check the words.
 
 import type { PlanState } from "./plans.ts";
 
@@ -45,43 +45,85 @@ export function homeIdeas(ideas: readonly string[], ready: { arrowsterr: boolean
   return ideas.filter(needs).slice(0, max);
 }
 
-export type ServiceRow = { product: string; status: string };
-export type SetupStep = {
-  key: "knowledge" | "seo" | "social" | "apps";
-  title: string;
-  text: string;
-  /** What the button says and where it goes. None while it's in progress on our side. */
-  action?: { label: string; path: string };
-  /** A quiet word on the right instead of a button. */
-  meta?: string;
-  /** "social" opens the connect page instead of going somewhere. */
-  connect?: boolean;
-};
+// ─────────────── other ways to reach the team ───────────────
+
+export type ReachChannel = { id: "email" | "text" | "slack"; label: string; detail: string };
 
 /**
- * What's left to set up, like the old app's Finish setup card. Done steps are left out, so an empty list means
- * nothing is left. `canSocial` and `canApps` hide steps the person can't do.
+ * Ways into the workspace outside the app. Each door fills its own field once it exists: the team's email address,
+ * the number to text, and whether the team answers in Slack. Nothing filled means the app has no door yet.
  */
-export function setupSteps(s: {
-  docs: number;
-  services: readonly ServiceRow[];
-  socialConnected: boolean;
-  appsConnected: boolean;
-  canSocial: boolean;
-  canApps: boolean;
-  canKnowledge: boolean;
-}): SetupStep[] {
-  const out: SetupStep[] = [];
-  if (!s.docs && s.canKnowledge)
-    out.push({ key: "knowledge", title: "Tell your team about your business", text: "Fill in what you sell, who you serve and how you sound", action: { label: "Start", path: "/knowledge" } });
-  const seo = s.services.find((r) => r.product === "arrowsterr")?.status;
-  if (seo === "waiting") out.push({ key: "seo", title: "SEO and AI visibility", text: "Add your website so your team can track how people find you.", action: { label: "Add website", path: "/settings" } });
-  else if (seo === "failed") out.push({ key: "seo", title: "SEO and AI visibility", text: "Part of the setup didn't finish. Our team has been told and is on it.", meta: "We're on it" });
-  else if (seo === "pending") out.push({ key: "seo", title: "SEO and AI visibility", text: "Morning Telos is setting this up for you. It takes a minute or two.", meta: "In progress" });
-  if (!s.socialConnected && s.canSocial)
-    out.push({ key: "social", title: "Connect your social accounts", text: "Link Instagram, Facebook, LinkedIn and more, so Aphrodite can post for you", action: { label: "Connect", path: "/settings/social" }, connect: true });
-  if (!s.appsConnected && s.canApps)
-    out.push({ key: "apps", title: "Connect your apps", text: "Gmail, Outlook, your calendar and CRM, so Iris, Hermes, Hora and Hestia can work in them", action: { label: "Connect", path: "/settings/apps" } });
+export type ReachDoors = { emailAddress?: string | null; textNumber?: string | null; slackTeam?: boolean };
+
+/** The channels Home's "Other ways to reach your team" strip shows, in its order. Empty hides the strip. */
+export function reachChannels(ws: ReachDoors): ReachChannel[] {
+  const out: ReachChannel[] = [];
+  const email = String(ws.emailAddress ?? "").trim();
+  const text = String(ws.textNumber ?? "").trim();
+  if (email) out.push({ id: "email", label: "Email", detail: email });
+  if (text) out.push({ id: "text", label: "Text", detail: text });
+  if (ws.slackTeam) out.push({ id: "slack", label: "Slack", detail: "Message your team in Slack" });
+  return out;
+}
+
+// ─────────────── the Slack banner ───────────────
+
+/** Where a person's "not now" on the Slack banner is kept in this browser. */
+export const slackBannerKey = (userId: string, workspaceId: string) => `mt.slackBanner.${workspaceId}.${userId}`;
+
+/** The banner at the top of Home: for owners and admins, while Slack can be connected here and isn't yet. */
+export function showSlackBanner(s: { canConnect: boolean; slackReady: boolean; slackConnected: boolean; dismissed: boolean }): boolean {
+  return s.canConnect && s.slackReady && !s.slackConnected && !s.dismissed;
+}
+
+// ─────────────── Finish setup ───────────────
+
+export const MAIL_APPS = ["gmail", "outlook"] as const;
+export const CALENDAR_APPS = ["googlecalendar", "calendly"] as const;
+/** Site builders connected through the apps page. "wordpress" is a self-hosted site, connected directly. */
+export const SITE_APPS = ["wordpress", "shopify", "framer", "webflow", "wordpress_com"] as const;
+
+export type SetupRow = {
+  key: "social" | "email" | "calendar" | "website";
+  title: string;
+  text: string;
+  /** App logos on the row, first one biggest. */
+  logos: string[];
+  /**
+   * What Connect does: open the social accounts' connect page, open one app's sign-in (one button per app), or go
+   * to Settings, Apps (a self-hosted WordPress site needs its address typed there).
+   */
+  connect: { kind: "social" } | { kind: "apps"; apps: string[] } | { kind: "page"; path: string };
+};
+
+/** What Home knows about the workspace's connections. */
+export type SetupState = {
+  /** Owners and admins only: nobody else sees Finish setup. */
+  canConnect: boolean;
+  /** Social accounts the workspace has, working or not. */
+  socialAccounts: number;
+  /** Apps with a connection, working or waiting for a new sign-in. */
+  connected: readonly string[];
+  /** Apps this server can connect right now. */
+  connectable: readonly string[];
+  /** A self-hosted WordPress site is connected. */
+  wordpress: boolean;
+};
+
+/** Home's Finish setup rows: what's left to connect, in order. Done rows are left out, so empty hides the section. */
+export function finishSetup(s: SetupState): SetupRow[] {
+  if (!s.canConnect) return [];
+  const has = (apps: readonly string[]) => apps.some((a) => s.connected.includes(a) || (a === "wordpress" && s.wordpress));
+  const ready = (apps: readonly string[]) => apps.filter((a) => s.connectable.includes(a));
+  const out: SetupRow[] = [];
+  if (!s.socialAccounts)
+    out.push({ key: "social", title: "Connect your social accounts", text: "Instagram, Facebook, LinkedIn and more, so Aphrodite can post for you.", logos: ["instagram", "facebook", "linkedin"], connect: { kind: "social" } });
+  if (!has(MAIL_APPS) && ready(MAIL_APPS).length)
+    out.push({ key: "email", title: "Connect your email", text: "Gmail or Outlook, so Iris, Hermes and Hestia can work in your inbox.", logos: [...MAIL_APPS], connect: { kind: "apps", apps: ready(MAIL_APPS) } });
+  if (!has(CALENDAR_APPS) && ready(CALENDAR_APPS).length)
+    out.push({ key: "calendar", title: "Connect your calendar", text: "Google Calendar or Calendly, so Hora can book meetings for you.", logos: [...CALENDAR_APPS], connect: { kind: "apps", apps: ready(CALENDAR_APPS) } });
+  if (!has(SITE_APPS))
+    out.push({ key: "website", title: "Connect your website builder", text: "WordPress, Shopify, Framer or Webflow, so Hephaestus can build pages for you.", logos: ["wordpress", "shopify", "framer", "webflow"], connect: { kind: "page", path: "/settings/apps" } });
   return out;
 }
 

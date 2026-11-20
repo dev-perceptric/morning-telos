@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ago, firstName, greeting, homeIdeas, initial, paletteMatch, setupSteps, trialPill, type PaletteItem } from "../src/lib/home.ts";
+import { ago, finishSetup, firstName, greeting, homeIdeas, initial, paletteMatch, reachChannels, showSlackBanner, slackBannerKey, trialPill, type PaletteItem, type SetupState } from "../src/lib/home.ts";
 import { effectivePlan } from "../src/lib/plans.ts";
 
 test("greeting: by the hour, with the first name", () => {
@@ -41,17 +41,65 @@ test("homeIdeas: SEO and social ideas wait for their product", () => {
   assert.deepEqual(homeIdeas(ideas, { arrowsterr: false, capybaroar: true }), ["@Aphrodite plan posts", "@Iris write an email", "What can my team do?"]);
 });
 
-test("setupSteps: what's left, in order, for what the person can do", () => {
-  const all = setupSteps({ docs: 0, services: [{ product: "arrowsterr", status: "pending" }], socialConnected: false, appsConnected: false, canSocial: true, canApps: true, canKnowledge: true });
-  assert.deepEqual(all.map((s) => s.key), ["knowledge", "seo", "social", "apps"]);
-  assert.equal(all[1].meta, "In progress");
-  assert.equal(all[1].action, undefined);
-  assert.equal(all[2].connect, true);
-  const waiting = setupSteps({ docs: 2, services: [{ product: "arrowsterr", status: "waiting" }], socialConnected: true, appsConnected: true, canSocial: true, canApps: true, canKnowledge: true });
-  assert.deepEqual(waiting.map((s) => [s.key, s.action?.path]), [["seo", "/settings"]]);
-  assert.equal(setupSteps({ docs: 0, services: [{ product: "arrowsterr", status: "failed" }], socialConnected: false, appsConnected: false, canSocial: false, canApps: false, canKnowledge: false })[0].meta, "We're on it");
-  assert.deepEqual(setupSteps({ docs: 1, services: [{ product: "arrowsterr", status: "ready" }], socialConnected: true, appsConnected: true, canSocial: true, canApps: true, canKnowledge: true }), []);
-  for (const s of all) assert.doesNotMatch(`${s.title} ${s.text}`, /[–—]/);
+const ALL_APPS = ["gmail", "outlook", "googlecalendar", "calendly", "slack", "shopify", "framer", "webflow", "wordpress_com"];
+const fresh: SetupState = { canConnect: true, socialAccounts: 0, connected: [], connectable: ALL_APPS, wordpress: false };
+
+test("finishSetup: every row for a new workspace, in order, each with its logos and connect flow", () => {
+  const rows = finishSetup(fresh);
+  assert.deepEqual(rows.map((r) => r.key), ["social", "email", "calendar", "website"]);
+  assert.deepEqual(rows[0].connect, { kind: "social" });
+  assert.deepEqual(rows[1].connect, { kind: "apps", apps: ["gmail", "outlook"] });
+  assert.deepEqual(rows[2].connect, { kind: "apps", apps: ["googlecalendar", "calendly"] });
+  assert.deepEqual(rows[3].connect, { kind: "page", path: "/settings/apps" });
+  assert.deepEqual(rows[1].logos, ["gmail", "outlook"]);
+  for (const r of rows) {
+    assert.ok(r.logos.length > 0);
+    assert.doesNotMatch(`${r.title} ${r.text}`, /[–—]|capybaroar|arrowsterr|composio/i);
+  }
+});
+
+test("finishSetup: finished rows go, and the section empties when all is done", () => {
+  assert.deepEqual(finishSetup({ ...fresh, socialAccounts: 2 }).map((r) => r.key), ["email", "calendar", "website"]);
+  // Either mail app finishes the email row, and either calendar app the calendar row.
+  assert.deepEqual(finishSetup({ ...fresh, connected: ["outlook", "calendly"] }).map((r) => r.key), ["social", "website"]);
+  // Any site builder finishes the website row, a self-hosted WordPress site too.
+  assert.deepEqual(finishSetup({ ...fresh, connected: ["framer"] }).map((r) => r.key), ["social", "email", "calendar"]);
+  assert.deepEqual(finishSetup({ ...fresh, wordpress: true }).map((r) => r.key), ["social", "email", "calendar"]);
+  assert.deepEqual(finishSetup({ ...fresh, socialAccounts: 1, connected: ["gmail", "googlecalendar", "shopify"] }), []);
+});
+
+test("finishSetup: owners and admins only, and only apps this server can connect", () => {
+  assert.deepEqual(finishSetup({ ...fresh, canConnect: false }), []);
+  // No app sign-in on this server: the email and calendar rows can't be done here, so they don't show.
+  assert.deepEqual(finishSetup({ ...fresh, connectable: [] }).map((r) => r.key), ["social", "website"]);
+  const some = finishSetup({ ...fresh, connectable: ["outlook"] });
+  assert.deepEqual(some.find((r) => r.key === "email")?.connect, { kind: "apps", apps: ["outlook"] });
+});
+
+test("reachChannels: only the doors this workspace has, in order", () => {
+  assert.deepEqual(reachChannels({}), []);
+  assert.deepEqual(reachChannels({ emailAddress: "  ", textNumber: null, slackTeam: false }), []);
+  assert.deepEqual(
+    reachChannels({ slackTeam: true, textNumber: "+1 555 0100", emailAddress: "team@acme.morningtelos.com" }).map((c) => [c.id, c.label, c.detail]),
+    [
+      ["email", "Email", "team@acme.morningtelos.com"],
+      ["text", "Text", "+1 555 0100"],
+      ["slack", "Slack", "Message your team in Slack"],
+    ],
+  );
+  assert.deepEqual(reachChannels({ emailAddress: "team@acme.morningtelos.com" }).map((c) => c.id), ["email"]);
+});
+
+test("showSlackBanner: owners and admins, Slack ready here, not connected, not dismissed", () => {
+  const on = { canConnect: true, slackReady: true, slackConnected: false, dismissed: false };
+  assert.equal(showSlackBanner(on), true);
+  assert.equal(showSlackBanner({ ...on, canConnect: false }), false);
+  assert.equal(showSlackBanner({ ...on, slackReady: false }), false);
+  assert.equal(showSlackBanner({ ...on, slackConnected: true }), false);
+  assert.equal(showSlackBanner({ ...on, dismissed: true }), false);
+  // Kept per person and per workspace.
+  assert.notEqual(slackBannerKey("u1", "w1"), slackBannerKey("u2", "w1"));
+  assert.notEqual(slackBannerKey("u1", "w1"), slackBannerKey("u1", "w2"));
 });
 
 test("paletteMatch: every typed word must match", () => {
