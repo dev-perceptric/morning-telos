@@ -813,3 +813,43 @@ button.row:disabled:hover{background:none}
 .jump{position:absolute;left:50%;top:-30px;transform:translateX(-50%);height:30px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-lg);color:var(--ink-2);z-index:5;animation:in .15s var(--ease)}
 .jump:hover{color:var(--ink)}
 @media (prefers-reduced-motion:reduce){.md.writing>:is(p,h2,h3,h4):last-child::after,.md.writing>:is(ul,ol):last-child>li:last-child::after{animation:none;opacity:.35}}
+
+/* The message box's files and voice: the + menu, file chips, the mic, the line under the box, a drop target. */
+.plus-wrap{position:relative;display:inline-flex}
+.tool-b.plus[aria-expanded="true"]{background:var(--sunk);color:var(--ink)}
+.plus-menu{position:absolute;left:0;bottom:calc(100% + 6px);width:240px;max-width:calc(100vw - 48px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-lg);padding:6px;z-index:45;animation:in .15s var(--ease)}
+.composer.down .plus-menu{top:calc(100% + 6px);bottom:auto}
+.plus-menu button{display:flex;align-items:center;gap:9px;width:100%;padding:8px;border-radius:8px;font-size:13.5px;text-align:left;color:var(--ink-2)}
+.plus-menu button:hover,.plus-menu button:focus-visible{background:var(--sunk);color:var(--ink)}
+.plus-menu .ico{color:var(--ink-3)}
+.c-files{display:flex;flex-wrap:wrap;gap:6px;padding:10px 10px 0;list-style:none;margin:0}
+.fchip{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;height:44px;padding:4px 4px 4px 4px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:12.5px}
+.fchip img{width:34px;height:34px;border-radius:7px;object-fit:cover;flex:none;background:var(--sunk)}
+.fchip .fi{width:34px;height:34px;border-radius:7px;display:grid;place-items:center;flex:none;background:var(--clay-bg);color:var(--clay-2)}
+.fchip .fn{display:flex;flex-direction:column;min-width:0;line-height:1.25;padding-right:2px}
+.fchip .fn b{font-weight:600;color:var(--ink);overflow-wrap:anywhere;max-width:180px}
+.fchip .fn small{color:var(--ink-4);font-size:11.5px}
+.fchip.up{border-style:dashed}
+.fchip.up .fn small{color:var(--clay-2)}
+.fx{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:none;color:var(--ink-4)}
+.fx:hover,.fx:focus-visible{background:var(--sunk);color:var(--ink)}
+.c-end{margin-left:auto;display:inline-flex;align-items:center;gap:6px}
+.c-end .send{margin-left:0}
+.mic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--ink-3);transition:background .15s,color .15s}
+.mic:hover{background:var(--sunk);color:var(--ink)}
+.mic.solo{background:var(--ink);color:#fff}
+.mic.solo:hover{background:var(--clay-2);color:#fff}
+.mic.on{background:var(--clay);color:#fff;animation:listen 1.6s ease-out infinite}
+.mic.on:hover{background:var(--clay-2)}
+@keyframes listen{0%{box-shadow:0 0 0 0 rgba(217,119,87,.45)}70%{box-shadow:0 0 0 8px rgba(217,119,87,0)}100%{box-shadow:0 0 0 0 rgba(217,119,87,0)}}
+.c-line{padding:0 14px 10px;margin-top:-2px;font-size:12.5px;line-height:1.35;color:var(--ink-3)}
+.c-line.err{color:var(--red)}
+.composer.drop{border-color:var(--clay);border-style:dashed;box-shadow:0 0 0 3px rgba(217,119,87,.14)}
+.s-files{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}
+.s-files:last-child{margin-bottom:2px}
+.sthumb{display:block;width:120px;height:120px;border-radius:10px;overflow:hidden;background:var(--sunk);border:1px solid var(--line)}
+.sthumb img{width:100%;height:100%;object-fit:cover}
+.fchip.sent{background:var(--surface)}
+a.fchip.sent:hover{border-color:var(--line-2)}
+@media (max-width:900px){.sthumb{width:96px;height:96px}.fchip .fn b{max-width:140px}}
+@media (prefers-reduced-motion:reduce){.mic.on{animation:none;box-shadow:0 0 0 3px rgba(217,119,87,.3)}}
