@@ -34,7 +34,7 @@
 .atable th,.atable td{padding:8px 12px;text-align:left;vertical-align:top;border-top:1px solid var(--line)}
 .atable th{background:var(--tint);border-top:0;border-bottom:1px solid var(--tint-line);font-weight:600;color:var(--ink);white-space:nowrap}
 .atable tbody tr:first-child td{border-top:0}
-.atable td{color:var(--ink-2);overflow-wrap:anywhere}
+.atable td{color:var(--ink-2);overflow-wrap:break-word}
 .atable .al-r{text-align:right}
 .atable .num{font-variant-numeric:tabular-nums;white-space:nowrap;overflow-wrap:normal}
 

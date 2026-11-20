@@ -556,6 +556,16 @@ export function goalStatus(g: { status: string; current: number; target: number;
 
 export type ChartBox = { w: number; h: number; left: number; right: number; top: number; bottom: number };
 export const CHART_BOX: ChartBox = { w: 640, h: 180, left: 44, right: 12, top: 14, bottom: 26 };
+/** The box for a narrow card (a phone): fewer units across, so the labels stay readable when the chart shrinks. */
+export const NARROW_CHART_BOX: ChartBox = { w: 360, h: 190, left: 44, right: 12, top: 14, bottom: 26 };
+/** Cards narrower than this many pixels use NARROW_CHART_BOX. */
+export const NARROW_CHART_PX = 480;
+
+/** The chart's box for a card this many pixels wide. */
+export const chartBoxFor = (width: number): ChartBox => (width > 0 && width < NARROW_CHART_PX ? NARROW_CHART_BOX : CHART_BOX);
+
+/** Show every nth label on the x axis, so they don't run into each other: about 8 across, 4 on a narrow box. */
+export const labelEvery = (count: number, box: ChartBox) => Math.max(1, Math.ceil(count / (box.w < 500 ? 4 : 8)));
 
 /** The highest and lowest the y axis shows: from 0 (or below, for negatives) to a little over the top value. */
 export function chartRange(values: number[], extra: number[] = []): { min: number; max: number } {

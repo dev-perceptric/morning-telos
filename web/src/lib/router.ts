@@ -26,10 +26,10 @@ const isTeamNote = (m: StoredMessage) => SKIP_META.some((f) => m.meta?.[f]);
 
 /**
  * How the teammate was picked. forced: the person picked them (Retry, Ask someone else, a routine). tag: @ in the
- * message. follow: a follow-up to the last answer. router: the router call. lead: no router, so Athena. fallback: the
- * router failed or was too slow, so Athena.
+ * message. follow: a follow-up to the last answer. router: the router call. topic: no router answer, but the message
+ * names one teammate's work. lead: no router, so Athena. fallback: the router failed or was too slow, so Athena.
  */
-export type RouteHow = "forced" | "tag" | "follow" | "router" | "lead" | "fallback";
+export type RouteHow = "forced" | "tag" | "follow" | "router" | "topic" | "lead" | "fallback";
 /** agents: who answers, in order. reason: one short line, for staff and the screen's tooltip. */
 export type Route = { agents: AgentKey[]; how: RouteHow; reason: string };
 
@@ -58,6 +58,16 @@ export const TOPICS: Record<AgentKey, RegExp> = {
 
 /** Teammates whose work the message names. */
 export const topicsOf = (text: string): AgentKey[] => ORDER.filter((k) => TOPICS[k].test(text));
+
+/**
+ * The one teammate whose work the message names, for when the router can't answer (no key, an error, too slow).
+ * Athena's words ("who handles", "the team") don't count against a specialist: "who handles our social media?" is
+ * Aphrodite's. Null when no teammate or more than one fits, so Athena takes it.
+ */
+export function topicPick(text: string, working: readonly AgentKey[]): AgentKey | null {
+  const fits = topicsOf(text).filter((k) => k !== LEAD && working.includes(k));
+  return fits.length === 1 ? fits[0] : null;
+}
 
 /** The teammate who answered last in the thread, leaving out notes about the team itself. Null when none has. */
 export function lastAnswerer(history: StoredMessage[]): AgentKey | null {
@@ -211,7 +221,10 @@ export async function routeMessage(o: RouteInput): Promise<Route> {
   if (tagged.length) return { agents: tagged, how: "tag", reason: "Tagged in the message" };
   const follow = followUp(o.history, o.text, o.working);
   if (follow) return { agents: [follow], how: "follow", reason: `A follow-up to ${AGENTS[follow].god}'s answer` };
-  const lead: Route = { agents: [LEAD], how: o.ask ? "fallback" : "lead", reason: "Answers general questions" };
+  const topic = topicPick(o.text, o.working);
+  const lead: Route = topic
+    ? { agents: [topic], how: "topic", reason: AGENTS[topic].name }
+    : { agents: [LEAD], how: o.ask ? "fallback" : "lead", reason: "Answers general questions" };
   if (!o.ask) return lead;
 
   const ctrl = new AbortController();
@@ -225,18 +238,18 @@ export async function routeMessage(o: RouteInput): Promise<Route> {
   try {
     const reply = await Promise.race([o.ask(routerRequest(o), ctrl.signal), late]);
     if (reply === "late") {
-      o.log?.("The router took too long, so Athena answered.");
+      o.log?.(`The router took too long, so ${AGENTS[lead.agents[0]].god} answered.`);
       return lead;
     }
     await Promise.resolve(o.onReply?.(reply)).catch((e) => o.log?.(`The router's usage wasn't saved: ${String((e as Error)?.message ?? e).slice(0, 300)}`));
     const pick = reply.stop_reason === "refusal" ? null : parsePick(textOf(reply), o.working);
     if (!pick) {
-      o.log?.("The router's answer couldn't be read, so Athena answered.");
+      o.log?.(`The router's answer couldn't be read, so ${AGENTS[lead.agents[0]].god} answered.`);
       return lead;
     }
     return { agents: [pick.agent], how: "router", reason: pick.reason || AGENTS[pick.agent].name };
   } catch (e) {
-    o.log?.(`The router failed, so Athena answered: ${String((e as Error)?.message ?? e).slice(0, 300)}`);
+    o.log?.(`The router failed, so ${AGENTS[lead.agents[0]].god} answered: ${String((e as Error)?.message ?? e).slice(0, 300)}`);
     return lead;
   } finally {
     clearTimeout(timer);

@@ -1,5 +1,5 @@
 // Pages inside the one client app (src/app/[[...slug]]). The address bar holds the page, so links and Back work.
-import { isAgentKey, type AgentKey } from "./team.ts";
+import { agentByGod, isAgentKey, type AgentKey } from "./team.ts";
 import { inviteTokenFromPath } from "./workspace.ts";
 
 export type SettingsTab = "general" | "members" | "social" | "apps" | "skills" | "extension";
@@ -46,8 +46,10 @@ export function parseRoute(path: string): Route {
   if (p === "/use-cases") return { page: "useCases" };
   if (p === "/team") return { page: "team" };
   // One teammate's own page, like the current app's #agent/<key>.
-  const agent = /^\/team\/([a-z]+)$/.exec(p);
-  if (agent && isAgentKey(agent[1])) return { page: "agent", key: agent[1] };
+  // Their name works too: /team/athena opens the same page as /team/chief.
+  const agent = /^\/team\/([a-z]+)$/i.exec(p);
+  const key = agent ? (isAgentKey(agent[1]) ? agent[1] : agentByGod(agent[1])) : null;
+  if (key) return { page: "agent", key };
   // Stripe Checkout and the billing portal come back here.
   if (p === "/billing") return { page: "billing" };
   // A new chat is /chat until its first reply names the thread, then /chat/<thread id>.

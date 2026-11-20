@@ -33,6 +33,31 @@ import { AGENTS, agentByGod, LEAD, ORDER, parseMentions, workingAgents, type Age
 
 /** Steps one agent may take in a turn (one API call each). */
 export const MAX_STEPS = 12;
+
+/**
+ * One reply's words across steps: the words kept from a step that only showed cards, then this step's. A teammate
+ * sometimes writes the same answer again after a card; that copy is dropped, so the reply never says it twice.
+ */
+export function joinSteps(kept: string, next: string): string {
+  const squash = (t: string) => t.replace(/\s+/g, " ").trim();
+  const a = squash(kept);
+  const b = squash(next);
+  if (!b) return kept;
+  if (!a) return next;
+  if (a === b || a.endsWith(b)) return kept;
+  if (b.startsWith(a)) return next;
+  return `${kept}\n\n${next}`;
+}
+
+/** Sent once when a reply showed cards but wrote no words, so every answer says something. */
+export const WORDS_NUDGE =
+  "Your cards are on screen under your reply, but the reply has no words yet. Write your answer now in one to three short sentences: what you found or did, and what comes next. Don't call show_card again and don't repeat the cards' contents.";
+
+/** Cards that only show a result. A reply made of these alone still needs words; a question or a form card doesn't. */
+const RESULT_CARDS = new Set(["quick_replies", "table", "chart"]);
+
+/** True when a finished reply has only result cards and no words: the loop asks once more for the words (WORDS_NUDGE). */
+export const needsWords = (text: string, kinds: string[], asked: boolean) => !asked && kinds.length > 0 && kinds.every((k) => RESULT_CARDS.has(k)) && !text.trim();
 /** Agent replies in one turn, counting handoffs. */
 export const MAX_RUNS = 4;
 /** Earlier messages each agent sees. */
@@ -241,7 +266,8 @@ export function toneRule(tone: string | null | undefined): string | null {
  * In every teammate's prompt. tests/cards.test.ts checks it is there.
  */
 export const CARD_GUIDE = [
-  "Make answers easy to act on with cards. Call show_card, and don't repeat what a card shows in words.",
+  "Make answers easy to act on with cards. Call show_card, and don't repeat what a card shows in words. Still write at least a sentence or two of answer: a reply is never only cards.",
+  "Cards show under your words, so point to them as below, never above.",
   "When you need the person to pick from clear options, ask with a choices card instead of plain text. Up to 4 questions in one card.",
   "When there are natural next steps, end your answer with a quick_replies card of 2 to 4 short replies.",
   "Use a table card for lists of items, like leads, posts or keywords. Use a chart card for numbers over time. A small Markdown table is fine for a few rows.",
@@ -506,7 +532,9 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
   let finalText = "";
   // Text from steps that only showed cards. The next step's text adds to it instead of replacing it.
   let kept = "";
-  const join = (a: string, b: string) => [a, b].filter(Boolean).join("\n\n");
+  const join = joinSteps;
+  // Whether the reply was asked once for its words (needsWords).
+  let askedWords = false;
   for (let step = 0; step < MAX_STEPS; step++) {
     d.emit({ type: "status", agent: key, text: step === 0 ? "Thinking" : "Working" });
     // This step's text as it streams. The first piece tells the screen to start the reply over, unless the step
@@ -565,7 +593,21 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
       continue;
     }
     const calls = res.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
-    if (res.stop_reason !== "tool_use" || !calls.length) break;
+    if (res.stop_reason !== "tool_use" || !calls.length) {
+      // Cards but no words: ask once for a short answer, so the person never gets cards with nothing said.
+      if (needsWords(finalText, run.cards.map((c) => c.kind), askedWords) && step < MAX_STEPS - 1 && !d.signal?.aborted) {
+        askedWords = true;
+        const last = messages[messages.length - 1];
+        if (res.content.length) {
+          messages.push({ role: "assistant", content: res.content });
+          messages.push({ role: "user", content: WORDS_NUDGE });
+        } else if (last?.role === "user" && Array.isArray(last.content)) {
+          last.content = [...last.content, { type: "text", text: WORDS_NUDGE }];
+        } else break;
+        continue;
+      }
+      break;
+    }
     kept = calls.every((c) => byName.get(c.name)?.quiet) ? text : "";
 
     // The whole reply goes back unchanged (thinking blocks included), then every result in one message.

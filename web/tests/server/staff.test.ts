@@ -91,10 +91,16 @@ const call = async (action: string, body: Record<string, unknown> = {}, user: st
   return { status: res.status, body: (await res.json()) as Record<string, unknown>, cache: res.headers.get("cache-control") };
 };
 
-test("not signed in, not staff, or a staff email not confirmed yet: 404 from every route, and nothing is read", async () => {
+test("not signed in, not staff, or a staff email not confirmed yet: 404 from every route but me, and nothing is read", async () => {
   for (const user of [null, "owner1", "late1"]) {
     for (const action of ["me", "overview", "workspace", "plan", "trial", "retry", "nope"]) {
       const out = await call(action, { workspaceId: WS, plan: "pro", days: 7, jobId: 1 }, user);
+      if (action === "me" && user) {
+        // Signed in but not staff: me says so, so the app shows no Staff link and logs no 404.
+        assert.equal(out.status, 200, `${user} me`);
+        assert.deepEqual(out.body, { staff: false });
+        continue;
+      }
       assert.equal(out.status, 404, `${user} ${action}`);
       assert.deepEqual(out.body, { error: "Not found." });
     }
@@ -107,7 +113,8 @@ test("STAFF_EMAILS empty means nobody is staff", async () => {
   const before = process.env.STAFF_EMAILS;
   process.env.STAFF_EMAILS = "";
   try {
-    assert.equal((await call("me")).status, 404);
+    assert.deepEqual((await call("me")).body, { staff: false });
+    assert.equal((await call("overview")).status, 404);
   } finally {
     process.env.STAFF_EMAILS = before;
   }

@@ -322,3 +322,20 @@ test("usage: strangers and signed-out people get nothing; the internal plan has 
   assert.equal(out.allowance, null);
   assert.equal(out.percent, 0);
 });
+
+test("checkout and portal: with no Stripe key on the server, the owner gets one polite line, never the key's name", async () => {
+  const key = process.env.STRIPE_SECRET_KEY;
+  delete process.env.STRIPE_SECRET_KEY;
+  try {
+    for (const route of [checkout, portal]) {
+      const res = await post(route, "owner1", { workspaceId: "ws1", plan: "starter" });
+      assert.equal(res.status, 503);
+      const { error } = (await res.json()) as { error: string };
+      assert.match(error, /Payments aren't turned on yet/);
+      assert.doesNotMatch(error, /STRIPE|key|server/i);
+    }
+    assert.equal(calls.length, 0);
+  } finally {
+    process.env.STRIPE_SECRET_KEY = key;
+  }
+});

@@ -1,10 +1,14 @@
 import "server-only";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { userCache } from "./userCache.ts";
 import { DEFAULT_FROM } from "./workspaceMail.ts";
 
 // Who is calling and what they may do, for API routes. Copied from Arrowsterr's serverAuth.ts.
 
 export type Min = "owner" | "admin" | "editor" | "viewer";
+
+/** Tokens already checked with Supabase Auth, for a minute at most (src/lib/userCache.ts). */
+const checked = userCache<User>();
 
 export const supabaseUrl = () => process.env.SUPABASE_URL?.trim().replace(/\/+$/, "") ?? "";
 
@@ -25,8 +29,9 @@ export async function requireRole(request: Request, workspaceId: unknown, min: M
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: user } = await sb.auth.getUser(token);
-  if (!user?.user) return deny("Please sign in again.", 401);
+  const found = await checked.get(token, async () => (await sb.auth.getUser(token)).data?.user ?? null);
+  if (!found) return deny("Please sign in again.", 401);
+  const user = { user: found };
   const { data: ok, error } = await sb.rpc("has_role", { ws: workspaceId, min });
   if (error) return deny(error.message, 500);
   if (!ok) return deny(min === "owner" ? "Only the workspace owner can do that." : `You need ${min} access in this workspace to do that.`, 403);
@@ -40,8 +45,7 @@ export async function signedInUser(request: Request): Promise<User | null> {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!url || !key || !token) return null;
   const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data } = await sb.auth.getUser(token);
-  return data?.user ?? null;
+  return checked.get(token, async () => (await sb.auth.getUser(token)).data?.user ?? null);
 }
 
 /** True when the signed-in person can make changes (and spend) in the workspace. */

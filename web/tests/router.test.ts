@@ -6,6 +6,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { StoredMessage } from "../src/lib/agentLoop.ts";
 import { costOf, tokensOf } from "../src/lib/meter.ts";
 import {
+  topicPick,
   claudeRouter,
   followUp,
   lastAnswerer,
@@ -274,4 +275,34 @@ test("quickRoute: what the screen can show before the server answers", () => {
   assert.equal(quickRoute("And last month?", history, ALL), "seo");
   assert.equal(quickRoute("hi", history, ALL, "web"), "web");
   assert.equal(quickRoute("Write a welcome email", history, ALL), null);
+});
+
+// ─────────────── when the router can't answer ───────────────
+
+test("topicPick: the one teammate whose work the message names; Athena's words don't count against a specialist", () => {
+  const all = ORDER.filter((k) => !AGENTS[k].soon);
+  assert.equal(topicPick("who handles our social media?", all), "social");
+  assert.equal(topicPick("check traffic of katalon.com", all), "seo");
+  assert.equal(topicPick("What should I focus on this week?", all), null, "only Athena's words");
+  assert.equal(topicPick("Post about the menu and fix the website", all), null, "two teammates: Athena plans it");
+  assert.equal(topicPick("Show the prices as a table", all), null);
+  assert.equal(topicPick("who handles our social media?", all.filter((k) => k !== "social")), null, "paused or soon teammates don't count");
+});
+
+test("routeMessage: a router that fails or is too slow falls back on the message's topic before Athena", async () => {
+  const working = ORDER.filter((k) => !AGENTS[k].soon);
+  const failing = async () => {
+    throw new Error("overloaded");
+  };
+  const r = await routeMessage({ text: "who handles our social media?", history: [], working, ask: failing as never });
+  assert.deepEqual(r, { agents: ["social"], how: "topic", reason: AGENTS.social.name });
+  const slow = () => new Promise<never>(() => {});
+  const r2 = await routeMessage({ text: "check traffic of katalon.com", history: [], working, ask: slow as never, timeoutMs: 10 });
+  assert.deepEqual(r2.agents, ["seo"]);
+  assert.equal(r2.how, "topic");
+  const r3 = await routeMessage({ text: "How are we doing?", history: [], working, ask: failing as never });
+  assert.deepEqual(r3, { agents: ["chief"], how: "fallback", reason: "Answers general questions" });
+  const r4 = await routeMessage({ text: "who handles our social media?", history: [], working, ask: null });
+  assert.equal(r4.how, "topic");
+  assert.deepEqual(r4.agents, ["social"]);
 });

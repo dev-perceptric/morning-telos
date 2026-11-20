@@ -198,10 +198,10 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
 /* drawer / sheet */
 .dw-wrap{position:fixed;inset:0;z-index:70;pointer-events:none}
 .dw-scrim{position:absolute;inset:0;background:rgba(20,20,19,.28);opacity:0;transition:opacity .25s}
-.dw{position:absolute;top:0;right:0;bottom:0;width:min(500px,100%);background:var(--surface);box-shadow:var(--sh-lg);transform:translateX(102%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+.dw{position:absolute;top:0;right:0;bottom:0;width:min(500px,100%);background:var(--surface);box-shadow:var(--sh-lg);transform:translateX(102%);visibility:hidden;transition:transform .3s var(--ease),visibility 0s .3s;display:flex;flex-direction:column}
 .dw-wrap.on{pointer-events:auto}
 .dw-wrap.on .dw-scrim{opacity:1}
-.dw-wrap.on .dw{transform:none}
+.dw-wrap.on .dw{transform:none;visibility:visible;transition:transform .3s var(--ease)}
 .dw-h{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 14px 20px;border-bottom:1px solid var(--line)}
 .dw-h b{font-size:13.5px;font-weight:600}
 .dw-b{padding:20px;overflow-y:auto;flex:1}
@@ -229,7 +229,7 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
 .res{margin-top:10px}
 .formprev{display:grid;gap:6px;margin-top:10px}
 .formprev div{background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;color:var(--ink-3)}
-.dock{position:sticky;bottom:16px;padding-top:6px;background:linear-gradient(to bottom,rgba(250,249,245,0),var(--bg) 30%)}
+.dock{position:sticky;bottom:0;padding-top:6px;padding-bottom:16px;background:linear-gradient(to bottom,rgba(250,249,245,0),var(--bg) 30%)}
 
 /* ---------- team ---------- */
 .team{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
@@ -484,7 +484,7 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
   .dw-b{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
   .rv-act .note{display:none}
   .thread{min-height:calc(100vh - 220px)}
-  .dock{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 8px)}
+  .dock{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom));padding-bottom:8px}
   .hint .hide-m{display:none}
   .uc-grid,.bl-grid{grid-template-columns:1fr}
   .dd .dd-menu{left:0;right:auto}

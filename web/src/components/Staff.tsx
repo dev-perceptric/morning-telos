@@ -32,7 +32,7 @@ function PlanTag({ plan }: { plan: EffectivePlan }) {
   return <span className={`tag ${PLAN_TONE[plan]}`}>{PLAN_LABEL[plan]}</span>;
 }
 
-/** Whether the signed-in person is staff, for the nav link. Anyone else gets 404 and sees nothing. */
+/** Whether the signed-in person is staff, for the nav link. Everyone else is told no and sees nothing. */
 export function useIsStaff(sb: SupabaseClient): boolean {
   const [staff, setStaff] = useState(false);
   useEffect(() => {

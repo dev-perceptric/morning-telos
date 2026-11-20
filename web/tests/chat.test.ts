@@ -111,3 +111,11 @@ test("readChat: a message can be only files, and Retry can answer one; nothing a
   assert.deepEqual(readChat({ text: "", files: [] }), { ok: false, error: CHAT_MESSAGES.empty });
   assert.deepEqual(readChat({ text: "", again: true }), { ok: false, error: CHAT_MESSAGES.empty }, "again needs a thread");
 });
+
+test("threadTitle: leaves out the leading @teammates, /skills and a use case's Start:", () => {
+  assert.equal(threadTitle("@Aphrodite I want more followers on LinkedIn"), "I want more followers on LinkedIn");
+  assert.equal(threadTitle("@Artemis /check-ai-visibility Start: AI visibility tracker. Check how often AI answers name my business."), "AI visibility tracker. Check how often AI answers name my business.");
+  assert.equal(threadTitle("@Aphrodite, @Artemis plan posts"), "plan posts");
+  assert.equal(threadTitle("/weekly-report"), "/weekly-report", "nothing left: keeps the words");
+  assert.equal(threadTitle("Email ana@shop.com about @Hermes"), "Email ana@shop.com about @Hermes");
+});

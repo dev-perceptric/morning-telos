@@ -60,7 +60,10 @@ export async function POST(request: Request, ctx: { params: Promise<{ action: st
   const { action } = await ctx.params;
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const user = await signedInUser(request).catch(() => null);
-  // Not staff: 404 before anything else, with no hint that staff routes exist.
+  // "me" answers every signed-in person, so the app can hide the Staff link without a 404 in everyone's console.
+  // It says only whether they are staff.
+  if (action === "me" && user && !isStaff(user, process.env.STAFF_EMAILS)) return reply({ staff: false });
+  // Not staff: 404 before anything else, with no hint that the other staff routes exist.
   if (!isStaff(user, process.env.STAFF_EMAILS)) return reply({ error: STAFF_MESSAGES.notFound }, 404);
   const db = adminClient();
   if (!db) return reply({ error: "Add SUPABASE_SECRET_KEY to the server's settings." }, 500);

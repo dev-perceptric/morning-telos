@@ -11,7 +11,8 @@ import { identify, inWorkspace, isRecent, pageView, resetAnalytics, trackOnce } 
 import { initial, paletteMatch, type PaletteItem } from "@/lib/home";
 import type { ModelChoice } from "@/lib/models";
 import { routePath, wantsSignup, withoutSignup, type Route } from "@/lib/routes";
-import { getSupabase, type SupaConfig } from "@/lib/supa";
+import { getSupabase, signOutNow, type SupaConfig } from "@/lib/supa";
+import { cleanLink, LINK_NOTICES, readLink } from "@/lib/authLinks";
 import { cleanWebsite } from "@/lib/signup";
 import { agentFace, AGENTS, ORDER, type AgentKey } from "@/lib/team";
 import { can, inviteTokenFromPath, roleLabel } from "@/lib/workspace";
@@ -55,14 +56,38 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
   // Read once on load: the site's "Start free trial" link (#signup or /signup) opens the sign-up form.
   const [signup] = useState(() => wantsSignup(window.location.pathname, window.location.hash));
 
+  // A word for the log in screen after an email link that couldn't sign the person in here (src/lib/authLinks.ts).
+  const [linkNotice, setLinkNotice] = useState("");
+
   useEffect(() => {
-    sb.auth.getSession().then(({ data }) => setSession(data.session));
+    let live = true;
+    const link = readLink(window.location.hash, window.location.search);
+    const clean = () => window.history.replaceState(null, "", cleanLink(window.location.pathname, window.location.search));
+    (async () => {
+      if (link?.kind === "tokens") {
+        const { error } = await sb.auth.setSession({ access_token: link.access_token, refresh_token: link.refresh_token });
+        clean();
+        if (error && live) setLinkNotice(LINK_NOTICES.failed);
+      } else if (link?.kind === "error") {
+        clean();
+        if (live) setLinkNotice(link.notice);
+      }
+      const { data } = await sb.auth.getSession();
+      if (link?.kind === "code") {
+        clean();
+        if (!data.session && live) setLinkNotice(LINK_NOTICES.confirmed);
+      }
+      if (live) setSession(data.session);
+    })();
     const { data } = sb.auth.onAuthStateChange((event, s) => {
       setSession(s);
       if (event === "PASSWORD_RECOVERY") setRecovering(true);
       if (event === "SIGNED_OUT") resetAnalytics();
     });
-    return () => data.subscription.unsubscribe();
+    return () => {
+      live = false;
+      data.subscription.unsubscribe();
+    };
   }, [sb]);
 
   // Signed in, the sign-up link just opens home, so take it out of the address.
@@ -82,7 +107,7 @@ export function App({ supabase, turnstileSiteKey, google = false }: { supabase: 
 
   if (session === undefined) return <Loading />;
   if (recovering && session) return <NewPassword sb={sb} onDone={() => setRecovering(false)} />;
-  if (!session) return <AuthScreen sb={sb} invited={Boolean(invite)} signup={signup} turnstileSiteKey={turnstileSiteKey} google={google} />;
+  if (!session) return <AuthScreen sb={sb} invited={Boolean(invite)} signup={signup} turnstileSiteKey={turnstileSiteKey} google={google} notice={linkNotice} />;
   if (invite) return <JoinInvite sb={sb} session={session} token={invite} onDone={clearInvite} />;
   return <Shell sb={sb} session={session} />;
 }
@@ -123,7 +148,7 @@ function JoinInvite({ sb, session, token, onDone }: { sb: SupabaseClient; sessio
       <ErrorText>{error}</ErrorText>
       <div className="flex flex-col gap-3">
         {wrongEmail ? (
-          <button type="button" className={btnPrimary} onClick={() => sb.auth.signOut()}>
+          <button type="button" className={btnPrimary} onClick={() => void signOutNow(sb)}>
             Log out and use the invited email
           </button>
         ) : null}
@@ -324,7 +349,7 @@ function Frame2({
     focusComposer();
   }, []);
   const logout = useCallback(() => {
-    sb.auth.signOut();
+    void signOutNow(sb);
   }, [sb]);
 
   // ⌘K or Ctrl+K opens and closes the search palette.

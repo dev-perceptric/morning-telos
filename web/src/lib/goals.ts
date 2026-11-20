@@ -32,6 +32,28 @@ export type StepRow = { id: string; plan_id: string; goal_id: string | null; pos
 export const STEP_COLUMNS = "id, plan_id, goal_id, position, title, agent, status";
 
 /** A goal row as the database gives it: numbers as numbers (numeric columns can come back as text). */
+/**
+ * The row a goal card's Start adds, as the signed-in person. Only the columns 024_goals.sql lets them insert: the
+ * database fills created_by from auth.uid(), and sending it (or anything else) is refused with "permission denied".
+ */
+export function goalInsert(o: { workspaceId: string; threadId: string; card: { id: string; agent: AgentKey; metric: Metric; lead: string; unit: string }; target: number; due: string }) {
+  return { workspace_id: o.workspaceId, thread_id: o.threadId, card_id: o.card.id, agent: o.card.agent, metric: o.card.metric, title: o.card.lead, target: o.target, unit: o.card.unit, due_date: o.due };
+}
+
+/** The rows a plan card's Go adds, one per step kept, in order. The same rule: no created_by. */
+export function stepInserts(o: { workspaceId: string; threadId: string; goalId: string | null; planId: string; steps: { title: string; agent: AgentKey }[] }) {
+  return o.steps.map((s, i) => ({ workspace_id: o.workspaceId, thread_id: o.threadId, goal_id: o.goalId, plan_id: o.planId, position: i + 1, title: s.title, agent: s.agent }));
+}
+
+/**
+ * The line a card shows when saving a goal or a plan fails. "Not set up" only when the table is missing (the
+ * migration hasn't run); anything else is a short retry line, never the database's own words.
+ */
+export function startError(e: { code?: string; message?: string }, what: "goal" | "plan"): string {
+  if (e.code === "42P01" || e.code === "PGRST205") return what === "goal" ? "Goals aren't set up on the server yet." : "Plans aren't set up on the server yet.";
+  return what === "goal" ? "We couldn't start the goal. Try again." : "We couldn't start the plan. Try again.";
+}
+
 export function goalOf(r: Record<string, unknown>): GoalRow {
   const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   return {

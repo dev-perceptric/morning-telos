@@ -105,6 +105,7 @@ export function AuthScreen({
   signup = false,
   turnstileSiteKey = null,
   google: googleOn = false,
+  notice = "",
 }: {
   sb: SupabaseClient;
   invited: boolean;
@@ -112,6 +113,8 @@ export function AuthScreen({
   signup?: boolean;
   turnstileSiteKey?: string | null;
   google?: boolean;
+  /** One line about an email link that couldn't sign the person in here (src/lib/authLinks.ts). */
+  notice?: string;
 }) {
   const [mode, setMode] = useState<Mode>(invited || signup ? "signup" : "signin");
   const [name, setName] = useState("");
@@ -211,6 +214,8 @@ export function AuthScreen({
   }
 
   const [title, sub] = TITLES[mode];
+  // A new account's email is on its way: only the code box and a way back stay, so the form can't be sent twice.
+  const waiting = Boolean(sent) && mode === "signup";
   return (
     <div className="auth">
       <section className="auth-card">
@@ -220,6 +225,7 @@ export function AuthScreen({
             <h1>{title}</h1>
             <p className="text-[14px] text-ink-3">{sub}</p>
           </div>
+          {notice ? <Notice>{notice}</Notice> : null}
           {invited ? <Notice>You were invited to a team. Use the email address the invite was sent to.</Notice> : null}
           {googleOn && (mode === "signin" || mode === "signup") ? (
             <>
@@ -234,6 +240,8 @@ export function AuthScreen({
               </div>
             </>
           ) : null}
+          {waiting ? <Notice>{sent}</Notice> : null}
+          {waiting ? null : (
           <form onSubmit={submit} className="flex flex-col gap-4">
             {mode === "signup" ? (
               <>
@@ -284,6 +292,7 @@ export function AuthScreen({
               {busy ? "Please wait..." : mode === "signin" ? "Log in" : mode === "signup" ? "Start free trial" : mode === "code" ? "Email me a code" : "Send reset link"}
             </button>
           </form>
+          )}
           {sent && (mode === "code" || mode === "signup") ? (
             <form onSubmit={verify} className="flex flex-col gap-3">
               <label className={label} htmlFor="email-code">
@@ -300,9 +309,14 @@ export function AuthScreen({
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                 className={`${input} text-center font-mono text-[22px] tracking-[0.3em]`}
               />
-              <button type="submit" className={btnSecondary} disabled={busy || code.length < 6}>
+              <button type="submit" className={waiting ? btnPrimary : btnSecondary} disabled={busy || code.length < 6}>
                 {busy ? "Checking..." : "Continue"}
               </button>
+              {waiting ? (
+                <button type="button" className={`${textLink} self-start text-[13px]`} onClick={() => switchTo("signup")}>
+                  Use a different email
+                </button>
+              ) : null}
             </form>
           ) : null}
           <div className="flex flex-col gap-3 border-t border-line pt-5 text-[14px] text-ink-2">
