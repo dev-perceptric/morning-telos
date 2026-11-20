@@ -12,6 +12,9 @@ import { routineJobHandlers } from "@/lib/routinesServer";
 import { seal } from "@/lib/sealing";
 import { knowledgeJobHandlers } from "@/lib/siteScanDb";
 import { adminClient } from "@/lib/serverAuth";
+import { appUrl } from "@/lib/emailKit";
+import { teamEmailDomain } from "@/lib/teamEmail";
+import { teamEmailJobHandlers } from "@/lib/teamEmailServer";
 
 // One worker tick: claim the jobs that are due (supabase/006_jobs.sql) and run them a few at a time.
 // Copied from Arrowsterr's and Omniscient's /api/worker.
@@ -52,6 +55,8 @@ function handlers(db: SupabaseClient): Record<string, Handler> {
     ...knowledgeJobHandlers(db),
     // A routine's scheduled run: its teammate does the job in a new chat (src/lib/routinesServer.ts).
     ...routineJobHandlers(db, { client: teamClient, log: (m) => warn(m, "run_routine") }),
+    // An email to the workspace's team address: the team answers by email (src/lib/teamEmailInbound.ts).
+    ...teamEmailJobHandlers(db, { client: teamClient, log: (m) => warn(m, "team_email") }, teamEmailDomain(process.env), appUrl()),
     provision: async (job) => {
       const ws = job.workspace_id;
       if (!ws) return { status: "failed", error: "A provision job needs a workspace." };

@@ -9,7 +9,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ToolRegistry } from "./agentLoop.ts";
-import type { Approval, Decision, NewApproval, RunResult } from "./approvals.ts";
+import type { Approval, DecideDeps, Decision, NewApproval, RunResult } from "./approvals.ts";
 import { appToolSource, isAppApproval, runApproval as runAppApproval, type AppToolDeps } from "./composio/appAction.ts";
 import { composioOn } from "./composio/composio.ts";
 import { connectionsOf, markReconnect } from "./composio/store.ts";
@@ -110,6 +110,28 @@ export function runTeamApproval(db: SupabaseClient, log?: (message: string) => v
   const apps = appDeps(db, log);
   const wordpress = wordpressDeps(db, log);
   return (ap) => (isWordpressApproval(ap) ? runWordpressApproval(ap, wordpress) : isAppApproval(ap) ? runAppApproval(ap, apps) : runProductApproval(ap, products));
+}
+
+/**
+ * What decide() (src/lib/approvals.ts) needs for one workspace: the approvals store, the run, and the short note back
+ * in the chat. Shared by POST /api/approvals/:id and the Approve link in team emails (src/app/api/email/approve).
+ */
+export function decideDeps(db: SupabaseClient, ws: string, log: (message: string) => void): DecideDeps {
+  const store = approvalStore(db);
+  return {
+    load: (i) => store.load(ws, i),
+    claim: (i, by, d) => store.claim(ws, i, by, d),
+    run: runTeamApproval(db, log),
+    finish: (i, status, result) => store.finish(ws, i, status, result),
+    note: async (ap, text, status) => {
+      if (!ap.thread_id) return;
+      const { error } = await db.from("messages").insert({ thread_id: ap.thread_id, workspace_id: ws, role: "note", agent: ap.agent, content: text, meta: { approval: ap.id, status } });
+      if (error) throw new Error(error.message);
+      await db.from("threads").update({ updated_at: new Date().toISOString() }).eq("id", ap.thread_id).eq("workspace_id", ws);
+    },
+    activity: (ap, text) => store.activity({ workspace_id: ws, agent: ap.agent, thread_id: ap.thread_id, approval_id: ap.id, text }),
+    log,
+  };
 }
 
 /** Every tool source, in order. The first source's tool wins when two share a name. */

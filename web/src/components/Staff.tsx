@@ -81,6 +81,7 @@ export function StaffPage({ sb, id }: { sb: SupabaseClient; id: string | null })
     ["Trials ending", s ? String(s.trialsEnding) : "·", "In the next 3 days"],
     ["Failed jobs", s ? String(s.failedJobs) : "·", "In the last day"],
     ["AI spend", s ? usd(s.aiMonth) : "·", "This month"],
+    ["Dropped emails", s ? String(s.droppedEmails ?? 0) : "·", "To team addresses, this month"],
   ];
 
   return (

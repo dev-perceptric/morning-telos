@@ -25,6 +25,7 @@ import { EFFORT, FALLBACK_BETA, MAX_TOKENS, modelFor, SERVER_FALLBACK, type Mode
 import { cleanTone } from "./brand.ts";
 import { FILE_RULE, fileBlocks, filesNamed, filesToSend, ONLY_FILES, storedFiles, type LoadedFile, type StoredFile } from "./attachments.ts";
 import { PAGE_RULE, pageBlock, storedPage, type Screenshot } from "./pageContext.ts";
+import { emailBlock, storedEmail } from "./teamEmail.ts";
 import { progressLine, usedName } from "./progress.ts";
 import { ROUTER_MODEL, routeMessage, SKIP_META, type RouteHow, type RouterAsk } from "./router.ts";
 import { AGENTS, agentByGod, LEAD, ORDER, parseMentions, workingAgents, type AgentKey } from "./team.ts";
@@ -277,6 +278,7 @@ export function handoffTool(teammates: AgentKey[]): Anthropic.Beta.BetaTool {
  * role are joined, the first is always the person's, and the last always asks this agent to answer.
  * A page the person attached from the Chrome extension (meta.page) follows their words inside an outside_data block
  * (src/lib/pageContext.ts). `shot`, this turn's screenshot, goes as an image on the turn with the newest page.
+ * A message that came by email (meta.email) goes the same way: the email inside an outside_data block.
  * Files the person attached (meta.files, src/lib/attachments.ts) go first in their turn, as image, document or text
  * blocks, when `files.loaded` holds them; the rest are named only. Without `files.workspaceId` no file is read.
  */
@@ -288,6 +290,8 @@ export function historyFor(rows: StoredMessage[], key: AgentKey, shot?: Screensh
     const attached = m.role === "user" && files ? storedFiles(m.meta, files.workspaceId) : [];
     if ((!m.content?.trim() && !attached.length) || SKIP_META.some((f) => m.meta?.[f])) continue;
     const page = m.role === "user" ? storedPage(m.meta) : null;
+    // A message that came by email (src/lib/teamEmail.ts) goes to Claude inside an outside_data block.
+    const email = m.role === "user" ? storedEmail(m.meta) : null;
     const here = attached.flatMap((f) => (loaded.has(f.path) ? [loaded.get(f.path)!] : []));
     const named = filesNamed(attached.filter((f) => !loaded.has(f.path)));
     const words = [m.content?.trim() ? m.content : attached.length ? ONLY_FILES : "", named].filter(Boolean).join("\n\n");
@@ -296,7 +300,7 @@ export function historyFor(rows: StoredMessage[], key: AgentKey, shot?: Screensh
         ? { role: "assistant" as const, text: m.content, files: [] }
         : m.role === "agent"
           ? { role: "user" as const, text: `${m.agent ? AGENTS[m.agent].god : "Teammate"}: ${m.content}`, files: [] }
-          : { role: "user" as const, text: page ? `${words}\n\n${pageBlock(page)}` : words, files: here };
+          : { role: "user" as const, text: email ? emailBlock(email, words) : page ? `${words}\n\n${pageBlock(page)}` : words, files: here };
     const last = turns[turns.length - 1];
     if (last && last.role === t.role) {
       last.text += `\n\n${t.text}`;

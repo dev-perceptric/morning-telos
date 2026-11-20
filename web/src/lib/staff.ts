@@ -145,13 +145,15 @@ export type StaffSummary = {
   trialsEnding: number;
   failedJobs: number;
   aiMonth: number;
+  /** Emails to team addresses dropped with no reply this month (team_email_drops). Only a count is kept. */
+  droppedEmails: number;
 };
 
 /** The top strip: workspaces by plan in force, trials ending soon, failed jobs in the last day, and AI spend this month. */
-export function summarize(rows: readonly StaffWorkspace[], o: { failedJobs: number; aiTotal: unknown }, now = Date.now()): StaffSummary {
+export function summarize(rows: readonly StaffWorkspace[], o: { failedJobs: number; aiTotal: unknown; droppedEmails?: number }, now = Date.now()): StaffSummary {
   const byPlan = Object.fromEntries(PLAN_ORDER.map((p) => [p, 0])) as Record<EffectivePlan, number>;
   for (const r of rows) byPlan[r.effective] += 1;
-  return { workspaces: rows.length, byPlan, trialsEnding: rows.filter((r) => trialEndingSoon(r, now)).length, failedJobs: o.failedJobs, aiMonth: money(o.aiTotal) };
+  return { workspaces: rows.length, byPlan, trialsEnding: rows.filter((r) => trialEndingSoon(r, now)).length, failedJobs: o.failedJobs, aiMonth: money(o.aiTotal), droppedEmails: Math.max(0, Math.floor(Number(o.droppedEmails) || 0)) };
 }
 
 // ─────────────── jobs, services and approvals ───────────────
@@ -237,6 +239,8 @@ export type StaffDeps = {
   /** One workspace's approvals still pending that were made before a time. */
   pendingBefore: (ws: string, before: string) => Promise<StaffApproval[]>;
   actions: (ws: string) => Promise<StaffAction[]>;
+  /** Team emails dropped with no reply since a UTC day (YYYY-MM-DD), all reasons together. */
+  droppedEmails?: (sinceDay: string) => Promise<number>;
   /** staff_set_plan(), staff_extend_trial(), staff_retry_job(): the change plus its staff_actions row. Null when nothing matched. */
   setPlan: (who: StaffCaller, ws: string, patch: { plan: PlanId; status: string }) => Promise<Record<string, unknown> | null>;
   extendTrial: (who: StaffCaller, ws: string, days: number) => Promise<Record<string, unknown> | null>;
@@ -268,9 +272,9 @@ export async function staffRoute(action: string, body: Record<string, unknown>, 
 
   if (action === "overview") {
     const dayAgo = new Date(now - DAY).toISOString();
-    const [rows, total, jobs] = await Promise.all([d.workspaces(since), d.aiTotal(since), d.openJobsSince(dayAgo)]);
+    const [rows, total, jobs, dropped] = await Promise.all([d.workspaces(since), d.aiTotal(since), d.openJobsSince(dayAgo), d.droppedEmails?.(since.slice(0, 10)) ?? 0]);
     const all = rows.map((r) => toStaffWorkspace(r, now));
-    const summary = summarize(all, { failedJobs: jobs.filter(isFailedJob).length, aiTotal: total }, now);
+    const summary = summarize(all, { failedJobs: jobs.filter(isFailedJob).length, aiTotal: total, droppedEmails: dropped }, now);
     return { status: 200, body: { summary, workspaces: searchWorkspaces(all, body.q), since } };
   }
 
