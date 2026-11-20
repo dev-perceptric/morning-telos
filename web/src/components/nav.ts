@@ -61,3 +61,13 @@ export async function callApi<T = Record<string, unknown>>(sb: SupabaseClient, p
   if (!res.ok) throw new Error(out.error || "Something went wrong. Try again.");
   return out;
 }
+
+/** GET one of the app's own server routes as the signed-in person. Throws the route's error message. */
+export async function getApi<T = Record<string, unknown>>(sb: SupabaseClient, path: string): Promise<T> {
+  const token = (await sb.auth.getSession()).data.session?.access_token;
+  const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store" }).catch(() => null);
+  if (!res) throw new Error("Couldn't reach the server. Check your connection and try again.");
+  const out = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new Error(out.error || "Something went wrong. Try again.");
+  return out;
+}

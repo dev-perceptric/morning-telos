@@ -1,7 +1,7 @@
 // The partner API client (src/lib/partner.ts) against a fake fetch. Nothing reaches Arrowsterr or Capybaroar.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isRetryable, partnerClient, partnerFor } from "../src/lib/partner.ts";
+import { integrationConnectFor, isRetryable, partnerClient, partnerFor, socialConnectClient, socialConnectFor } from "../src/lib/partner.ts";
 
 type Call = { url: string; method: string; headers: Headers; body: unknown };
 
@@ -140,4 +140,64 @@ test("removeBrand deletes the brand, and a 404 comes back typed", async () => {
   assert.deepEqual(await api.removeBrand("b1"), { ok: true, status: 204, data: null });
   assert.deepEqual([calls[0].method, calls[0].url], ["DELETE", "https://aw.test/api/partner/brands/b1"]);
   assert.deepEqual(await api.removeBrand("gone"), { ok: false, status: 404, code: "not_found", message: "No such brand.", retryable: false });
+});
+
+// ─────────────── connecting on our own page ───────────────
+
+test("socialConnectClient: the networks list, the start, and the pick step, under <url>/api/partner", async () => {
+  const { f, calls } = fakeFetch((c) => {
+    if (c.url.endsWith("/networks")) return json(200, { networks: [{ id: "linkedin", name: "LinkedIn", kind: "profile" }, { id: "Facebook", name: "Facebook" }, { id: "bad id", name: "x" }, { id: "x" }, { id: "linkedin", name: "Again" }] });
+    if (c.url.endsWith("/connect/start")) return json(200, { url: "https://www.linkedin.com/oauth/v2/authorization?x=1" });
+    if (c.method === "GET") return json(200, { network: "linkedin-page", options: [{ id: "p1", name: "Ana's Bakery", picture: "https://cdn.test/a.png" }, { id: "p2", name: "Shop", picture: "javascript:alert(1)" }, { id: "p1", name: "dup" }, { name: "no id" }] });
+    return json(200, { channels: [{ id: "ch1" }] });
+  });
+  const r = socialConnectFor({ CAPYBAROAR_PARTNER_URL: "https://cb.test/", CAPYBAROAR_PARTNER_KEY: "cb_partner_y" }, f);
+  assert.ok(r.ok);
+  assert.deepEqual(await r.client.networks(), { ok: true, status: 200, data: [{ id: "linkedin", name: "LinkedIn", kind: "profile" }, { id: "facebook", name: "Facebook", kind: "" }] });
+  assert.deepEqual(await r.client.start("b 1", { network: "linkedin", return_url: "https://app.test/settings/social/return?state=s" }), { ok: true, status: 200, data: { url: "https://www.linkedin.com/oauth/v2/authorization?x=1" } });
+  assert.deepEqual(await r.client.pick("tok_12345678"), {
+    ok: true,
+    status: 200,
+    data: { network: "linkedin-page", options: [{ id: "p1", name: "Ana's Bakery", picture: "https://cdn.test/a.png" }, { id: "p2", name: "Shop", picture: null }] },
+  });
+  assert.deepEqual(await r.client.pickConnect("tok_12345678", ["p1"]), { ok: true, status: 200, data: { channels: [{ id: "ch1" }] } });
+  assert.deepEqual(
+    calls.map((c) => [c.method, c.url, c.body]),
+    [
+      ["GET", "https://cb.test/api/partner/networks", undefined],
+      ["POST", "https://cb.test/api/partner/brands/b%201/connect/start", { network: "linkedin", return_url: "https://app.test/settings/social/return?state=s" }],
+      ["GET", "https://cb.test/api/partner/connect/pick/tok_12345678", undefined],
+      ["POST", "https://cb.test/api/partner/connect/pick/tok_12345678", { ids: ["p1"] }],
+    ],
+  );
+  assert.equal(calls[0].headers.get("authorization"), "Bearer cb_partner_y");
+  assert.equal(socialConnectFor({}, f).ok, false);
+});
+
+test("socialConnectClient: a 404 stays a 404 (the older partner), and a broken answer is a retryable bad_response", async () => {
+  const missing = fakeFetch(() => json(404, { error: { code: "not_found", message: "No." } }));
+  const c = socialConnectClient({ product: "capybaroar", url: "https://cb.test", key: "k", fetch: missing.f });
+  const r = await c.networks();
+  assert.equal(r.ok, false);
+  assert.equal(!r.ok && r.status, 404);
+  const broken = fakeFetch((x) => (x.url.endsWith("/networks") ? json(200, { networks: "no" }) : x.method === "GET" ? json(200, { network: "x" }) : json(200, { url: "http://plain.test/x" })));
+  const b = socialConnectClient({ product: "capybaroar", url: "https://cb.test", key: "k", fetch: broken.f });
+  for (const out of [await b.networks(), await b.start("b", { network: "x", return_url: "https://a.test" }), await b.pick("tok_12345678")]) {
+    assert.equal(out.ok, false);
+    assert.equal(!out.ok && out.code, "bad_response");
+    assert.equal(!out.ok && out.retryable, true);
+  }
+});
+
+test("integrationConnectClient: Arrowsterr's integrations and its start", async () => {
+  const { f, calls } = fakeFetch((c) => (c.url.endsWith("/integrations") ? json(200, { integrations: [{ id: "google_search_console", name: "Google Search Console", kind: "seo" }] }) : json(201, { url: "https://accounts.google.test/o/oauth2?x" })));
+  const r = integrationConnectFor(ENV, f);
+  assert.ok(r.ok);
+  assert.deepEqual(await r.client.integrations(), { ok: true, status: 200, data: [{ id: "google_search_console", name: "Google Search Console", kind: "seo" }] });
+  assert.deepEqual(await r.client.start("aw-1", { integration: "google_search_console", return_url: "https://app.test/r" }), { ok: true, status: 201, data: { url: "https://accounts.google.test/o/oauth2?x" } });
+  assert.deepEqual(calls.map((c) => [c.method, c.url, c.body]), [
+    ["GET", "https://aw.test/api/partner/integrations", undefined],
+    ["POST", "https://aw.test/api/partner/brands/aw-1/connect/start", { integration: "google_search_console", return_url: "https://app.test/r" }],
+  ]);
+  assert.equal(calls[0].headers.get("authorization"), "Bearer aw_partner_x");
 });

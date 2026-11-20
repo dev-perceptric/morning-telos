@@ -28,7 +28,7 @@ export const NEEDS = {
   changeRole: "admin",
   removeMember: "admin",
   deleteWorkspace: "owner",
-  connectSocial: "editor",
+  connectSocial: "admin",
   readChats: "viewer",
   chat: "editor",
   changeTeam: "admin",

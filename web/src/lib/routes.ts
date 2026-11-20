@@ -16,6 +16,8 @@ export type Route =
   | { page: "approvals"; id: number | null }
   | { page: "settings"; tab: SettingsTab }
   | { page: "invite"; token: string }
+  // Where a social network's (or SEO tool's) sign-in comes back to (src/lib/connectFlow.ts RETURN_PATH).
+  | { page: "socialReturn" }
   // The staff console. Its routes answer 404 to anyone who isn't staff (src/lib/staff.ts).
   | { page: "staff"; id: string | null };
 
@@ -37,6 +39,7 @@ export function parseRoute(path: string): Route {
   if (p === "/settings" || p === "/settings/general") return { page: "settings", tab: "general" };
   if (p === "/settings/members") return { page: "settings", tab: "members" };
   if (p === "/settings/social") return { page: "settings", tab: "social" };
+  if (p === "/settings/social/return") return { page: "socialReturn" };
   if (p === "/settings/apps") return { page: "settings", tab: "apps" };
   if (p === "/settings/skills") return { page: "settings", tab: "skills" };
   if (p === "/settings/extension") return { page: "settings", tab: "extension" };
@@ -66,6 +69,7 @@ export function parseRoute(path: string): Route {
 export function routePath(r: Route): string {
   if (r.page === "settings") return r.tab === "general" ? "/settings" : `/settings/${r.tab}`;
   if (r.page === "invite") return `/invite/${r.token}`;
+  if (r.page === "socialReturn") return "/settings/social/return";
   if (r.page === "thread") return r.id ? `/chat/${r.id}` : "/chat";
   if (r.page === "useCases") return "/use-cases";
   if (r.page === "team") return "/team";

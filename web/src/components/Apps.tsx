@@ -10,7 +10,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useState } from "react";
 import { APP_MESSAGES, appLogo, appName, APPS, DIRECT, GROUPS, isAppId, type AppEntry } from "@/lib/composio/catalog";
 import { can } from "@/lib/workspace";
-import { callApi, message } from "./nav";
+import { TOOLS, TOOLS_PRODUCT } from "@/lib/connectFlow";
+import type { Connectable } from "@/lib/partner";
+import { callApi, getApi, message } from "./nav";
+import { useStartConnect } from "./Social";
 import type { Workspace } from "./Settings";
 import { ErrorText, input, Notice } from "./ui";
 
@@ -155,6 +158,7 @@ export function AppsSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) 
             );
           })
         : null}
+      {admin ? <ToolsSection sb={sb} ws={ws} /> : null}
     </>
   );
 }
@@ -204,6 +208,53 @@ function AppRow(p: { app: AppEntry; conn: Conn | null; ready: boolean; admin: bo
         ) : null}
       </span>
     </div>
+  );
+}
+
+/**
+ * SEO tools Artemis reads, like Cloudflare for which AI tools visit the site. Owners and admins sign in on the tool's
+ * own page, and it comes back here through /settings/social/return. Hidden until there is a tool to connect.
+ */
+function ToolsSection({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {
+  const [tools, setTools] = useState<Connectable[]>([]);
+  const { start, busy, error } = useStartConnect(sb, ws.id);
+  useEffect(() => {
+    let live = true;
+    getApi<{ mode: string; integrations: Connectable[] }>(sb, `/api/seo/integrations?${new URLSearchParams({ workspaceId: ws.id })}`).then(
+      (r) => live && setTools(r.mode === "branded" ? (r.integrations ?? []) : []),
+      () => live && setTools([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [sb, ws.id]);
+  if (!tools.length) return null;
+  return (
+    <section className="app-grp">
+      <h3 className="grp-h">SEO tools</h3>
+      <div className="card list">
+        {tools.map((t) => (
+          <div key={t.id} className="row wrap-row">
+            {TOOLS[t.id] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={TOOLS[t.id].logo} alt="" width={32} height={32} className="lg-img" />
+            ) : (
+              <span className="ini">{t.name[0]}</span>
+            )}
+            <span className="main">
+              <b>{t.name}</b>
+              {TOOLS[t.id] ? <small className="wrap">{TOOLS[t.id].blurb}</small> : null}
+            </span>
+            <span className="row-act">
+              <button type="button" className="btn sm" onClick={() => start(t.id, "branded", { to: "settings" }, TOOLS_PRODUCT)} disabled={Boolean(busy)}>
+                {busy === t.id ? "Opening..." : `Connect ${t.name}`}
+              </button>
+            </span>
+          </div>
+        ))}
+      </div>
+      {error ? <ErrorText>{error}</ErrorText> : null}
+    </section>
   );
 }
 

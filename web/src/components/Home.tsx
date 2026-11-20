@@ -32,8 +32,8 @@ import { Composer, Face, useSkillRows } from "./Chat";
 import { Icon } from "./icons";
 import { callApi, message, navigate, readLocal, writeLocal } from "./nav";
 import type { Workspace } from "./Settings";
-import { useConnect } from "./Social";
-import { ErrorText, Notice, Section, to } from "./ui";
+import { NetworkChooserSheet, NetworkMark } from "./Social";
+import { ErrorText, Section, to } from "./ui";
 
 type AppsList = {
   on: boolean;
@@ -128,7 +128,8 @@ export function Home({
   const skills = useSkillRows(sb, ws.id);
   const pill = trialPill(effectivePlan(ws));
   const { apps, social, industry } = useHomeState(sb, ws, admin);
-  const socialConnect = useConnect(sb, ws.id);
+  // Finish setup's social row opens our own chooser of networks.
+  const [chooser, setChooser] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const bannerKey = slackBannerKey(userId, ws.id);
@@ -285,15 +286,7 @@ export function Home({
       </div>
 
       {error ? <ErrorText>{error}</ErrorText> : null}
-      {socialConnect.error ? (
-        <ErrorText>{socialConnect.error}</ErrorText>
-      ) : null}
-      {socialConnect.opened ? (
-        <Notice>
-          We opened the connect page in a new tab. Sign in to each account
-          there.
-        </Notice>
-      ) : null}
+      <NetworkChooserSheet sb={sb} ws={ws} open={chooser} onClose={() => setChooser(false)} />
 
       {rows.length ? (
         <Section
@@ -306,8 +299,7 @@ export function Home({
                 key={r.key}
                 row={r}
                 busy={busy}
-                socialBusy={socialConnect.busy}
-                onSocial={socialConnect.connect}
+                onSocial={() => setChooser(true)}
                 onApp={connectApp}
               />
             ))}
@@ -357,27 +349,31 @@ function go(e: React.MouseEvent, path: string) {
 function SetupLine({
   row,
   busy,
-  socialBusy,
   onSocial,
   onApp,
 }: {
   row: SetupRow;
   busy: string;
-  socialBusy: boolean;
   onSocial: () => void;
   onApp: (toolkit: string) => void;
 }) {
   const c = row.connect;
   return (
     <div className="row wrap-row">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={appLogo(row.logos[0])}
-        alt=""
-        width={32}
-        height={32}
-        className="lg-img"
-      />
+      {c.kind === "social" ? (
+        <span className="lg-img">
+          <NetworkMark network={row.logos[0]} size={26} />
+        </span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={appLogo(row.logos[0])}
+          alt=""
+          width={32}
+          height={32}
+          className="lg-img"
+        />
+      )}
       <span className="main">
         <b className="wrap">{row.title}</b>
         <small className="wrap">{row.text}</small>
@@ -388,9 +384,9 @@ function SetupLine({
             type="button"
             className="btn sm"
             onClick={onSocial}
-            disabled={socialBusy}
+            aria-haspopup="dialog"
           >
-            {socialBusy ? "Opening..." : "Connect"}
+            Connect
           </button>
         ) : c.kind === "page" ? (
           <a

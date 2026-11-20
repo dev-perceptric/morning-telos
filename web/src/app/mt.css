@@ -887,3 +887,19 @@ button.row:disabled:hover{background:none}
 a.fchip.sent:hover{border-color:var(--line-2)}
 @media (max-width:900px){.sthumb{width:96px;height:96px}.fchip .fn b{max-width:140px}}
 @media (prefers-reduced-motion:reduce){.mic.on{animation:none;box-shadow:0 0 0 3px rgba(217,119,87,.3)}}
+
+/* Connecting social accounts on our own page (Social.tsx) */
+.netchoose{display:flex;flex-direction:column;gap:10px;align-items:flex-start;min-width:0;width:100%}
+.netgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;width:100%}
+.netbtn{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface);font-size:13.5px;font-weight:600;color:var(--ink);text-align:left;transition:background .15s,border-color .15s}
+.netbtn:hover:not(:disabled){background:var(--sunk);border-color:var(--line-2)}
+.netbtn:disabled{opacity:.6}
+.netmark{flex:none;border-radius:5px;object-fit:contain}
+.netmark.ini{border-radius:6px}
+span.lg-img{display:grid;place-items:center}
+.netret{max-width:560px}
+.netret-h{display:flex;align-items:flex-start;gap:12px;font-size:14px;color:var(--ink-2)}
+.netret-b{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.netpick{cursor:pointer}
+.netpick input{width:16px;height:16px;flex:none;accent-color:var(--ink)}
+.netpick-pic{width:32px;height:32px;border-radius:50%;object-fit:cover;flex:none}

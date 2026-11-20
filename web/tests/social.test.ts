@@ -47,7 +47,7 @@ function connectDeps(o: { role?: Role | null; service?: { status: ServiceStatus;
     logs,
     p,
     d: {
-      gate: gateAs(o.role === undefined ? "editor" : o.role, asked),
+      gate: gateAs(o.role === undefined ? "admin" : o.role, asked),
       service: async () => (o.service === undefined ? { status: "ready" as ServiceStatus, brand_id: "cb-brand-1" } : o.service),
       partner: () => ("error" in p ? { ok: false as const, error: p.error } : { ok: true as const, partner: p.partner }),
       log: (m: string) => void logs.push(m),
@@ -57,23 +57,23 @@ function connectDeps(o: { role?: Role | null; service?: { status: ServiceStatus;
 
 // ─────────────── connect link ───────────────
 
-test("connect link: an editor, admin or owner gets the link for their workspace's brand", async () => {
-  for (const role of ["editor", "admin", "owner"] as const) {
+test("connect link: an admin or owner gets the link for their workspace's brand", async () => {
+  for (const role of ["admin", "owner"] as const) {
     const { d, asked, p } = connectDeps({ role });
     const r = await connectLink(d);
     assert.equal(r.status, 200, role);
     assert.deepEqual(r.body, { url: "https://cb.test/connect/tok123", expires_at: "2026-11-18T10:00:00Z" });
-    assert.deepEqual(asked, ["editor"]);
+    assert.deepEqual(asked, ["admin"]);
     assert.deepEqual("calls" in p ? p.calls : null, ["cb-brand-1"]);
   }
 });
 
-test("connect link: a viewer or a non-member gets no link, and the partner is never called", async () => {
-  for (const role of ["viewer", null] as const) {
+test("connect link: an editor, a viewer or a non-member gets no link, and the partner is never called", async () => {
+  for (const role of ["editor", "viewer", null] as const) {
     const { d, p } = connectDeps({ role });
     const r = await connectLink(d);
     assert.equal(r.status, 403);
-    assert.deepEqual(r.body, { error: "You need editor access in this workspace to do that." });
+    assert.deepEqual(r.body, { error: "You need admin access in this workspace to do that." });
     assert.deepEqual("calls" in p ? p.calls : null, []);
   }
 });

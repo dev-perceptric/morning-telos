@@ -58,6 +58,7 @@ beforeEach(() => {
   };
   auth.db = db;
   auth.roles = new Map([
+    [`admin1:${WS}`, "admin"],
     [`editor1:${WS}`, "editor"],
     [`viewer1:${WS}`, "viewer"],
     [`owner2:${OTHER}`, "owner"],
@@ -67,18 +68,19 @@ beforeEach(() => {
 const ask = (user: string | null, workspaceId: unknown = WS) =>
   connect.POST(new Request("https://app.test/api/social/connect-link", { method: "POST", headers: user ? { Authorization: `Bearer ${user}` } : {}, body: JSON.stringify({ workspaceId }) }));
 
-test("connect-link: an editor gets the link for their workspace's Capybaroar brand", async () => {
-  const res = await ask("editor1");
+test("connect-link: an admin gets the link for their workspace's Capybaroar brand", async () => {
+  const res = await ask("admin1");
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { url: "https://cb.test/connect/for-cb-1", expires_at: "2026-11-18T10:00:00Z" });
   assert.deepEqual(partnerCalls, ["POST /api/partner/brands/cb-1/connect-link"]);
 });
 
-test("connect-link: viewers, strangers and signed-out people get no link", async () => {
+test("connect-link: editors, viewers, strangers and signed-out people get no link", async () => {
+  assert.equal((await ask("editor1")).status, 403);
   assert.equal((await ask("viewer1")).status, 403);
   assert.equal((await ask("owner2")).status, 403, "an owner of another workspace");
   assert.equal((await ask(null)).status, 401);
-  assert.equal((await ask("editor1", "")).status, 400);
+  assert.equal((await ask("admin1", "")).status, 400);
   assert.deepEqual(partnerCalls, []);
 });
 
