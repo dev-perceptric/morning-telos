@@ -3,6 +3,7 @@
 // Home works like ChatGPT's new chat screen: one question in the middle of the page and the message box under it.
 // Nothing else, so the page is only about asking the team. The trial pill stays at the top while a trial runs.
 
+import type { StoredFile } from "@/lib/attachments";
 import { effectivePlan } from "@/lib/plans";
 import { trialPill } from "@/lib/home";
 import type { ModelChoice } from "@/lib/models";
@@ -27,7 +28,8 @@ export function Home({
   name: string;
   draft: string;
   onDraft: (v: string) => void;
-  onStart: (text: string) => void;
+  /** The first message, with the files attached to it. */
+  onStart: (text: string, files: StoredFile[]) => void;
   model: ModelChoice;
   onModel: (m: ModelChoice) => void;
 }) {
@@ -67,6 +69,7 @@ export function Home({
           rows={2}
           model={model}
           onModel={onModel}
+          attach={editor ? { sb, workspaceId: ws.id } : undefined}
         />
       </div>
     </div>

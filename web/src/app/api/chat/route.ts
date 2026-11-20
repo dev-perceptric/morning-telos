@@ -1,5 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { randomUUID } from "node:crypto";
+import { FILE_MESSAGES, MESSAGE_MAX_BYTES, readFileRefs, storedFile, wordsFor, type LoadedFile, type StoredFile } from "@/lib/attachments";
+import { fileReader, loadFiles } from "@/lib/attachmentsServer";
 import { runTurn, type ChatEvent, type TeamWorkspace } from "@/lib/agentLoop";
 import { CHAT_MESSAGES, ndjsonLine, rateLimiter, readChat } from "@/lib/chat";
 import { preflight, refuseOtherExtension, withCors } from "@/lib/cors";
@@ -29,6 +31,9 @@ import { NEEDS } from "@/lib/workspace";
 // The Chrome extension calls this too, with its own bearer token, and only its origin gets CORS (src/lib/cors.ts).
 // It can send `page` (a web page, an email or selected text) and `screenshot`: the page is saved on the message and
 // goes to Claude as outside data, the screenshot only goes with this turn (src/lib/pageContext.ts).
+// `files`: paths of files uploaded first through POST /api/chat/files, in this workspace's folder. Each is read again
+// here, saved on the message (meta.files) and sent to Claude as image, document or text blocks; later turns read them
+// again from the message (src/lib/attachments.ts). A message can be only files.
 export const dynamic = "force-dynamic";
 
 // 60 messages an hour per workspace, the same as the old app.
@@ -65,6 +70,9 @@ async function chat(request: Request) {
   if (!shot.ok) return fail(shot.error, 400);
   // A screenshot only comes with a page, and never with a routine.
   const screenshot = page.value && !routineId ? shot.value : null;
+  // Files only come with a new message from the person, never with a routine or Retry.
+  const refs = readFileRefs(routineId || again ? null : body.files, ws);
+  if (!refs.ok) return fail(refs.error, 400);
   let text = read.value.text;
   let forced: AgentKey | null = agent;
   const db = adminClient();
@@ -72,6 +80,8 @@ async function chat(request: Request) {
 
   let threadId = read.value.threadId;
   let workspace: TeamWorkspace | null = null;
+  // The new message's files, read once here and handed to the turn, so nothing is read twice.
+  let ready: LoadedFile[] = [];
   try {
     workspace = await loadWorkspace(db, ws);
     if (!workspace) return fail("We couldn't find that workspace.", 404);
@@ -83,19 +93,27 @@ async function chat(request: Request) {
     if (again && threadId) {
       // Retry and Ask someone else answer what the person already sent. Nothing new is saved for them.
       const last = await lastUserText(db, ws, threadId);
-      if (!last) return fail(CHAT_MESSAGES.nothingToRetry, 400);
+      if (last === null) return fail(CHAT_MESSAGES.nothingToRetry, 400);
       text = last;
     } else if (routine) {
       text = routine.instruction;
       forced = routine.agent;
       threadId = await startRoutineThread(db, routine, { userId: who.userId, email: who.email ?? who.userId, now: true });
     } else {
+      let files: StoredFile[] = [];
+      if (refs.value.length) {
+        const wanted = refs.value.map((p) => storedFile(p, 0, ws)!);
+        ready = await loadFiles(db, ws, wanted, log);
+        if (ready.length !== wanted.length) return fail(FILE_MESSAGES.bad, 400);
+        if (ready.reduce((n, f) => n + f.size, 0) > MESSAGE_MAX_BYTES) return fail(FILE_MESSAGES.tooMuch, 400);
+        files = ready.map(({ path, name, kind, type, size }) => ({ path, name, kind, type, size }));
+      }
       if (!threadId) {
         threadId = randomUUID();
-        const { error } = await db.from("threads").insert({ id: threadId, workspace_id: ws, title: threadTitle(text), created_by: who.userId });
+        const { error } = await db.from("threads").insert({ id: threadId, workspace_id: ws, title: threadTitle(wordsFor(text, files)), created_by: who.userId });
         if (error) throw new Error(error.message);
       }
-      const { error } = await db.from("messages").insert({ thread_id: threadId, workspace_id: ws, role: "user", agent: null, content: text, meta: { user: who.email ?? who.userId, ...(page.value ? { page: pageForStore(page.value) } : {}) } });
+      const { error } = await db.from("messages").insert({ thread_id: threadId, workspace_id: ws, role: "user", agent: null, content: text, meta: { user: who.email ?? who.userId, ...(page.value ? { page: pageForStore(page.value) } : {}), ...(files.length ? { files } : {}) } });
       if (error) throw new Error(error.message);
     }
   } catch (e) {
@@ -105,7 +123,8 @@ async function chat(request: Request) {
 
   const thread = threadId;
   const team: TeamWorkspace = workspace;
-  const words = text;
+  // Routing and the Knowledge search read the words, or the file names when there are none.
+  const words = wordsFor(text, ready);
   const encoder = new TextEncoder();
   let open = true;
   // Stop: the person cancelled the request, so the stream is cancelled (cancel() below). The reply stops and what
@@ -132,6 +151,8 @@ async function chat(request: Request) {
           // Picks who answers an untagged message: Claude Haiku 5.5, cut off after 1.5 seconds (then Athena).
           router: client ? claudeRouter(client) : null,
           signal: stopped.signal,
+          // Files on the thread's newest messages, read from storage once for the whole turn.
+          files: fileReader(db, ws, ready, log),
           store: teamStore(db, ws),
           // Arrowsterr and Capybaroar through this workspace's brand keys (changes wait for approval), Knowledge
           // search, and use_skill and remember (src/lib/brainServer.ts).

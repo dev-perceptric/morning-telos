@@ -4,7 +4,7 @@ import { NEEDS } from "@/lib/workspace";
 
 // Whether the email door is on for this server, for Settings > General: { domain } with TEAM_EMAIL_DOMAIN, or
 // { domain: null } while it is empty (the section stays hidden). Any member may ask. The address itself is read from
-// Supabase by the screen (team_email, supabase/022_team_email.sql).
+// Supabase by the screen (team_email, supabase/023_team_email.sql).
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {

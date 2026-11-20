@@ -20,6 +20,7 @@ import {
   messageIds,
   newThreadToken,
   parseTeamAddress,
+  pickAttachments,
   pickThread,
   replyIds,
   replySubject,
@@ -208,4 +209,24 @@ test("capTrust: on an email turn every teammate waits for approval, even on auto
 
 test("the words have no em dashes", () => {
   for (const v of [...Object.values(TEAM_EMAIL_MESSAGES), EMAIL_SAYS]) assert.doesNotMatch(v, /[–—]/);
+});
+
+test("pickAttachments: images and PDFs, not tiny inline signature pictures, 5 at most and 20 MB together", () => {
+  const MB = 1024 * 1024;
+  const a = (filename: string, size: number, content_disposition: string | null = "attachment") => ({ filename, size, content_disposition });
+  const { take, skip } = pickAttachments([
+    a("menu.pdf", 2 * MB),
+    a("logo.png", 4000, "inline"),
+    a("screenshot.png", 400_000, "inline"),
+    a("notes.docx", 1000),
+    a("data.csv", 1000),
+    a("huge.png", 6 * MB),
+    a("big1.pdf", 9 * MB),
+    a("big2.pdf", 9 * MB),
+    a("p1.jpg", 1000),
+    a("p2.jpg", 1000),
+    a("p3.jpg", 1000),
+  ]);
+  assert.deepEqual(take.map((x) => x.filename), ["menu.pdf", "screenshot.png", "big1.pdf", "p1.jpg", "p2.jpg"]);
+  assert.deepEqual(skip.map((x) => x.filename), ["logo.png", "notes.docx", "data.csv", "huge.png", "big2.pdf", "p3.jpg"]);
 });

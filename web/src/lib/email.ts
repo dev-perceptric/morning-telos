@@ -85,3 +85,25 @@ export async function getReceivedEmail(id: string, d: Pick<ResendDeps, "key" | "
       .map((a) => ({ id: String(a.id ?? ""), filename: String(a.filename ?? "file"), content_type: String(a.content_type ?? ""), size: typeof a.size === "number" ? a.size : undefined })),
   };
 }
+
+/** A received email's attachment with a link to download it (Resend's link lasts an hour). */
+export type ReceivedAttachment = { id: string; filename: string; content_type: string; content_disposition: string | null; size: number; download_url: string };
+
+/** Lists a received email's attachments with their download links. Throws when Resend says no. */
+export async function listReceivedAttachments(id: string, d: Pick<ResendDeps, "key" | "fetch">): Promise<ReceivedAttachment[]> {
+  if (!d.key) throw new Error("RESEND_API_KEY is not set.");
+  if (!/^[A-Za-z0-9-]{1,100}$/.test(id)) throw new Error("That is not a Resend email id.");
+  const res = await d.fetch(`${RESEND_RECEIVING_URL}/${encodeURIComponent(id)}/attachments?limit=100`, { headers: { Authorization: `Bearer ${d.key}` }, signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) throw new Error(`Resend returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const body = (await res.json()) as { data?: unknown };
+  return (Array.isArray(body.data) ? body.data : [])
+    .filter((a): a is Record<string, unknown> => Boolean(a) && typeof a === "object")
+    .map((a) => ({
+      id: String(a.id ?? ""),
+      filename: String(a.filename ?? "file"),
+      content_type: String(a.content_type ?? ""),
+      content_disposition: typeof a.content_disposition === "string" ? a.content_disposition : null,
+      size: Number(a.size) || 0,
+      download_url: String(a.download_url ?? ""),
+    }));
+}

@@ -8,6 +8,7 @@
 // reason is kept (team_email_drops), never the address or the text.
 // Pure: the database, Resend and the turn come in as deps. The server's are in src/lib/teamEmailServer.ts.
 import type { ChatEvent } from "./agentLoop.ts";
+import { wordsFor, type StoredFile } from "./attachments.ts";
 import type { Email } from "./emailKit.ts";
 import type { ReceivedEmail } from "./email.ts";
 import { emailText, trimEmail } from "./emailText.ts";
@@ -117,6 +118,11 @@ export type JobDeps = {
   /** The chat's Message-IDs, oldest first. */
   references: (workspaceId: string, threadId: string) => Promise<string[]>;
   saveMessage: (workspaceId: string, threadId: string, content: string, meta: Record<string, unknown>) => Promise<void>;
+  /**
+   * Keeps the email's images and PDFs as chat files (pickAttachments, src/lib/attachmentsServer.ts saveFile), so the
+   * team reads them like files attached in the app. Returns the saved files and the names of the ones left out.
+   */
+  saveAttachments: (workspaceId: string, emailId: string) => Promise<{ files: StoredFile[]; skipped: string[] }>;
   /** Runs the team's turn on this chat. Every change waits for approval (capTrust). */
   runTurn: (workspaceId: string, threadId: string, text: string, emit: (e: ChatEvent) => void) => Promise<void>;
   /** Saves an Approve link for this member and returns its address (src/lib/approveLink.ts). */
@@ -153,7 +159,7 @@ export async function processTeamEmail(job: { workspace_id: string | null; paylo
   const words = trimEmail(emailText(e), { forward: isForward(e.subject) });
   const subject = cleanSubject(e.subject);
   const content = words || subject;
-  if (!content) return drop("empty");
+  if (!content && !e.attachments.length) return drop("empty");
 
   // Which chat: the token in the address it was sent to, else the In-Reply-To and References headers.
   const to = findTeamAddress([e.to, e.cc, e.received_for], d.domain);
@@ -174,13 +180,22 @@ export async function processTeamEmail(job: { workspace_id: string | null; paylo
   }
 
   if (!(await d.recordMessage(ws, threadId, messageId, "in"))) return { status: "done" };
-  const meta: StoredEmail = { from, to: teamAddress(addr.slug, d.domain), subject, attachments: e.attachments.map((a) => a.filename).slice(0, 20) };
-  await d.saveMessage(ws, threadId, content, { user: from, email: meta });
+  // Images and PDFs become chat files the team reads; anything else is only named.
+  let saved: { files: StoredFile[]; skipped: string[] } = { files: [], skipped: e.attachments.map((a) => a.filename) };
+  if (e.attachments.length) {
+    try {
+      saved = await d.saveAttachments(ws, emailId);
+    } catch (err) {
+      d.log(`Team email ${emailId}: attachments weren't saved: ${String((err as Error)?.message ?? err).slice(0, 200)}`);
+    }
+  }
+  const meta: StoredEmail = { from, to: teamAddress(addr.slug, d.domain), subject, attachments: saved.skipped.slice(0, 20) };
+  await d.saveMessage(ws, threadId, content, { user: from, email: meta, ...(saved.files.length ? { files: saved.files } : {}) });
 
   // The turn: smart routing picks who answers, a tag in the subject or first line picks them by name.
   let last: { agent: AgentKey; text: string } | null = null;
   const approvals: { id: number; title: string }[] = [];
-  await d.runTurn(ws, threadId, routingText(e.subject, content), (ev) => {
+  await d.runTurn(ws, threadId, routingText(e.subject, content || wordsFor("", saved.files)), (ev) => {
     if (ev.type === "message" && ev.text.trim()) last = { agent: ev.agent, text: ev.text };
     if (ev.type === "approval" && !approvals.some((a) => a.id === ev.id)) approvals.push({ id: ev.id, title: ev.title });
   });

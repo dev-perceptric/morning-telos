@@ -1,7 +1,7 @@
 "use client";
 
 // Settings > General: "Email your team". The workspace's address with Copy, a one-time change of the address, the
-// on/off switch and "Also accept email from" (src/lib/teamEmail.ts, supabase/022_team_email.sql). Hidden until the
+// on/off switch and "Also accept email from" (src/lib/teamEmail.ts, supabase/023_team_email.sql). Hidden until the
 // server has TEAM_EMAIL_DOMAIN (POST /api/email/team), so nothing shows before receiving is set up.
 // Members read it; only the owner changes it. Row level security and the SQL functions check that again.
 

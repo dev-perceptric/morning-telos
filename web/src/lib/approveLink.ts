@@ -1,6 +1,6 @@
 // The Approve link in a team email (src/lib/teamEmailReply.ts). The link holds a token sealed with the server's key
 // (src/lib/sealing.ts) that names one approval, its workspace, the member it was sent to and a nonce, and says when
-// it stops working (72 hours). The nonce is a row in approval_links (supabase/022_team_email.sql), used once.
+// it stops working (72 hours). The nonce is a row in approval_links (supabase/023_team_email.sql), used once.
 //
 // Opening the link (GET /api/email/approve) only shows the change and a button, so a mail scanner that opens every
 // link approves nothing. Pressing the button (POST) uses the link and approves through the same path as the app

@@ -6,6 +6,7 @@
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import type { StoredFile } from "@/lib/attachments";
 import { identify, inWorkspace, isRecent, pageView, resetAnalytics, trackOnce } from "@/lib/analytics";
 import { initial, paletteMatch, type PaletteItem } from "@/lib/home";
 import type { ModelChoice } from "@/lib/models";
@@ -288,11 +289,11 @@ function Frame2({
   // The workspace's first chat, once (the chat list may still be loading, so the mark keeps it from counting twice).
   const firstChat = chrome.threads.length === 0;
   const wsId = ws.id;
-  const startChat = useCallback((text: string) => {
+  const startChat = useCallback((text: string, files: StoredFile[] = []) => {
     if (firstChat) trackOnce(`firstchat.${wsId}`, "first_chat_sent");
     setDraft("");
     setOwnThread(null);
-    setStart({ text });
+    setStart({ text, files });
     navigate("/chat");
   }, [firstChat, wsId]);
   // Run now on the Routines page: a new chat that streams the routine.

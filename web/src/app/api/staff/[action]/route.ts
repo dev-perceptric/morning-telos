@@ -46,7 +46,7 @@ function deps(db: SupabaseClient, staff: StaffDeps["staff"]): StaffDeps {
     actions: async (ws) => rows<StaffAction[]>(await db.from("staff_actions").select("id, staff_email, action, details, created_at").eq("workspace_id", ws).order("id", { ascending: false }).limit(20)) ?? [],
     droppedEmails: async (sinceDay) => {
       const r = await db.from("team_email_drops").select("count").gte("day", sinceDay).limit(5000);
-      // Before 022_team_email.sql runs there is no table: no count, and the console still loads.
+      // Before 023_team_email.sql runs there is no table: no count, and the console still loads.
       if (r.error) return 0;
       return ((r.data ?? []) as { count: number }[]).reduce((n, x) => n + (Number(x.count) || 0), 0);
     },

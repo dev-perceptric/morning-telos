@@ -5,12 +5,14 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runTurn, type LoopClient, type TeamStore } from "./agentLoop.ts";
 import { approveUrl, makeApproveToken, newNonce } from "./approveLink.ts";
+import type { StoredFile } from "./attachments.ts";
+import { fileReader, saveFile } from "./attachmentsServer.ts";
 import { brainTools, teamContext } from "./brainServer.ts";
-import { getReceivedEmail, sendBuilt } from "./email.ts";
+import { getReceivedEmail, listReceivedAttachments, sendBuilt } from "./email.ts";
 import type { Handler } from "./jobs.ts";
 import { claudeRouter } from "./router.ts";
 import { envKeyring } from "./sealing.ts";
-import { capTrust, type DropReason, type SenderRow } from "./teamEmail.ts";
+import { capTrust, pickAttachments, type DropReason, type SenderRow } from "./teamEmail.ts";
 import type { InboundDeps, JobDeps } from "./teamEmailInbound.ts";
 import { processTeamEmail } from "./teamEmailInbound.ts";
 import { loadWorkspace, teamStore } from "./teamStore.ts";
@@ -100,6 +102,26 @@ export function teamEmailJobHandlers(db: SupabaseClient, deps: TeamEmailServerDe
         saveMessage: async (w, threadId, content, meta) => {
           must(await db.from("messages").insert({ thread_id: threadId, workspace_id: w, role: "user", agent: null, content, meta }), "Message wasn't saved");
         },
+        saveAttachments: async (w, emailId) => {
+          const { take, skip } = pickAttachments(await listReceivedAttachments(emailId, { key, fetch: net }));
+          const files: StoredFile[] = [];
+          const skipped = skip.map((a) => a.filename);
+          for (const a of take) {
+            try {
+              // Resend's own short-lived download link, never an address from the email.
+              if (!/^https:\/\//.test(a.download_url)) throw new Error("no download link");
+              const res = await net(a.download_url, { signal: AbortSignal.timeout(30_000) });
+              if (!res.ok) throw new Error(`download returned ${res.status}`);
+              const r = await saveFile(db, w, a.filename, new Uint8Array(await res.arrayBuffer()), log);
+              if (!r.ok) throw new Error(r.error);
+              files.push(r.file);
+            } catch (err) {
+              log(`Team email ${emailId}: ${a.filename} wasn't kept: ${String((err as Error)?.message ?? err).slice(0, 200)}`);
+              skipped.push(a.filename);
+            }
+          }
+          return { files, skipped };
+        },
         runTurn: async (w, threadId, text, emit) => {
           const client = deps.client();
           const base = teamStore(db, w);
@@ -113,6 +135,8 @@ export function teamEmailJobHandlers(db: SupabaseClient, deps: TeamEmailServerDe
               store,
               emit,
               log,
+              // The email's images and PDFs, saved as chat files above, read from storage once for the turn.
+              files: fileReader(db, w, [], log),
               tools: teamTools(db, { log, extra: [brainTools(db, w)] }),
               context: teamContext(db, { text, log }),
             },

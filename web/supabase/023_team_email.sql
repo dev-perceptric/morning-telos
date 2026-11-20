@@ -1,6 +1,6 @@
--- Morning Telos migration 022: the email door. Every workspace gets an address like acme@team.morningtelos.com. The
+-- Morning Telos migration 023: the email door. Every workspace gets an address like acme@team.morningtelos.com. The
 -- owner and the team email it or forward to it, the right teammate answers by email, and the chat shows in the app.
--- Run once in Supabase → SQL Editor, after 021_brand.sql. Safe to run again.
+-- Run once in Supabase → SQL Editor, after 022_chat_files.sql. Safe to run again.
 -- Nothing changes for customers until TEAM_EMAIL_DOMAIN is set on the server (src/lib/teamEmail.ts).
 --
 -- How mail flows: Resend receives the email and calls POST /api/email/inbound (src/lib/teamEmailInbound.ts). The

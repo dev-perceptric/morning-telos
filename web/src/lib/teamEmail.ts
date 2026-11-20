@@ -3,7 +3,8 @@
 // the Settings screen (src/components/TeamEmail.tsx), the agent loop and tests: the feature flag, slugs and
 // addresses, who may send, matching a reply to its chat, and how an email reaches Claude.
 //
-// The table and its rules are supabase/022_team_email.sql. Nothing here reads the environment: callers pass it in.
+// The table and its rules are supabase/023_team_email.sql. Nothing here reads the environment: callers pass it in.
+import { checkFile, MAX_FILES, MESSAGE_MAX_BYTES } from "./attachments.ts";
 import { cleanText, fence, fenceAttr } from "./pageContext.ts";
 
 type Env = Record<string, string | undefined>;
@@ -55,7 +56,7 @@ export const TEAM_EMAIL_MESSAGES = {
 
 // ─────────────── slugs and addresses ───────────────
 
-/** Names nobody gets. The same list as team_email_reserved() in supabase/022_team_email.sql. */
+/** Names nobody gets. The same list as team_email_reserved() in supabase/023_team_email.sql. */
 export const RESERVED_SLUGS: readonly string[] = [
   "abuse", "admin", "billing", "help", "hostmaster", "info", "mailer-daemon", "morningtelos", "no-reply", "noreply",
   "postmaster", "root", "security", "staff", "support", "team", "webmaster",
@@ -241,6 +242,31 @@ export function routingText(subject: unknown, body: string): string {
   const first = lines.findIndex((l) => l.trim());
   const rest = first < 0 ? "" : lines.slice(first + 1).join("\n").replace(/@(?=\w)/g, "");
   return [cleanSubject(subject), first < 0 ? "" : lines[first], rest].filter(Boolean).join("\n").slice(0, 8000);
+}
+
+// ─────────────── attachments ───────────────
+
+/** An inline picture smaller than this is a logo or icon in a signature, not something the person means to send. */
+export const SIGNATURE_IMAGE_BYTES = 30_000;
+
+/**
+ * Which of an email's attachments become chat files (src/lib/attachments.ts): images and PDFs, not the small inline
+ * pictures in a signature (inline and under 30 KB), up to 5 and 20 MB together, the same limits as the message box.
+ * The rest are named only.
+ */
+export function pickAttachments<T extends { filename: string; size: number; content_disposition?: string | null }>(list: T[]): { take: T[]; skip: T[] } {
+  const take: T[] = [];
+  const skip: T[] = [];
+  let bytes = 0;
+  for (const a of list) {
+    const c = checkFile(a.filename, a.size);
+    const fits = c.ok && (c.kind === "image" || c.kind === "pdf") && !(a.content_disposition === "inline" && a.size < SIGNATURE_IMAGE_BYTES) && take.length < MAX_FILES && bytes + a.size <= MESSAGE_MAX_BYTES;
+    if (fits) {
+      take.push(a);
+      bytes += a.size;
+    } else skip.push(a);
+  }
+  return { take, skip };
 }
 
 // ─────────────── the email as Claude sees it ───────────────

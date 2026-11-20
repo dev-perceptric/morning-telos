@@ -24,11 +24,14 @@ export type ChatRequest = { text: string; threadId: string | null; agent: AgentK
 /** Checks the body of POST /api/chat. Unknown agents and models are ignored, not errors. */
 export function readChat(body: Record<string, unknown>): { ok: true; value: ChatRequest } | { ok: false; error: string } {
   const text = typeof body.text === "string" ? body.text.trim() : "";
-  if (!text) return { ok: false, error: CHAT_MESSAGES.empty };
-  if (text.length > MAX_MESSAGE) return { ok: false, error: CHAT_MESSAGES.tooLong };
   const threadId = typeof body.threadId === "string" && body.threadId ? body.threadId : null;
   const routineId = typeof body.routineId === "string" && body.routineId ? body.routineId : null;
   const again = body.again === true && Boolean(threadId) && !routineId;
+  // A message can be only files (src/lib/attachments.ts), and the route checks the files themselves. Answering again
+  // reads the saved message, which may be only files.
+  const files = Array.isArray(body.files) && body.files.length > 0;
+  if (!text && !files && !again) return { ok: false, error: CHAT_MESSAGES.empty };
+  if (text.length > MAX_MESSAGE) return { ok: false, error: CHAT_MESSAGES.tooLong };
   return { ok: true, value: { text, threadId, agent: isAgentKey(body.agent) ? body.agent : null, model: isModelChoice(body.model) ? body.model : null, routineId, again } };
 }
 

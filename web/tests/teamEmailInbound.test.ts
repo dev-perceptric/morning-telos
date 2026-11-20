@@ -192,6 +192,15 @@ function world(o: { sender?: SenderRow | null; events?: ChatEvent[]; sendFails?:
     saveMessage: async (ws, thread, content, meta) => {
       db.saved.push({ ws, thread, content, meta });
     },
+    // The fake keeps PDFs and images by name and leaves out the rest, like pickAttachments and saveFile.
+    saveAttachments: async (ws, id) => {
+      const e = emails.get(id)!;
+      const keep = e.attachments.filter((a) => /\.(pdf|png|jpe?g)$/i.test(a.filename));
+      return {
+        files: keep.map((a) => ({ path: `${ws}/00000000-0000-4000-8000-000000000001/${a.filename}`, name: a.filename, kind: a.filename.endsWith(".pdf") ? "pdf" : "image", type: a.content_type as "application/pdf", size: 100 })),
+        skipped: e.attachments.filter((a) => !keep.includes(a)).map((a) => a.filename),
+      };
+    },
     runTurn: async (ws, thread, text, emit) => {
       turns.push({ ws, thread, text });
       for (const e of o.events ?? [{ type: "route", agent: "social", how: "router", reason: "" }, { type: "message", agent: "social", text: "Here are **3 posts**." }, { type: "done" }]) emit(e);
@@ -221,7 +230,16 @@ test("a new email starts a chat titled from the subject, saves the trimmed words
   assert.equal(t.created_by, "u-ana");
   assert.match(t.token, /^[a-z0-9]{16}$/);
   assert.deepEqual(w.db.saved, [
-    { ws: WS, thread: t.id, content: "Can you plan three posts?", meta: { user: "ana@bakery.com", email: { from: "ana@bakery.com", to: "acme@team.morningtelos.com", subject: "Posts for next week", attachments: ["menu.pdf"] } } },
+    {
+      ws: WS,
+      thread: t.id,
+      content: "Can you plan three posts?",
+      meta: {
+        user: "ana@bakery.com",
+        email: { from: "ana@bakery.com", to: "acme@team.morningtelos.com", subject: "Posts for next week", attachments: [] },
+        files: [{ path: `${WS}/00000000-0000-4000-8000-000000000001/menu.pdf`, name: "menu.pdf", kind: "pdf", type: "application/pdf", size: 100 }],
+      },
+    },
   ]);
   assert.equal(w.turns.length, 1);
   assert.equal(w.turns[0].text, "Posts for next week\nCan you plan three posts?");
@@ -291,7 +309,7 @@ test("dropped with no reply: faked From (no DKIM or DMARC pass), automatic mail,
     [{ sender: { kind: "member", user_id: "u-v", role: "viewer" } }, {}, "viewer"],
     [{ sender: null }, {}, "unknown_sender"],
     [{ inbound: EMAILS_PER_HOUR }, {}, "too_many"],
-    [{}, { subject: "", text: "On Mon Bo wrote:\n> only a quote" }, "empty"],
+    [{}, { subject: "", text: "On Mon Bo wrote:\n> only a quote", attachments: [] }, "empty"],
   ];
   for (const [o, e, reason] of cases) {
     const w = world(o);
@@ -365,4 +383,51 @@ test("a forward keeps the forwarded email, and a tag in the subject picks the te
   assert.match(w.db.saved[0].content, /Where is my order\?/);
   assert.match(w.turns[0].text, /^@Hestia customer question\n/);
   assert.equal(w.db.threads[0].title, "@Hestia customer question");
+});
+
+test("attachments: images and PDFs become chat files on the message; other files are named only; files alone are enough", async () => {
+  const w = world();
+  w.emails.set("e1", email({ subject: "", text: "", attachments: [{ id: "a1", filename: "photo.jpg", content_type: "image/jpeg" }, { id: "a2", filename: "notes.docx", content_type: "application/msword" }] }));
+  await processTeamEmail(w.job("e1"), w.d);
+  assert.equal(w.db.saved.length, 1);
+  const m = w.db.saved[0];
+  assert.equal(m.content, "");
+  assert.deepEqual((m.meta.files as { name: string }[]).map((f) => f.name), ["photo.jpg"]);
+  assert.deepEqual((m.meta.email as { attachments: string[] }).attachments, ["notes.docx"]);
+  assert.equal(w.turns[0].text, "Files: photo.jpg");
+  assert.equal(w.db.threads[0].title, "Email to your team");
+
+  // A failure keeping the files still answers the words, and names the files.
+  const f = world();
+  f.d.saveAttachments = async () => {
+    throw new Error("storage is down");
+  };
+  f.emails.set("e1", email());
+  await processTeamEmail(f.job("e1"), f.d);
+  assert.deepEqual((f.db.saved[0].meta.email as { attachments: string[] }).attachments, ["menu.pdf"]);
+  assert.equal(f.db.saved[0].meta.files, undefined);
+  assert.equal(f.sent.length, 1);
+});
+
+test("Resend's receiving API: the email and its attachments are read with the key, from the documented paths", async () => {
+  const { getReceivedEmail, listReceivedAttachments } = await import("../src/lib/email.ts");
+  const calls: { url: string; auth: string | null }[] = [];
+  const fetch = (async (url: string, init?: RequestInit) => {
+    calls.push({ url: String(url), auth: new Headers(init?.headers).get("authorization") });
+    if (String(url).endsWith("/attachments?limit=100")) return Response.json({ object: "list", has_more: false, data: [{ id: "a1", filename: "menu.pdf", size: 4096, content_type: "application/pdf", content_disposition: null, download_url: "https://inbound-cdn.resend.com/x", expires_at: "2026-11-20T13:00:00Z" }] });
+    if (String(url).includes("/missing")) return new Response('{"message":"not found"}', { status: 404 });
+    return Response.json({ object: "email", id: "e1", to: ["acme@team.morningtelos.com"], from: "ana@bakery.com", subject: "Hi", html: "<p>Hi</p>", text: null, headers: { "in-reply-to": "<x@y>" }, authentication: { spf: "pass", dkim: "pass", dmarc: "pass" }, message_id: "<m@gmail>", attachments: [{ id: "a1", filename: "menu.pdf", content_type: "application/pdf", size: 4096 }] });
+  }) as typeof globalThis.fetch;
+  const e = await getReceivedEmail("e1", { key: "re_test", fetch });
+  assert.equal(calls[0].url, "https://api.resend.com/emails/receiving/e1");
+  assert.equal(calls[0].auth, "Bearer re_test");
+  assert.deepEqual([e.from, e.text, e.html, e.message_id, e.cc, e.received_for], ["ana@bakery.com", null, "<p>Hi</p>", "<m@gmail>", [], []]);
+  assert.deepEqual(e.authentication, { spf: "pass", dkim: "pass", dmarc: "pass" });
+  assert.deepEqual(e.attachments, [{ id: "a1", filename: "menu.pdf", content_type: "application/pdf", size: 4096 }]);
+  const list = await listReceivedAttachments("e1", { key: "re_test", fetch });
+  assert.equal(calls[1].url, "https://api.resend.com/emails/receiving/e1/attachments?limit=100");
+  assert.deepEqual(list, [{ id: "a1", filename: "menu.pdf", content_type: "application/pdf", content_disposition: null, size: 4096, download_url: "https://inbound-cdn.resend.com/x" }]);
+  await assert.rejects(getReceivedEmail("missing", { key: "re_test", fetch }), /Resend returned 404/);
+  await assert.rejects(getReceivedEmail("../etc", { key: "re_test", fetch }), /not a Resend email id/);
+  await assert.rejects(getReceivedEmail("e1", { key: "", fetch }), /RESEND_API_KEY/);
 });
