@@ -16,6 +16,7 @@ import { cleanWebsite } from "@/lib/signup";
 import { agentFace, AGENTS, ORDER, type AgentKey } from "@/lib/team";
 import { can, inviteTokenFromPath, roleLabel } from "@/lib/workspace";
 import { ApprovalsPage } from "./Approvals";
+import { GoalsNav } from "./Cards";
 import { AuthScreen, NewPassword } from "./AuthScreen";
 import { BillingPage } from "./Billing";
 import { ThreadPage, type StartChat } from "./Chat";
@@ -374,6 +375,7 @@ function Frame2({
             {setupNav.map(navLink)}
           </div>
         </nav>
+        <GoalsNav sb={sb} ws={ws.id} reloadKey={`${path}:${chrome.threads[0]?.updated_at ?? ""}`} current={route.page === "thread" ? (route.id ?? null) : null} />
         <div className="grp">
           <h6>Recent</h6>
           {chrome.threads.length ? (

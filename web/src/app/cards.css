@@ -1,0 +1,131 @@
+/* Answer cards under a reply (src/components/Cards.tsx), the goal pinned at the top of its chat, and the Goals list in
+   the sidebar. Shaped like the approved Outcome Chat demo, with the app's tokens (src/app/mt.css). Charts, meters and
+   picked options use the brand's accent when "Use my brand in answers" is on (--md-accent, src/lib/brand.ts). */
+@layer components {
+.acards{--acc:var(--md-accent,var(--clay-2));--tint:var(--md-tint,var(--sunk));--tint-line:var(--md-tint-line,var(--line-2));display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.acard{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh);padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0;animation:acard-in .35s var(--ease) both}
+.acard.accent{border-color:var(--clay)}
+@keyframes acard-in{from{opacity:.001;transform:translateY(6px);filter:blur(2px)}to{opacity:1;transform:none;filter:none}}
+.acard-h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--ink-4);flex-wrap:wrap}
+.acard-b{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.acard-hint{font-size:13px;color:var(--ink-3)}
+.acard-ok{display:flex;align-items:center;gap:6px;color:var(--green);font-weight:500;font-size:13.5px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+
+/* choices */
+.aq{display:grid;gap:6px}
+.aq-l{font-size:13.5px;font-weight:500;color:var(--ink)}
+.aq-l small{font-weight:400;color:var(--ink-4);margin-left:4px}
+.aopts{display:flex;flex-wrap:wrap;gap:6px}
+.aopt{min-height:32px;padding:5px 12px;border-radius:99px;border:1px solid var(--line-2);background:var(--surface);font-size:13px;color:var(--ink-2);transition:border-color .15s,background .15s,color .15s}
+.aopt:hover:not(:disabled){border-color:var(--acc)}
+.aopt.on{background:color-mix(in srgb,var(--acc) 10%,var(--surface));border-color:var(--acc);color:var(--acc);font-weight:500}
+.aopt:disabled{cursor:default;opacity:.75}
+.aopt.on:disabled{opacity:1}
+
+/* quick replies */
+.aqr{display:flex;flex-wrap:wrap;gap:6px}
+.aqr button{min-height:32px;padding:6px 12px;border-radius:99px;border:1px solid var(--line-2);background:var(--surface);font-size:13px;color:var(--ink-2);text-align:left}
+.aqr button:hover:not(:disabled){border-color:var(--acc);color:var(--ink)}
+.aqr button:disabled{opacity:.6;cursor:default}
+
+/* table */
+.atable{box-shadow:none}
+.atable table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.45}
+.atable th,.atable td{padding:8px 12px;text-align:left;vertical-align:top;border-top:1px solid var(--line)}
+.atable th{background:var(--tint);border-top:0;border-bottom:1px solid var(--tint-line);font-weight:600;color:var(--ink);white-space:nowrap}
+.atable tbody tr:first-child td{border-top:0}
+.atable td{color:var(--ink-2);overflow-wrap:anywhere}
+.atable .al-r{text-align:right}
+.atable .num{font-variant-numeric:tabular-nums;white-space:nowrap;overflow-wrap:normal}
+
+/* charts */
+.achart{width:100%;height:auto;display:block;overflow:visible}
+.achart text{font-size:11px;fill:var(--ink-4)}
+.achart .ax{stroke:var(--line-2)}
+.achart .grid{stroke:var(--line);stroke-dasharray:3 4}
+.achart .line{fill:none;stroke:var(--acc);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.achart .line.dash{stroke-width:2;stroke-dasharray:5 5;opacity:.7}
+.achart .dot{fill:var(--acc)}
+.achart .bar{fill:var(--acc)}
+
+/* connect */
+.aconn{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--ink-2)}
+.aconn-ic{width:32px;height:32px;border-radius:8px;flex:none;display:grid;place-items:center;background:var(--sunk);color:var(--ink-2);object-fit:contain}
+.aconn-site{max-width:240px;height:30px;padding:4px 10px;font-size:13px}
+
+/* social post look-alikes */
+.pframe{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;color:#141413;font-size:14px;position:relative}
+.pf-head{display:flex;gap:10px;align-items:center;padding:12px 14px 6px}
+.pf-head b{display:block;font-weight:600;font-size:14px;line-height:1.25}
+.pf-head small{display:block;color:#65645f;font-size:12px}
+.pf-av{width:40px;height:40px;border-radius:8px;flex:none;display:grid;place-items:center;color:#fff;font-weight:600;background:var(--acc)}
+.pf-av.x,.pf-av.instagram,.pf-av.facebook{border-radius:50%}
+.pf-av.instagram{width:32px;height:32px;font-size:13px}
+.pf-text{display:block;width:100%;border:0;outline:0;resize:none;background:transparent;font:inherit;color:inherit;line-height:1.5;padding:4px 14px 12px;white-space:pre-wrap;overflow:hidden;border-radius:6px}
+.pf-text:not([readonly]):hover{background:#f5f4ed}
+.pf-text:not([readonly]):focus{background:#f5f4ed;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--acc) 40%,transparent)}
+.pf-img{min-height:120px;background:var(--acc);color:#fff;display:flex;align-items:flex-end;padding:14px;font:500 19px/1.25 var(--serif);overflow-wrap:anywhere}
+.pf-img.sq{aspect-ratio:1/1;max-height:360px;align-items:center;justify-content:center;text-align:center}
+.pf-img.x{border-radius:14px;margin:0 14px 10px}
+.pf-foot{display:flex;gap:18px;padding:8px 14px;border-top:1px solid #e8e6dc;color:#8c8b84;font-size:12.5px;flex-wrap:wrap}
+.pframe.x .pf-foot,.pframe.instagram .pf-foot{border-top:0}
+.pf-cap{display:flex;gap:6px;align-items:flex-start;padding:0 14px 6px}
+.pf-cap b{font-weight:600;padding-top:4px;flex:none}
+.pf-cap .pf-text{padding:4px 0 10px}
+.pf-count{position:absolute;right:12px;top:12px;font-size:11.5px;color:#8c8b84;font-variant-numeric:tabular-nums}
+.pf-count.over{color:var(--red)}
+.apager{display:inline-flex;gap:2px;margin-left:auto}
+
+/* email */
+.amail{display:grid;gap:8px}
+.amail label{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-4)}
+.amail label:last-child{grid-template-columns:1fr}
+.amail .inp{height:34px;padding:6px 10px;font-size:13.5px}
+.amail .ta{min-height:100px;font-size:13.5px}
+.amail [readonly]{background:var(--sunk)}
+
+/* goal */
+.agoal{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font:400 22px/1.35 var(--serif);color:var(--ink)}
+.agoal>b{font-weight:500;font-variant-numeric:tabular-nums}
+.astep{display:inline-flex;align-items:center;gap:2px;background:var(--sunk);border-radius:10px;padding:2px 4px;font-family:var(--sans)}
+.astep button{width:30px;height:30px;border-radius:7px;font:500 17px var(--sans);color:var(--ink-3)}
+.astep button:hover:not(:disabled){background:var(--sunk-2);color:var(--ink)}
+.astep button:disabled{opacity:.35;cursor:default}
+.astep b{font:500 18px var(--serif);min-width:3ch;text-align:center;font-variant-numeric:tabular-nums}
+.astep b.wide{min-width:5.5ch}
+
+/* plan */
+.asteps{list-style:none;display:grid;gap:2px}
+.astp{display:flex;align-items:center;gap:12px;padding:8px 4px;border-radius:9px}
+.astp b{display:block;font-weight:500;color:var(--ink)}
+.astp small{display:block;color:var(--ink-4);font-size:12.5px}
+.amark{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-2);flex:none;display:grid;place-items:center;color:#fff;transition:background .3s,border-color .3s}
+.astp.running .amark{border-color:var(--acc);border-top-color:transparent;animation:spin .8s linear infinite}
+.astp.done .amark{background:var(--green);border-color:var(--green)}
+.astp.done .amark .ico{stroke-width:2.5;width:13px;height:13px}
+
+/* progress */
+.aprog{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.aprog b{color:var(--ink);font-size:20px;font-weight:600}
+.ameter{height:8px;border-radius:99px;background:var(--sunk-2);overflow:hidden;min-width:60px}
+.ameter i{display:block;height:100%;background:var(--acc);border-radius:99px;transition:width 1.2s var(--ease)}
+
+/* the goal pinned at the top of its chat */
+.agpin{position:sticky;top:0;z-index:5;background:var(--bg);padding:6px 0 10px;--acc:var(--md-accent,var(--clay-2))}
+.agpin-c{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh);padding:10px 14px}
+.agpin-c b{font-weight:600;font-size:14px;color:var(--ink)}
+.agpin-c .ameter{flex:1 1 120px}
+.agpin-c small{color:var(--ink-3);font-size:12.5px;font-variant-numeric:tabular-nums}
+
+/* the Goals list in the sidebar */
+.agoal-nav{justify-content:space-between}
+.agoal-nav small.gst{flex:none;font-size:11px;font-weight:600;color:var(--green)}
+.agoal-nav small.gst.needs_you{color:var(--clay-2)}
+.agoal-nav small.gst.done{color:var(--ink-4)}
+
+@media (max-width:900px){
+  .acard{padding:12px}
+  .agoal{font-size:19px}
+  .agpin{top:calc(env(safe-area-inset-top) + 52px)}
+}
+}

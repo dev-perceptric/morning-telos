@@ -12,6 +12,8 @@ import { ACCEPT, BUCKET, checkFile, FILE_MESSAGES, filesOnMessage, fitFiles, for
 import { readLines } from "@/lib/chat";
 import { IDLE, LIVE_WORDS, started as startLive, step, type Live } from "@/lib/liveReply";
 import { answerTheme, BRAND_COLUMNS, DEFAULT_THEME, type AnswerTheme, type BrandRow } from "@/lib/brand";
+import { hideNames, storedCards, type Card } from "@/lib/cards";
+import { CHECKIN_LABEL } from "@/lib/goals";
 import { parseMarkdown, partialMarkdown, type Block, type Inline, type List, type Table } from "@/lib/markdown";
 import { MODEL_CHOICES, type ModelChoice } from "@/lib/models";
 import { PLANS, type PaidPlan } from "@/lib/plans";
@@ -24,6 +26,7 @@ import { insertSkill, matchSkills, menuAgent, skillsFor, slashQuery, type SkillR
 import { agentFace, AGENTS, agentByGod, insertMention, isAgentKey, LEAD, mentionMatches, mentionQuery, workingAgents, type AgentKey } from "@/lib/team";
 import { can } from "@/lib/workspace";
 import { ApprovalCard } from "./Approvals";
+import { AnswerCards, CardsProvider, GoalPin, type CardsEnv } from "./Cards";
 import { Icon, type IconName } from "./icons";
 import { callApi, message, navigate } from "./nav";
 import type { Workspace } from "./Settings";
@@ -35,8 +38,8 @@ type Item =
    * files: files attached from the message box (meta.files), shown above their words.
    */
   | { kind: "user"; text: string; page?: { url: string; title: string } | null; files?: StoredFile[] }
-  /** stopped: the person pressed Stop while it was written. used: the tools it used, for the "Used: ..." note. */
-  | { kind: "agent"; agent: AgentKey; text: string; error?: boolean; blocked?: string; stopped?: boolean; used?: string[] }
+  /** stopped: the person pressed Stop while it was written. used: the tools it used, for the "Used: ..." note. cards: answer cards under it. */
+  | { kind: "agent"; agent: AgentKey; text: string; error?: boolean; blocked?: string; stopped?: boolean; used?: string[]; cards?: Card[] }
   | { kind: "note"; agent: AgentKey; text: string; full?: boolean }
   | { kind: "tool"; agent: AgentKey; text: string }
   | { kind: "approval"; id: number; title: string };
@@ -840,9 +843,11 @@ const toItems = (m: MessageRow): Item[] => {
     return [{ kind: "user", text: m.content, page, files: filesOnMessage(m.meta) }];
   }
   // A note about an approval ("Approved and done: ...") is shown whole. A handoff note shows who handed it to whom.
+  // A goal's Monday check-in shows one short line.
+  if (m.role === "note" && m.meta?.checkin) return [{ kind: "note", agent, text: CHECKIN_LABEL, full: true }];
   if (m.role === "note") return [{ kind: "note", agent, text: m.content, full: m.meta?.approval !== undefined }];
   const used = Array.isArray(m.meta?.used) ? (m.meta.used as unknown[]).filter((u): u is string => typeof u === "string") : undefined;
-  return [{ kind: "agent", agent, text: m.content, error: Boolean(m.meta?.error), blocked: typeof m.meta?.blocked === "string" ? m.meta.blocked : undefined, stopped: m.meta?.stopped === true, used }, ...approvalsIn(m.meta)];
+  return [{ kind: "agent", agent, text: m.content, error: Boolean(m.meta?.error), blocked: typeof m.meta?.blocked === "string" ? m.meta.blocked : undefined, stopped: m.meta?.stopped === true, used, cards: storedCards(m.meta) }, ...approvalsIn(m.meta)];
 };
 
 /**
@@ -931,12 +936,18 @@ export function ThreadPage({
   const [jump, setJump] = useState(false);
   // The thread this page is showing. A new chat learns its id from the stream, and the address changes without a reload.
   const thread = useRef<string | null>(id);
+  // The same, for drawing: the goal pinned at the top and the cards read it.
+  const [threadId, setThreadId] = useState<string | null>(id);
   const stopper = useRef<AbortController | null>(null);
   const running = useRef<Promise<void> | null>(null);
   // Stay at the newest message while a reply is written, unless the person scrolls up to read.
   const pinned = useRef(true);
   const skills = useSkillRows(sb, ws.id);
   const theme = useAnswerTheme(sb, ws.id);
+  // Answer cards that came on the stream for the reply being written, steps moved live, and goal changes.
+  const [liveCards, setLiveCards] = useState<Card[]>([]);
+  const [stepMoves, setStepMoves] = useState<CardsEnv["steps"]>({});
+  const [goalTick, setGoalTick] = useState(0);
   // The / menu shows the skills of whoever answered last, when the reply tags nobody.
   const lastAgent = [...items].reverse().find((x): x is Extract<Item, { kind: "agent" }> => x.kind === "agent")?.agent ?? LEAD;
   const lastUserItem = [...items].reverse().find((x): x is Extract<Item, { kind: "user" }> => x.kind === "user");
@@ -1023,6 +1034,9 @@ export function ThreadPage({
       show(startLive(routine ? null : quickRoute(text, asHistory(itemsRef.current), workingAgents(), agent)), true);
       // Approval cards wait for the reply that prepared them, so they show under it, as they do after a reload.
       let waiting: Item[] = [];
+      // Answer cards show under the reply being written, then move to the finished reply.
+      let cardsNow: Card[] = [];
+      setLiveCards([]);
       const body = {
         workspaceId: ws.id,
         threadId: thread.current,
@@ -1042,18 +1056,28 @@ export function ThreadPage({
               if (e.type === "thread") {
                 if (thread.current !== e.id) {
                   thread.current = e.id;
+                  setThreadId(e.id);
                   onThread(e.id);
                   navigate(`/chat/${e.id}`, true);
                 }
                 return;
               }
               if (e.type === "approval") return void waiting.push({ kind: "approval", id: e.id, title: e.title });
+              if (e.type === "card") {
+                cardsNow = [...cardsNow, e.card];
+                return setLiveCards(cardsNow);
+              }
+              if (e.type === "step") return setStepMoves((m) => ({ ...m, [e.plan]: { ...m[e.plan], [e.position]: e.status } }));
+              if (e.type === "goal") return setGoalTick((n) => n + 1);
               if (e.type === "handoff") setItems((xs) => [...xs, { kind: "note", agent: e.from, text: `${AGENTS[e.from].god} handed this to ${AGENTS[e.to].god}: ${e.note}` }]);
               if (e.type === "message") {
                 const used = e.used ?? liveRef.current.used;
                 const cards = waiting;
+                const answerCards = cardsNow;
                 waiting = [];
-                setItems((xs) => [...xs, { kind: "agent", agent: e.agent, text: e.text, error: e.error, blocked: e.blocked, stopped: e.stopped, used }, ...cards]);
+                cardsNow = [];
+                setLiveCards([]);
+                setItems((xs) => [...xs, { kind: "agent", agent: e.agent, text: e.text, error: e.error, blocked: e.blocked, stopped: e.stopped, used, cards: answerCards }, ...cards]);
               }
               const next = step(liveRef.current, e);
               // A finished reply leaves the screen in the same frame its message arrives, so nothing shows twice.
@@ -1065,10 +1089,12 @@ export function ThreadPage({
           if (ctrl.signal.aborted) {
             // Stopped: what was written stays on screen, marked Stopped, as the server saves it.
             const now = liveRef.current;
-            if (now.answering && now.text.trim()) setItems((xs) => [...xs, { kind: "agent", agent: now.answering!, text: now.text.trim(), stopped: true, used: now.used }]);
+            const answerCards = cardsNow;
+            if (now.answering && (now.text.trim() || answerCards.length)) setItems((xs) => [...xs, { kind: "agent", agent: now.answering!, text: hideNames(now.text.trim()), stopped: true, used: now.used, cards: answerCards }]);
           } else setError(message(err));
         }
         if (waiting.length) setItems((xs) => [...xs, ...waiting]);
+        setLiveCards([]);
         show(IDLE, true);
         if (stopper.current === ctrl) stopper.current = null;
         setBusy(false);
@@ -1102,6 +1128,14 @@ export function ThreadPage({
 
   const lastAnswer = busy ? -1 : items.reduce((at, x, i) => (x.kind === "agent" && !x.blocked ? i : at), -1);
   const canAgain = editor && Boolean(lastUserItem);
+  // A card's answer is the person's next message after its reply. The last reply's cards are open until then.
+  const answers = items.map((_, i) => {
+    const next = items.slice(i + 1).find((x): x is Extract<Item, { kind: "user" }> => x.kind === "user");
+    return next ? next.text : null;
+  });
+  const reply = useCallback((text: string, agent: AgentKey) => void send(text, { agent }), [send]);
+  const onGoal = useCallback(() => setGoalTick((n) => n + 1), []);
+  const cardsEnv: CardsEnv = { sb, ws, threadId, reply, busy, steps: stepMoves, goalTick, onGoal };
 
   return (
     <div className="thread">
@@ -1120,20 +1154,23 @@ export function ThreadPage({
         <h1>{title || (loading ? "" : "New chat")}</h1>
       </div>
       <ThemeFont theme={theme} />
+      <GoalPin sb={sb} ws={ws.id} threadId={threadId} tick={goalTick + items.length} style={theme.vars as React.CSSProperties} />
+      <CardsProvider value={cardsEnv}>
       <div className="msgs" aria-live="polite" aria-busy={busy} style={theme.vars as React.CSSProperties}>
         {loading ? <div className="step">Opening the chat...</div> : null}
         {!loading && !items.length && !busy && !error ? <div className="step">No messages yet.</div> : null}
         {items.map((it, i) => (
-          <ItemView key={i} item={it} sb={sb} ws={ws} last={i === lastAnswer} canAgain={canAgain} onAgain={askAgain} />
+          <ItemView key={i} item={it} sb={sb} ws={ws} last={i === lastAnswer} canAgain={canAgain} onAgain={askAgain} answer={answers[i]} />
         ))}
-        {live.answering && live.text ? (
+        {live.answering && (live.text || liveCards.length) ? (
           <div className="msg">
             <Face agent={live.answering} />
             <div className="body">
               <div className="who">
                 {AGENTS[live.answering].god} <span>· {AGENTS[live.answering].name}</span>
               </div>
-              <Markdown text={partialMarkdown(live.text)} writing />
+              {live.text ? <Markdown text={partialMarkdown(hideNames(live.text))} writing /> : null}
+              <AnswerCards cards={liveCards} answer={null} />
             </div>
           </div>
         ) : null}
@@ -1146,6 +1183,7 @@ export function ThreadPage({
         ) : null}
         {error ? <ErrorText>{error}</ErrorText> : null}
       </div>
+      </CardsProvider>
       <div className="dock">
         {jump ? (
           <button type="button" className="jump" onClick={toLatest}>
@@ -1304,7 +1342,7 @@ function SentFiles({ sb, files }: { sb: SupabaseClient; files: StoredFile[] }) {
   );
 }
 
-function ItemView({ item, sb, ws, last, canAgain, onAgain }: { item: Item; sb: SupabaseClient; ws: Workspace; last?: boolean; canAgain?: boolean; onAgain?: (k: AgentKey) => void }) {
+function ItemView({ item, sb, ws, last, canAgain, onAgain, answer = null }: { item: Item; sb: SupabaseClient; ws: Workspace; last?: boolean; canAgain?: boolean; onAgain?: (k: AgentKey) => void; answer?: string | null }) {
   if (item.kind === "approval") return <ApprovalCard sb={sb} ws={ws} id={item.id} title={item.title} />;
   if (item.kind === "user")
     return (
@@ -1346,7 +1384,8 @@ function ItemView({ item, sb, ws, last, canAgain, onAgain }: { item: Item; sb: S
         <div className="who">
           {a.god} <span>· {a.name}</span>
         </div>
-        <Markdown text={item.text} />
+        {item.text ? <Markdown text={item.text} /> : null}
+        {item.cards?.length ? <AnswerCards cards={item.cards} answer={answer} /> : null}
         {item.stopped || used ? (
           <div className="used">
             {item.stopped ? <span>{LIVE_WORDS.stopped}</span> : null}

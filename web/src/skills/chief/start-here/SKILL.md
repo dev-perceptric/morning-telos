@@ -15,7 +15,7 @@ The first ten minutes with a new business: show what the team knows, fill the ga
 
 ## What you have
 - search_knowledge: what the team read from the website and the owner's docs.
-- list_channels: social accounts connected in Capybaroar.
+- list_channels: the social accounts the business connected.
 - get_ai_visibility: whether AI answers already name the business.
 - handoff: starts work with Artemis and Aphrodite.
 

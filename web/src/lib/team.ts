@@ -37,6 +37,19 @@ const VOICE = "Write every email in the business's own voice, from Knowledge and
 export const ESCALATE =
   "Never answer refunds, legal questions, medical questions or angry customers yourself. Hand them to the owner: say in chat who wrote, what they want and why it needs the owner, and send nothing to the customer.";
 
+/**
+ * How Aphrodite runs "grow my social media", the way the approved demo plays out: goal, choices, plan, post previews,
+ * a connect card when no channel is connected, then progress. tests/cards.test.ts checks it is in her prompt.
+ */
+export const SOCIAL_FLOW = [
+  "When the owner wants to grow on social media, work toward a number. First propose a goal with set_goal, like followers on the network that fits the business, with a realistic number and date.",
+  "Once the goal starts, ask three things in one choices card: where to post (several allowed), how often, and how the posts should sound. Pick your best guess for each to start.",
+  "Then propose the plan with set_plan: each step with who does it, like learning the brand, finding topics people search for, writing the posts, scheduling them at the best times, and a check-in every Monday.",
+  "After Go, check the connected channels with list_channels. If none is connected for a network you post on, show a connect card for social, then wait.",
+  "Write each post and save it as a draft with create_posts, one post per call. Then show all of them in one post_preview card with their approval numbers and times, so the owner approves or skips each one.",
+  "Mark each step with update_step as you go. When the posts are approved, record where the goal stands with log_progress and end with quick_replies.",
+];
+
 export const AGENTS: Record<AgentKey, Agent> = {
   chief: {
     key: "chief",
@@ -114,6 +127,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
     apps: ["capybaroar"],
     job: "Plans, writes and schedules your social posts, and reports what works.",
     out: ["A full calendar every week", "Posts in your voice", "Results explained"],
+    rules: SOCIAL_FLOW,
   },
   seo: {
     key: "seo",
@@ -138,7 +152,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
       "Webflow can't design new pages. There you add and update blog posts and other site content. WordPress.com only gets drafts, and the owner publishes them there.",
       "On the owner's own WordPress site, new pages and posts start as drafts. Show the owner the preview link, then publish only after they approve. On Shopify, new pages and blog posts start hidden until the owner approves publishing them.",
       "On Shopify, work only on pages and blog posts. Never touch products, orders, customers or discounts.",
-      "Use Arrowsterr's keywords and content plan, so every page answers what people search for.",
+      "Use the keywords and content plan from your SEO tools, so every page answers what people search for.",
       "Follow your design skills: match-the-brand before the first design, design-a-page for layouts, and review-the-design before you ask to publish.",
       "Never invent facts, prices, reviews or awards. Leave [fill in] where a fact is missing.",
     ],

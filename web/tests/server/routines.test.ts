@@ -129,7 +129,7 @@ test("run_routine: a new chat called Routine: <title>, the instruction as the me
   assert.match(extra, /The person picked the skill "plan-weekly-posts"/);
   assert.deepEqual(
     requests[0].tools?.map((x) => x.name),
-    ["remember", "search_knowledge", "use_skill", "handoff"],
+    ["log_progress", "remember", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"],
   );
   assert.equal(routine().last_thread_id, t.id);
   assert.equal(routine().last_note, null);
@@ -154,7 +154,7 @@ test("run_routine: Iris, Hora, Hermes and Hestia take routines, with their own s
     assert.match(requests[0].system[1].text, new RegExp(`The person picked the skill "${skill[agent]}"`), agent);
     assert.deepEqual(
       requests[0].tools?.map((x) => x.name),
-      ["remember", "search_knowledge", "use_skill", "handoff"],
+      ["log_progress", "remember", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"],
       agent,
     );
     assert.equal(routine().last_note, null, agent);

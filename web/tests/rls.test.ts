@@ -2682,3 +2682,186 @@ test("chat_file_workspace: the first folder when it is a workspace id, else null
   const r = (await db.query("select chat_file_workspace($1) a, chat_file_workspace('x/y/z.png') b, chat_file_workspace('') c, chat_file_workspace($2) d", [`${ws}/${randomUUID()}/a.png`, `${ws.toUpperCase()}/a/b.png`])).rows[0];
   assert.deepEqual(r, { a: ws, b: null, c: null, d: ws });
 });
+
+// ─────────────── goals, plan steps and the Monday check-in (024_goals.sql) ───────────────
+
+const threadIn = async (ws: string, by: User) => (await db!.query("insert into threads (workspace_id, title, created_by) values ($1, 'Grow on LinkedIn', $2) returning id", [ws, by.id])).rows[0].id as string;
+const GOAL_INSERT = "insert into goals (workspace_id, thread_id, card_id, agent, metric, title, target, unit, due_date) values ($1, $2, $3, 'social', 'followers', 'Grow LinkedIn by', 150, 'followers', '2027-01-31') returning id, created_by, status, current";
+
+test("goals: members read, editors and up start and change them, viewers, strangers and visitors can't; the number is the server's", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("goal-rls");
+  const other = await team("goal-other");
+  const thread = await threadIn(ws, owner);
+  const g = await asCommit(editor, async (q) => (await q(GOAL_INSERT, [ws, thread, "c_goalrls00001"])).rows[0]);
+  assert.equal(g.created_by, editor.id);
+  assert.equal(g.status, "active");
+  assert.equal(Number(g.current), 0);
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => assert.equal((await q("select * from goals where workspace_id = $1", [ws])).rowCount, 1));
+  }
+  await as(viewer, async (q) => {
+    await assert.rejects(q(GOAL_INSERT, [ws, thread, "c_goalrls00002"]), /row-level security/);
+  });
+  await as(viewer, async (q) => {
+    assert.equal((await q("update goals set target = 10 where id = $1", [g.id])).rowCount, 0);
+    assert.equal((await q("delete from goals where id = $1", [g.id])).rowCount, 0);
+  });
+  await as(other.owner, async (q) => {
+    assert.equal((await q("select * from goals where workspace_id = $1", [ws])).rowCount, 0);
+    assert.equal((await q("update goals set status = 'stopped' where id = $1", [g.id])).rowCount, 0);
+    assert.equal((await q("delete from goals where id = $1", [g.id])).rowCount, 0);
+  });
+  // Nobody starts a goal in another workspace, or in another workspace's chat.
+  await as(other.owner, async (q) => {
+    await assert.rejects(q(GOAL_INSERT, [ws, thread, "c_goalrls00003"]), /row-level security/);
+  });
+  const otherThread = await threadIn(other.ws, other.owner);
+  await as(owner, async (q) => {
+    await assert.rejects(q(GOAL_INSERT, [ws, otherThread, "c_goalrls00004"]), /foreign key/);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from goals"), /permission denied/);
+  });
+  // Editors change the words, the number, the date and the status. The number reached is the server's alone.
+  await as(editor, async (q) => {
+    assert.equal((await q("update goals set target = 200, due_date = '2027-02-28', title = 'Grow by', unit = 'followers', status = 'done' where id = $1", [g.id])).rowCount, 1);
+  });
+  for (const sql of [
+    "update goals set current = 150 where id = $1",
+    "update goals set baseline = 1 where id = $1",
+    "update goals set history = '[]' where id = $1",
+    "update goals set checked_at = now() where id = $1",
+    "update goals set created_by = null where id = $1",
+    "update goals set workspace_id = workspace_id where id = $1",
+    "update goals set thread_id = thread_id where id = $1",
+  ]) {
+    await as(editor, async (q) => {
+      await assert.rejects(q(sql, [g.id]), /permission denied/, sql);
+    });
+  }
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into goals (workspace_id, thread_id, card_id, agent, title, target, unit, due_date, created_by) values ($1, $2, 'c_goalrls00005', 'social', 'x', 1, 'x', '2027-01-31', $3)", [ws, thread, owner.id]), /permission denied/);
+    // a fake number can't come in with a new goal either
+  });
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into goals (workspace_id, thread_id, card_id, agent, title, target, unit, due_date, current) values ($1, $2, 'c_goalrls00006', 'social', 'x', 1, 'x', '2027-01-31', 99)", [ws, thread]), /permission denied/);
+  });
+  // The server writes the number.
+  await asService(async (q) => assert.equal((await q("update goals set current = 12, baseline = 1000, history = '[{\"at\":\"2026-11-20\",\"value\":12}]', checked_at = now() where id = $1", [g.id])).rowCount, 1));
+  assert.equal(Number((await db.query("select current from goals where id = $1", [g.id])).rows[0].current), 12);
+  // A goal card starts one goal, once.
+  await as(owner, async (q) => {
+    await assert.rejects(q(GOAL_INSERT, [ws, thread, "c_goalrls00001"]), /duplicate key/);
+  });
+  await as(editor, async (q) => assert.equal((await q("delete from goals where id = $1", [g.id])).rowCount, 1));
+});
+
+test("goals: known values only, and they go with their chat and their workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner } = await team("goal-limits");
+  const thread = await threadIn(ws, owner);
+  for (const [sql, err] of [
+    ["insert into goals (workspace_id, thread_id, card_id, agent, title, target, unit, due_date) values ($1, $2, 'bad id', 'social', 'x', 1, 'x', '2027-01-31')", /goals_card_id_check/],
+    ["insert into goals (workspace_id, thread_id, card_id, agent, title, target, unit, due_date) values ($1, $2, 'c_limits000001', 'zeus', 'x', 1, 'x', '2027-01-31')", /goals_agent_check/],
+    ["insert into goals (workspace_id, thread_id, card_id, agent, metric, title, target, unit, due_date) values ($1, $2, 'c_limits000002', 'social', 'revenue', 'x', 1, 'x', '2027-01-31')", /goals_metric_check/],
+    ["insert into goals (workspace_id, thread_id, card_id, agent, title, target, unit, due_date) values ($1, $2, 'c_limits000003', 'social', 'x', 0, 'x', '2027-01-31')", /goals_target_check/],
+    ["insert into goals (workspace_id, thread_id, card_id, agent, title, target, unit, due_date) values ($1, $2, 'c_limits000004', 'social', ' ', 1, 'x', '2027-01-31')", /goals_title_check/],
+  ] as const) {
+    await as(owner, async (q) => {
+      await assert.rejects(q(sql, [ws, thread]), err, sql);
+    });
+  }
+  await asCommit(owner, (q) => q(GOAL_INSERT, [ws, thread, "c_limits000010"]));
+  await db.query("delete from threads where id = $1", [thread]);
+  assert.equal((await db.query("select count(*)::int n from goals where workspace_id = $1", [ws])).rows[0].n, 0, "a deleted chat takes its goal");
+});
+
+test("goal_steps: members read, editors and up add and remove them, only the server moves them; other workspaces see nothing", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor, viewer } = await team("steps-rls");
+  const other = await team("steps-other");
+  const thread = await threadIn(ws, owner);
+  const g = await asCommit(owner, async (q) => (await q(GOAL_INSERT, [ws, thread, "c_stepsgoal001"])).rows[0]);
+  const STEP = "insert into goal_steps (workspace_id, thread_id, goal_id, plan_id, position, title, agent) values ($1, $2, $3, 'c_stepsplan001', $4, $5, 'social') returning id, status, created_by";
+  const s1 = await asCommit(editor, async (q) => (await q(STEP, [ws, thread, g.id, 1, "Learn your brand"])).rows[0]);
+  assert.equal(s1.status, "todo");
+  assert.equal(s1.created_by, editor.id);
+  await asCommit(editor, (q) => q(STEP, [ws, thread, null, 2, "Write 3 posts"]));
+  await as(viewer, async (q) => assert.equal((await q("select * from goal_steps where workspace_id = $1", [ws])).rowCount, 2));
+  await as(viewer, async (q) => {
+    await assert.rejects(q(STEP, [ws, thread, g.id, 3, "Mine"]), /row-level security/);
+  });
+  await as(viewer, async (q) => assert.equal((await q("delete from goal_steps where id = $1", [s1.id])).rowCount, 0));
+  await as(other.owner, async (q) => {
+    assert.equal((await q("select * from goal_steps where workspace_id = $1", [ws])).rowCount, 0);
+    assert.equal((await q("delete from goal_steps where id = $1", [s1.id])).rowCount, 0);
+  });
+  await as(other.owner, async (q) => {
+    await assert.rejects(q(STEP, [ws, thread, g.id, 4, "Planted"]), /row-level security/);
+  });
+  // A step can't point at another workspace's goal.
+  const otherThread = await threadIn(other.ws, other.owner);
+  await as(other.owner, async (q) => {
+    await assert.rejects(q(STEP, [other.ws, otherThread, g.id, 1, "Sneaky"]), /foreign key/);
+  });
+  // Steps move only through the server (update_step).
+  await as(editor, async (q) => {
+    await assert.rejects(q("update goal_steps set status = 'done' where id = $1", [s1.id]), /permission denied/);
+  });
+  await as(editor, async (q) => {
+    await assert.rejects(q("insert into goal_steps (workspace_id, thread_id, plan_id, position, title, agent, status) values ($1, $2, 'c_stepsplan002', 1, 'x', 'social', 'done')", [ws, thread]), /permission denied/);
+  });
+  await asService(async (q) => assert.equal((await q("update goal_steps set status = 'running' where id = $1", [s1.id])).rowCount, 1));
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from goal_steps"), /permission denied/);
+  });
+  // Go twice on the same plan doesn't make the steps twice.
+  await as(editor, async (q) => {
+    await assert.rejects(q(STEP, [ws, thread, g.id, 1, "Again"]), /duplicate key/);
+  });
+  await as(editor, async (q) => assert.equal((await q("delete from goal_steps where id = $1", [s1.id])).rowCount, 1));
+  // A deleted goal takes its steps.
+  await asCommit(editor, (q) => q(STEP, [ws, thread, g.id, 3, "Schedule"]));
+  await db.query("delete from goals where id = $1", [g.id]);
+  assert.equal((await db.query("select count(*)::int n from goal_steps where goal_id = $1", [g.id])).rows[0].n, 0);
+});
+
+test("queue_goal_checkins: one job per active goal each Monday from 9:00 in the workspace's time zone, once; server only", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner } = await team("checkin");
+  await db.query("update workspaces set timezone = 'America/Chicago' where id = $1", [ws]);
+  const thread = await threadIn(ws, owner);
+  const mk = async (card: string, extra = "") => {
+    const id = (await db!.query(`insert into goals (workspace_id, thread_id, card_id, agent, title, target, unit, due_date${extra ? ", status" : ""}) values ($1, $2, $3, 'social', 'Grow by', 150, 'followers', '2027-01-31'${extra ? ", $4" : ""}) returning id`, extra ? [ws, thread, card, extra] : [ws, thread, card])).rows[0].id as string;
+    await db!.query("update goals set created_at = '2026-11-01T00:00:00Z' where id = $1", [id]);
+    return id;
+  };
+  const active = await mk("c_checkin00001");
+  await mk("c_checkin00002", "done");
+  await mk("c_checkin00003", "stopped");
+  const fresh = (await db.query("insert into goals (workspace_id, thread_id, card_id, agent, title, target, unit, due_date) values ($1, $2, 'c_checkin00004', 'social', 'x', 1, 'x', '2027-01-31') returning id", [ws, thread])).rows[0].id as string;
+  await db.query("update goals set created_at = '2026-11-23T14:00:00Z' where id = $1", [fresh]);
+  const old = await mk("c_checkin00005");
+  await db.query("update goals set due_date = '2026-11-01' where id = $1", [old]);
+  const jobs = async () => (await db!.query("select payload, max_attempts from jobs where kind = 'goal_checkin' and workspace_id = $1 order by id", [ws])).rows;
+  const queue = async (at: string) => asService(async (q) => (await q("select queue_goal_checkins($1::timestamptz) n", [at])).rows[0].n as number);
+  // Monday Nov 23, 2026: 8:30 in Chicago is too early; Tuesday is the wrong day.
+  await queue("2026-11-23T14:30:00Z");
+  await queue("2026-11-24T15:30:00Z");
+  assert.deepEqual(await jobs(), []);
+  // 9:30 on Monday in Chicago: the active goal only (not done, stopped, made today, or long past due).
+  await queue("2026-11-23T15:30:00Z");
+  assert.deepEqual(await jobs(), [{ payload: { goal: active, week: "2026-11-23" }, max_attempts: 1 }]);
+  // Later the same Monday, and many calls at once: still one.
+  await Promise.all([queue("2026-11-23T20:00:00Z"), queue("2026-11-23T21:00:00Z")]);
+  assert.equal((await jobs()).length, 1);
+  // The next Monday gets its own, and the goal made last Monday joins in.
+  await queue("2026-11-30T15:30:00Z");
+  assert.deepEqual((await jobs()).map((j) => [j.payload.goal, j.payload.week]), [[active, "2026-11-23"], [active, "2026-11-30"], [fresh, "2026-11-30"]]);
+  for (const fn of ["select * from due_goal_checkins(now())", "select queue_goal_checkins(now())"]) {
+    await as(owner, async (q) => {
+      await assert.rejects(q(fn), /permission denied for function/, fn);
+    });
+  }
+});

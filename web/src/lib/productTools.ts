@@ -195,3 +195,23 @@ export async function runApproval(ap: Pick<Approval, "workspace_id" | "agent" | 
     return { ok: false, text: "We couldn't reach this service right now. Try again in a few minutes." };
   }
 }
+
+/**
+ * Calls one tool that only reads, with the workspace's brand key, outside a chat (goal progress from real data,
+ * src/lib/goalsServer.ts). Null when the product isn't ready, doesn't have the tool, the tool changes something, or
+ * the call fails. The brand key never leaves this function.
+ */
+export async function productRead(workspaceId: string, product: Product, tool: string, input: Record<string, unknown>, deps: ProductToolDeps): Promise<string | null> {
+  if (HIDDEN[product].has(tool)) return null;
+  const c = await connect(product, workspaceId, await deps.services(workspaceId), deps);
+  if (!c.ok) return null;
+  const t = c.tools.find((x) => x.name === tool);
+  if (!t || isWrite(t)) return null;
+  try {
+    const r = await deps.mcp.callTool(c.server, tool, input);
+    return r.isError ? null : r.text || null;
+  } catch (e) {
+    deps.log?.(`Reading ${product} ${tool} for workspace ${workspaceId} failed: ${errText(e)}`);
+    return null;
+  }
+}
