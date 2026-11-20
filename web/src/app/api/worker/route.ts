@@ -13,6 +13,9 @@ import { routineJobHandlers } from "@/lib/routinesServer";
 import { seal } from "@/lib/sealing";
 import { knowledgeJobHandlers } from "@/lib/siteScanDb";
 import { adminClient } from "@/lib/serverAuth";
+import { appUrl } from "@/lib/emailKit";
+import { teamEmailDomain } from "@/lib/teamEmail";
+import { teamEmailJobHandlers } from "@/lib/teamEmailServer";
 
 // One worker tick: claim the jobs that are due (supabase/006_jobs.sql) and run them a few at a time.
 // Copied from Arrowsterr's and Omniscient's /api/worker.
@@ -55,6 +58,8 @@ function handlers(db: SupabaseClient): Record<string, Handler> {
     ...routineJobHandlers(db, { client: teamClient, log: (m) => warn(m, "run_routine") }),
     // Monday's check-in in each active goal's chat, from its owner (src/lib/goalCheckin.ts).
     ...goalJobHandlers(db, { client: teamClient, log: (m) => warn(m, "goal_checkin") }),
+    // An email to the workspace's team address: the team answers by email (src/lib/teamEmailInbound.ts).
+    ...teamEmailJobHandlers(db, { client: teamClient, log: (m) => warn(m, "team_email") }, teamEmailDomain(process.env), appUrl()),
     provision: async (job) => {
       const ws = job.workspace_id;
       if (!ws) return { status: "failed", error: "A provision job needs a workspace." };
@@ -120,9 +125,9 @@ export async function POST(request: Request) {
   const routines = await db.rpc("queue_routine_runs");
   if (routines.error) warn(/queue_routine_runs/.test(routines.error.message) ? "Run supabase/014_routines_skills_memory.sql in Supabase." : `Routines: ${routines.error.message}`, "routines");
 
-  // Monday check-ins for active goals, once a week each in the workspace's time zone (supabase/023_goals.sql).
+  // Monday check-ins for active goals, once a week each in the workspace's time zone (supabase/024_goals.sql).
   const checkins = await db.rpc("queue_goal_checkins");
-  if (checkins.error) warn(/queue_goal_checkins/.test(checkins.error.message) ? "Run supabase/023_goals.sql in Supabase." : `Goal check-ins: ${checkins.error.message}`, "goal_checkin");
+  if (checkins.error) warn(/queue_goal_checkins/.test(checkins.error.message) ? "Run supabase/024_goals.sql in Supabase." : `Goal check-ins: ${checkins.error.message}`, "goal_checkin");
 
   // An approved change whose call never finished (the server restarted mid-call) is failed, so a person checks it.
   const stale = await db.rpc("fail_stale_approvals", { p_older: STALE_AFTER });

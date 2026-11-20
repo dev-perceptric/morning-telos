@@ -114,7 +114,7 @@ export const LIMITS = {
   maxTarget: 1_000_000_000,
 } as const;
 
-/** A card id: "c_" and 12 letters or digits. Goals and plans keep it (supabase/023_goals.sql). */
+/** A card id: "c_" and 12 letters or digits. Goals and plans keep it (supabase/024_goals.sql). */
 export const CARD_ID = /^c_[a-z0-9]{8,32}$/;
 export function newCardId(rand: () => string = () => globalThis.crypto.randomUUID()): string {
   return `c_${rand().replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 12).padEnd(12, "0")}`;

@@ -5,9 +5,21 @@
 //
 // Email clients are old: tables for layout and styles inline.
 
+import { markdownHtml, markdownText } from "./emailMarkdown.ts";
+
 export type Link = { label: string; url: string };
 
-export type Block = { t: "p"; text: string } | { t: "small"; text: string } | { t: "code"; label: string; code: string } | { t: "list"; items: string[] };
+/**
+ * md: a teammate's Markdown answer (src/lib/emailMarkdown.ts). item: one line with its links, like an approval with
+ * Approve and Open.
+ */
+export type Block =
+  | { t: "p"; text: string }
+  | { t: "small"; text: string }
+  | { t: "code"; label: string; code: string }
+  | { t: "list"; items: string[] }
+  | { t: "md"; text: string }
+  | { t: "item"; text: string; links: Link[] };
 
 export type EmailParts = {
   subject: string;
@@ -53,6 +65,12 @@ function blockHtml(b: Block): string {
       return `<tr><td style="padding:0 0 14px"><table role="presentation" cellpadding="0" cellspacing="0">${b.items
         .map((i) => `<tr><td valign="top" style="font-family:${SANS};font-size:16px;line-height:25px;color:${C.body};padding:0 10px 4px 0">&bull;</td><td style="font-family:${SANS};font-size:16px;line-height:25px;color:${C.body};padding:0 0 4px">${esc(i)}</td></tr>`)
         .join("")}</table></td></tr>`;
+    case "md":
+      return `<tr><td style="padding:0 0 4px">${markdownHtml(b.text)}</td></tr>`;
+    case "item":
+      return `<tr><td style="padding:0 0 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:${C.box};border:1px solid ${C.line};border-radius:10px;padding:12px 14px">
+<div style="font-family:${SANS};font-size:15px;line-height:22px;color:${C.ink};padding-bottom:8px">${esc(b.text)}</div>
+<div style="font-family:${SANS};font-size:14px;line-height:20px">${b.links.map((l, i) => `<a href="${esc(safeUrl(l.url))}" style="${i === 0 ? `display:inline-block;background:${C.ink};color:#ffffff;border-radius:8px;padding:6px 14px;font-weight:600;` : `display:inline-block;color:${C.quiet};padding:6px 4px;`}text-decoration:none;margin-right:8px">${esc(l.label)}</a>`).join("")}</div></td></tr></table></td></tr>`;
   }
 }
 
@@ -65,6 +83,10 @@ function blockText(b: Block): string[] {
       return [`${b.label}: ${b.code}`, ""];
     case "list":
       return [...b.items.map((i) => `- ${i}`), ""];
+    case "md":
+      return [markdownText(b.text), ""];
+    case "item":
+      return [`- ${b.text}`, ...b.links.map((l) => `  ${l.label}: ${l.url}`), ""];
   }
 }
 

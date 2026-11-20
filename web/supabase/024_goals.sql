@@ -1,5 +1,5 @@
--- Morning Telos migration 023: goals the team works toward, the steps of their plans, and the Monday check-in.
--- Run once in Supabase → SQL Editor, after 022_chat_files.sql. Safe to run again.
+-- Morning Telos migration 024: goals the team works toward, the steps of their plans, and the Monday check-in.
+-- Run once in Supabase → SQL Editor, after 023_team_email.sql. Safe to run again.
 --
 -- A teammate proposes a goal with a goal card (set_goal, src/lib/cardTools.ts). The person changes the number or the
 -- date and taps Start: the browser saves the goal as them. A plan card (set_plan) works the same way with Go and

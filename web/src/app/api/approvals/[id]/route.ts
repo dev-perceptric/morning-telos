@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import { approvalId, decide, readDecision } from "@/lib/approvals";
 import { preflight, refuseOtherExtension, withCors } from "@/lib/cors";
 import { adminClient, roleGate } from "@/lib/serverAuth";
-import { approvalStore, runTeamApproval } from "@/lib/teamTools";
+import { decideDeps } from "@/lib/teamTools";
 import { NEEDS } from "@/lib/workspace";
 
 // Approve or deny one change the AI team prepared (editors and up). Body: { workspaceId, action: "approve" | "deny",
@@ -43,23 +43,8 @@ async function approve(request: Request, ctx: { params: Promise<{ id: string }> 
   const db = adminClient();
   if (!db) return reply({ error: "Add SUPABASE_SECRET_KEY to the server's settings." }, 500);
 
-  const store = approvalStore(db);
-  const run = runTeamApproval(db, log);
   try {
-    const out = await decide(id, who.userId, read.value, {
-      load: (i) => store.load(ws, i),
-      claim: (i, by, d) => store.claim(ws, i, by, d),
-      run,
-      finish: (i, status, result) => store.finish(ws, i, status, result),
-      note: async (ap, text, status) => {
-        if (!ap.thread_id) return;
-        const { error } = await db.from("messages").insert({ thread_id: ap.thread_id, workspace_id: ws, role: "note", agent: ap.agent, content: text, meta: { approval: ap.id, status } });
-        if (error) throw new Error(error.message);
-        await db.from("threads").update({ updated_at: new Date().toISOString() }).eq("id", ap.thread_id).eq("workspace_id", ws);
-      },
-      activity: (ap, text) => store.activity({ workspace_id: ws, agent: ap.agent, thread_id: ap.thread_id, approval_id: ap.id, text }),
-      log,
-    });
+    const out = await decide(id, who.userId, read.value, decideDeps(db, ws, log));
     return reply(out.body, out.status);
   } catch (e) {
     log(`Approval ${id} in workspace ${ws} failed: ${e instanceof Error ? e.message : String(e)}`);

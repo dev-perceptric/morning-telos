@@ -2386,6 +2386,246 @@ test("021_brand.sql queues one learn_brand job for each older workspace with a w
   assert.deepEqual(jobs, [{ workspace_id: site.ws, max_attempts: 1 }]);
 });
 
+// ─────────────── the email door (023_team_email.sql) ───────────────
+
+const addressOfWs = async (ws: string) => (await db!.query("select slug, enabled, slug_changed_at from team_email where workspace_id = $1", [ws])).rows[0] ?? null;
+const confirm = (u: User) => db!.query("update auth.users set email_confirmed_at = now() where id = $1", [u.id]);
+
+test("team_email: every new workspace gets an address from its name; the same name gets -2, -3; it goes with the workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const a = await team("Door Name");
+  const b = await signUp("door-name-2@example.com", { business: "door name co" });
+  const c = await signUp("door-name-3@example.com", { business: "Door  Name Co!" });
+  assert.equal((await addressOfWs(a.ws)).slug, "door-name-co");
+  assert.equal((await addressOfWs(await wsOf(b))).slug, "door-name-co-2");
+  assert.equal((await addressOfWs(await wsOf(c))).slug, "door-name-co-3");
+  assert.equal((await addressOfWs(a.ws)).enabled, true);
+  const s = await signUp("door-support@example.com", { business: "Support" });
+  assert.equal((await addressOfWs(await wsOf(s))).slug, "support-team", "reserved names are moved aside");
+  // give_team_email() does nothing for a workspace that has one (the migration's backfill runs it again safely).
+  assert.equal((await db.query("select give_team_email($1, 'Something Else') s", [a.ws])).rows[0].s, "door-name-co");
+  await db.query("delete from workspaces where id = $1", [a.ws]);
+  assert.equal(await addressOfWs(a.ws), null);
+});
+
+test("team_email_slug_base() and the reserved names match slugFromName() and RESERVED_SLUGS in src/lib/teamEmail.ts", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { slugFromName, RESERVED_SLUGS } = await import("../src/lib/teamEmail.ts");
+  for (const name of ["Acme", "Ana's Bakery & Café", "  --Hello   World--  ", "!!!", "", "Support", "A".repeat(50), "abcdefghij abcdefghij abcdefgh-ij", "Dr. Who 2", "ÆØÅ Ltd"]) {
+    assert.equal((await db.query("select team_email_slug_base($1) s", [name])).rows[0].s, slugFromName(name), name);
+  }
+  for (const r of RESERVED_SLUGS) assert.equal((await db.query("select team_email_reserved($1) r", [r])).rows[0].r, true, r);
+  assert.equal((await db.query("select team_email_reserved('acme') r")).rows[0].r, false);
+});
+
+test("team_email: members read their own address, never another's; visitors see nothing; nobody writes it directly", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("door-read");
+  const other = await team("door-read-other");
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => {
+      assert.deepEqual((await q("select workspace_id, slug from team_email")).rows, [{ workspace_id: ws, slug: "door-read-co" }]);
+    });
+    for (const sql of [
+      ["update team_email set slug = 'hacked' where workspace_id = $1", [ws]],
+      ["update team_email set enabled = false where workspace_id = $1", [ws]],
+      ["insert into team_email (workspace_id, slug) values ($1, 'mine')", [other.ws]],
+      ["delete from team_email where workspace_id = $1", [ws]],
+    ] as const) {
+      await as(u, async (q) => {
+        await assert.rejects(q(sql[0], [...sql[1]]), /permission denied/, sql[0]);
+      });
+    }
+  }
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from team_email"), /permission denied/);
+  });
+});
+
+test("set_team_email_slug: only the owner, once, a good format, not reserved and not taken", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("door-slug");
+  const other = await team("door-slug-other");
+  for (const u of [admin, editor, viewer, other.owner]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select set_team_email_slug($1, 'new-name')", [ws]), /Only the owner can change the team email/);
+    });
+  }
+  await as(null, async (q) => {
+    await assert.rejects(q("select set_team_email_slug($1, 'new-name')", [ws]), /permission denied/);
+  });
+  for (const bad of ["a", "-x", "x-", "a--b", "a b", "a@b", "x".repeat(41)]) {
+    await as(owner, async (q) => {
+      await assert.rejects(q("select set_team_email_slug($1, $2)", [ws, bad]), /Use 2 to 40 letters/, bad);
+    });
+  }
+  await as(owner, async (q) => {
+    await assert.rejects(q("select set_team_email_slug($1, 'postmaster')", [ws]), /saved for email systems/);
+  });
+  await as(owner, async (q) => {
+    await assert.rejects(q("select set_team_email_slug($1, 'door-slug-other-co')", [ws]), /That address is taken/);
+  });
+  // The same address as now is fine and doesn't use up the one change.
+  assert.equal(await asCommit(owner, async (q) => (await q("select set_team_email_slug($1, 'Door-Slug-Co') s", [ws])).rows[0].s), "door-slug-co");
+  assert.equal((await addressOfWs(ws)).slug_changed_at, null);
+  assert.equal(await asCommit(owner, async (q) => (await q("select set_team_email_slug($1, ' Bakery-Ana ') s", [ws])).rows[0].s), "bakery-ana");
+  assert.ok((await addressOfWs(ws)).slug_changed_at);
+  await as(owner, async (q) => {
+    await assert.rejects(q("select set_team_email_slug($1, 'third-try')", [ws]), /already changed this address once/);
+  });
+  assert.equal((await addressOfWs(ws)).slug, "bakery-ana");
+});
+
+test("set_team_email_enabled: only the owner turns the address on and off", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("door-onoff");
+  for (const u of [admin, editor, viewer]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select set_team_email_enabled($1, false)", [ws]), /Only the owner/);
+    });
+  }
+  await asCommit(owner, (q) => q("select set_team_email_enabled($1, false)", [ws]));
+  assert.equal((await addressOfWs(ws)).enabled, false);
+  await asCommit(owner, (q) => q("select set_team_email_enabled($1, true)", [ws]));
+  assert.equal((await addressOfWs(ws)).enabled, true);
+});
+
+test("team_email_senders: members read; only the owner adds and removes, 20 at most, real addresses only; other workspaces see nothing", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, admin, editor, viewer } = await team("door-senders");
+  const other = await team("door-senders-other");
+  await asCommit(owner, (q) => q("insert into team_email_senders (workspace_id, email, added_by) values ($1, 'bo@partner.io', $2)", [ws, owner.id]));
+  for (const u of [owner, admin, editor, viewer]) {
+    await as(u, async (q) => {
+      assert.deepEqual((await q("select email from team_email_senders")).rows, [{ email: "bo@partner.io" }]);
+    });
+  }
+  await as(other.owner, async (q) => {
+    assert.equal((await q("select * from team_email_senders")).rowCount, 0);
+    assert.equal((await q("delete from team_email_senders where workspace_id = $1", [ws])).rowCount, 0);
+  });
+  await as(other.owner, async (q) => {
+    await assert.rejects(q("insert into team_email_senders (workspace_id, email, added_by) values ($1, 'x@y.com', $2)", [ws, other.owner.id]), /row-level security/);
+  });
+  for (const u of [admin, editor, viewer]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("insert into team_email_senders (workspace_id, email, added_by) values ($1, 'x@y.com', $2)", [ws, u.id]), /row-level security/);
+    });
+    await as(u, async (q) => {
+      assert.equal((await q("delete from team_email_senders where workspace_id = $1", [ws])).rowCount, 0);
+    });
+  }
+  for (const bad of ["Bo@Partner.io", "no-at-sign", "a@b", "a b@c.com"]) {
+    await as(owner, async (q) => {
+      await assert.rejects(q("insert into team_email_senders (workspace_id, email, added_by) values ($1, $2, $3)", [ws, bad, owner.id]), /violates check constraint/, bad);
+    });
+  }
+  await as(owner, async (q) => {
+    await assert.rejects(q("insert into team_email_senders (workspace_id, email, added_by) values ($1, 'z@y.com', $2)", [ws, admin.id]), /row-level security/, "added_by is the owner");
+  });
+  await asCommit(owner, async (q) => {
+    for (let i = 1; i < 20; i++) await q("insert into team_email_senders (workspace_id, email, added_by) values ($1, $2, $3)", [ws, `p${i}@partner.io`, owner.id]);
+  });
+  await as(owner, async (q) => {
+    await assert.rejects(q("insert into team_email_senders (workspace_id, email, added_by) values ($1, 'p21@partner.io', $2)", [ws, owner.id]), /row-level security/, "21st");
+  });
+  assert.equal(await asCommit(owner, async (q) => (await q("delete from team_email_senders where workspace_id = $1 and email = 'bo@partner.io'", [ws])).rowCount), 1);
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from team_email_senders"), /permission denied/);
+  });
+});
+
+test("team_email_sender(): a member by their confirmed sign-in email with their role, else an extra sender, else nobody; server only", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor, viewer } = await team("door-who");
+  const other = await team("door-who-other");
+  await confirm(owner);
+  await confirm(viewer);
+  await db.query("insert into team_email_senders (workspace_id, email) values ($1, 'bo@partner.io'), ($1, 'ed-door-who@example.com')", [ws]);
+  const who = async (email: string, w = ws) => (await asService(async (q) => (await q("select kind, user_id, role from team_email_sender($1, $2)", [w, email])).rows))[0] ?? null;
+  assert.deepEqual(await who(" OWN-door-who@Example.com "), { kind: "member", user_id: owner.id, role: "owner" });
+  assert.deepEqual(await who("vw-door-who@example.com"), { kind: "member", user_id: viewer.id, role: "viewer" });
+  assert.equal(await who("adm-door-who@example.com"), null, "an unconfirmed member is nobody");
+  assert.deepEqual(await who("ed-door-who@example.com"), { kind: "extra", user_id: null, role: null }, "unconfirmed, but the owner added the address");
+  assert.deepEqual(await who("BO@partner.io"), { kind: "extra", user_id: null, role: null });
+  assert.equal(await who("stranger@x.com"), null);
+  assert.equal(await who("own-door-who@example.com", other.ws), null, "a member of one workspace is nobody in another");
+  await confirm(editor);
+  assert.deepEqual(await who("ed-door-who@example.com"), { kind: "member", user_id: editor.id, role: "editor" }, "a member wins over the list");
+  for (const u of [owner, null]) {
+    await as(u, async (q) => {
+      await assert.rejects(q("select * from team_email_sender($1, 'bo@partner.io')", [ws]), /permission denied for function/);
+    });
+  }
+});
+
+test("email door server tables: members and visitors can't read or write them, or call their functions", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor } = await team("door-server");
+  const thread = await chatIn(ws, owner);
+  const ap = await approvalIn(ws, thread);
+  await db.query("insert into team_email_threads (thread_id, workspace_id, token) values ($1, $2, 'abcdefgh12345678')", [thread, ws]);
+  await db.query("insert into team_email_messages (workspace_id, thread_id, message_id, direction) values ($1, $2, '<a@b>', 'in')", [ws, thread]);
+  await db.query("insert into approval_links (nonce, approval_id, workspace_id, user_id, expires_at) values ('nonce-door-server-123', $1, $2, $3, now() + interval '72 hours')", [ap, ws, owner.id]);
+  for (const u of [owner, editor, null]) {
+    for (const table of ["team_email_threads", "team_email_messages", "team_email_inbound", "team_email_drops", "approval_links"]) {
+      await as(u, async (q) => {
+        await assert.rejects(q(`select * from ${table}`), /permission denied/, table);
+      });
+    }
+    for (const sql of [
+      ["select queue_team_email('e-x', $1)", [ws]],
+      ["select count_team_email_drop('unknown_sender')", []],
+      ["select use_approval_link('nonce-door-server-123', $1, $2)", [ap, owner.id]],
+      ["select give_team_email($1, 'x')", [ws]],
+    ] as const) {
+      await as(u, async (q) => {
+        await assert.rejects(q(sql[0], [...sql[1]]), /permission denied for function/, sql[0]);
+      });
+    }
+  }
+  // The rows go with the chat and the workspace.
+  await db.query("delete from threads where id = $1", [thread]);
+  assert.equal((await db.query("select count(*)::int n from team_email_threads where workspace_id = $1", [ws])).rows[0].n, 0);
+  assert.equal((await db.query("select count(*)::int n from team_email_messages where workspace_id = $1", [ws])).rows[0].n, 0);
+  await db.query("delete from workspaces where id = $1", [ws]);
+  assert.equal((await db.query("select count(*)::int n from approval_links where workspace_id = $1", [ws])).rows[0].n, 0);
+});
+
+test("queue_team_email queues one job per received email; count_team_email_drop counts per day and reason", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws } = await team("door-queue");
+  const q1 = await asService(async (q) => (await q("select queue_team_email('em-door-1', $1) ok", [ws])).rows[0].ok);
+  const q2 = await asService(async (q) => (await q("select queue_team_email('em-door-1', $1) ok", [ws])).rows[0].ok);
+  assert.deepEqual([q1, q2], [true, false]);
+  const jobs = (await db.query("select kind, payload, max_attempts from jobs where workspace_id = $1 and kind = 'team_email'", [ws])).rows;
+  assert.deepEqual(jobs, [{ kind: "team_email", payload: { email_id: "em-door-1" }, max_attempts: 3 }]);
+  const before = Number((await db.query("select coalesce(sum(count), 0) n from team_email_drops where reason = 'viewer'")).rows[0].n);
+  await asService((q) => q("select count_team_email_drop('viewer')"));
+  await asService((q) => q("select count_team_email_drop('viewer')"));
+  const after = Number((await db.query("select coalesce(sum(count), 0) n from team_email_drops where reason = 'viewer'")).rows[0].n);
+  assert.equal(after - before, 2);
+  await assert.rejects(asService((q) => q("select count_team_email_drop('Bad Reason!')")), /violates check constraint/);
+});
+
+test("use_approval_link: once, for the member and approval it was made for, before it expires", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor } = await team("door-link");
+  const ap = await approvalIn(ws, null);
+  const ap2 = await approvalIn(ws, null);
+  await db.query(
+    "insert into approval_links (nonce, approval_id, workspace_id, user_id, expires_at) values ('nonce-door-link-ok-1', $1, $2, $3, now() + interval '72 hours'), ('nonce-door-link-old-1', $1, $2, $3, now() - interval '1 second')",
+    [ap, ws, owner.id],
+  );
+  const use = (nonce: string, a: string, u: User) => asService(async (q) => (await q("select use_approval_link($1, $2, $3) s", [nonce, a, u.id])).rows[0].s);
+  assert.equal(await use("nonce-door-link-ok-1", ap, editor), "missing", "wrong member");
+  assert.equal(await use("nonce-door-link-ok-1", ap2, owner), "missing", "wrong approval");
+  assert.equal(await use("nonce-door-link-none", ap, owner), "missing");
+  assert.equal(await use("nonce-door-link-old-1", ap, owner), "expired");
+  assert.equal(await use("nonce-door-link-ok-1", ap, owner), "ok");
+  assert.equal(await use("nonce-door-link-ok-1", ap, owner), "used");
+});
+
 // ─────────────── chat files (022_chat_files.sql) ───────────────
 
 test("chat-files: a private bucket with the app's size and type limits", async (t) => {
@@ -2443,7 +2683,7 @@ test("chat_file_workspace: the first folder when it is a workspace id, else null
   assert.deepEqual(r, { a: ws, b: null, c: null, d: ws });
 });
 
-// ─────────────── goals, plan steps and the Monday check-in (023_goals.sql) ───────────────
+// ─────────────── goals, plan steps and the Monday check-in (024_goals.sql) ───────────────
 
 const threadIn = async (ws: string, by: User) => (await db!.query("insert into threads (workspace_id, title, created_by) values ($1, 'Grow on LinkedIn', $2) returning id", [ws, by.id])).rows[0].id as string;
 const GOAL_INSERT = "insert into goals (workspace_id, thread_id, card_id, agent, metric, title, target, unit, due_date) values ($1, $2, $3, 'social', 'followers', 'Grow LinkedIn by', 150, 'followers', '2027-01-31') returning id, created_by, status, current";

@@ -44,6 +44,12 @@ function deps(db: SupabaseClient, staff: StaffDeps["staff"]): StaffDeps {
     pendingBefore: async (ws, before) =>
       rows<StaffApproval[]>(await db.from("approvals").select("id, agent, title, created_at").eq("workspace_id", ws).eq("status", "pending").lt("created_at", before).order("created_at").limit(100)) ?? [],
     actions: async (ws) => rows<StaffAction[]>(await db.from("staff_actions").select("id, staff_email, action, details, created_at").eq("workspace_id", ws).order("id", { ascending: false }).limit(20)) ?? [],
+    droppedEmails: async (sinceDay) => {
+      const r = await db.from("team_email_drops").select("count").gte("day", sinceDay).limit(5000);
+      // Before 023_team_email.sql runs there is no table: no count, and the console still loads.
+      if (r.error) return 0;
+      return ((r.data ?? []) as { count: number }[]).reduce((n, x) => n + (Number(x.count) || 0), 0);
+    },
     setPlan: async (who, ws, p) => rows(await db.rpc("staff_set_plan", { p_staff: who.userId, p_email: who.email, p_ws: ws, p_plan: p.plan, p_status: p.status })),
     extendTrial: async (who, ws, days) => rows(await db.rpc("staff_extend_trial", { p_staff: who.userId, p_email: who.email, p_ws: ws, p_days: days })),
     retryJob: async (who, ws, jobId) => rows(await db.rpc("staff_retry_job", { p_staff: who.userId, p_email: who.email, p_ws: ws, p_job: jobId })),
