@@ -16,7 +16,8 @@ import { NEEDS } from "@/lib/workspace";
 
 // Chat with the AI team (editors and up). Saves the person's message, then streams the turn as NDJSON, one event
 // per line: {type:"thread"} first, then route (who answers), status, delta (the reply as it is written), tool,
-// handoff and message events, then {type:"done"}. An untagged message goes to the teammate the router picks
+// card (an answer card, src/lib/cards.ts), step and goal (a plan or goal changed), handoff and message events, then
+// {type:"done"}. An untagged message goes to the teammate the router picks
 // (src/lib/router.ts). Cancelling the request (the Stop button) stops the reply and saves what was written.
 // With again (Retry, Ask someone else) the thread's last message from the person is answered again and nothing new
 // is saved for the person.

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 /* The current app's look: tokens and component classes ported from app/public/app.css. */
 @import "./mt.css";
+/* Answer cards, goals and plans in chat. */
+@import "./cards.css";
 
 /* Morning Telos colors and fonts, the same as the current app (app/public/app.css). */
 @theme {

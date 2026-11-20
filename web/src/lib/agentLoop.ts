@@ -23,6 +23,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { aiBlock, CAP_MESSAGES, costOf, spendWindowStart, tokensOf, type MeterWorkspace, type Tokens } from "./meter.ts";
 import { EFFORT, FALLBACK_BETA, MAX_TOKENS, modelFor, SERVER_FALLBACK, type ModelChoice } from "./models.ts";
 import { cleanTone } from "./brand.ts";
+import { cardsNote, hideNames, LIMITS, storedCards, type Card } from "./cards.ts";
 import { PAGE_RULE, pageBlock, storedPage, type Screenshot } from "./pageContext.ts";
 import { progressLine, usedName } from "./progress.ts";
 import { ROUTER_MODEL, routeMessage, SKIP_META, type RouteHow, type RouterAsk } from "./router.ts";
@@ -91,6 +92,12 @@ export type ChatEvent =
   | { type: "handoff"; from: AgentKey; to: AgentKey; note: string }
   /** A change saved for approval (supabase/013_approvals.sql). The screen shows a card with Review. */
   | { type: "approval"; agent: AgentKey; id: number; title: string }
+  /** An answer card (src/lib/cards.ts), checked by the server. It shows under the reply and is saved with it. */
+  | { type: "card"; agent: AgentKey; card: Card }
+  /** A plan's step moved (update_step), so its plan card changes live. */
+  | { type: "step"; plan: string; position: number; status: "todo" | "running" | "done" }
+  /** A goal's number changed (log_progress), so the pinned meter and the sidebar read it again. */
+  | { type: "goal"; id: string; current: number; status: string }
   /** The whole reply. stopped: the person pressed Stop and this is what was written. used: the tools that ran. */
   | { type: "message"; agent: AgentKey; text: string; error?: boolean; blocked?: "expired" | "allowance" | "starting"; stopped?: boolean; used?: string[] }
   | { type: "done" };
@@ -124,6 +131,8 @@ export type ToolResult = {
   isError?: boolean;
   /** Set when the call was saved for approval instead of running. Shown in the chat as a card. */
   approval?: { id: number; title: string };
+  /** Answer cards the tool made (show_card and the goal tools). Shown under the reply and saved with it. */
+  cards?: Card[];
 };
 export type AgentTool = {
   definition: Anthropic.Beta.BetaTool;
@@ -131,6 +140,11 @@ export type AgentTool = {
   label: string;
   /** True when it changes something outside the app (it goes through approvals). Tells the prompt which rules apply. */
   write?: boolean;
+  /**
+   * A tool that only shapes the answer (the card tools): no progress line, not in "Used: ...", and text written
+   * before it stays in the reply instead of being replaced by the next step's.
+   */
+  quiet?: boolean;
   run: (input: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>;
 };
 /** One tool, as tool sources make them. */
@@ -201,7 +215,7 @@ const TOOL_RULES: Record<WriteMode, string> = {
 export const FORMAT_GUIDE = [
   "Lead with the answer in one or two sentences.",
   "When the answer is long, split it into short sections with ### headings.",
-  "Use a Markdown table for numbers over time or for comparing things side by side. No more than one table per idea.",
+  "Use a small Markdown table (up to 6 rows) for comparing a few things side by side. No more than one table per idea.",
   "Put the key numbers in **bold**.",
   "Use short bullets, not long paragraphs. No walls of text.",
   "End with one clear next step or one question.",
@@ -214,6 +228,21 @@ export function toneRule(tone: string | null | undefined): string | null {
     ? `The business's tone is "${t}". In chat with the owner, stay plain and clear with a light touch of that tone. In anything written for customers (emails, posts, pages, replies), follow that tone closely.`
     : null;
 }
+
+/**
+ * How teammates use answer cards (show_card, set_goal, set_plan, update_step, log_progress in src/lib/cardTools.ts).
+ * In every teammate's prompt. tests/cards.test.ts checks it is there.
+ */
+export const CARD_GUIDE = [
+  "Make answers easy to act on with cards. Call show_card, and don't repeat what a card shows in words.",
+  "When you need the person to pick from clear options, ask with a choices card instead of plain text. Up to 4 questions in one card.",
+  "When there are natural next steps, end your answer with a quick_replies card of 2 to 4 short replies.",
+  "Use a table card for lists of items, like leads, posts or keywords. Use a chart card for numbers over time. A small Markdown table is fine for a few rows.",
+  "When an action needs an app that isn't connected, show a connect card for that app instead of saying you can't.",
+  "After a social post or an email is saved for approval, show it with a post_preview or email_preview card that gives its approval number, so the owner can edit and approve it right there. Save one post per approval.",
+  "When the person states a result they want, like more followers, more bookings or more reviews, propose a goal with set_goal. Once they start it, propose the steps with set_plan. As you work, mark steps with update_step, and record the number with log_progress.",
+  "Never name the services or tools behind the team. Say what they do, like your social calendar, your SEO data or your email.",
+];
 
 export function systemPrompt(ws: { name: string; website: string | null; tone?: string | null }, key: AgentKey, o: { tools: boolean; writes?: WriteMode; missing: string[]; teammates: AgentKey[] }): string {
   const a = AGENTS[key];
@@ -245,7 +274,10 @@ How you work:
 ${rules.map((r) => `- ${r}`).join("\n")}
 
 How to format answers:
-${FORMAT_GUIDE.map((r) => `- ${r}`).join("\n")}`;
+${FORMAT_GUIDE.map((r) => `- ${r}`).join("\n")}
+
+How to use cards:
+${CARD_GUIDE.map((r) => `- ${r}`).join("\n")}`;
 }
 
 /** The handoff tool: name a teammate and say what they should do. They run right after this agent's reply. */
@@ -275,13 +307,15 @@ export function historyFor(rows: StoredMessage[], key: AgentKey, shot?: Screensh
   const turns: { role: "user" | "assistant"; text: string; page?: boolean }[] = [];
   let pageTurn = -1;
   for (const m of rows.slice(-HISTORY)) {
-    if (!m.content?.trim() || SKIP_META.some((f) => m.meta?.[f])) continue;
+    // An agent's cards are told in words, so the teammate knows what the person saw (and answered).
+    const content = m.role === "agent" ? [m.content?.trim(), cardsNote(storedCards(m.meta))].filter(Boolean).join("\n\n") : m.content;
+    if (!content?.trim() || SKIP_META.some((f) => m.meta?.[f])) continue;
     const page = m.role === "user" ? storedPage(m.meta) : null;
     const t =
       m.role === "agent" && m.agent === key
-        ? { role: "assistant" as const, text: m.content }
+        ? { role: "assistant" as const, text: content }
         : m.role === "agent"
-          ? { role: "user" as const, text: `${m.agent ? AGENTS[m.agent].god : "Teammate"}: ${m.content}` }
+          ? { role: "user" as const, text: `${m.agent ? AGENTS[m.agent].god : "Teammate"}: ${content}` }
           : { role: "user" as const, text: page ? `${m.content}\n\n${pageBlock(page)}` : m.content };
     const last = turns[turns.length - 1];
     if (last && last.role === t.role) last.text += `\n\n${t.text}`;
@@ -365,14 +399,14 @@ export function stoppedTokens(partial: Anthropic.Beta.BetaMessage | undefined, w
 // ─────────────── one agent ───────────────
 
 type Handoff = { agent: AgentKey; note: string };
-type Run = { handoffs: Handoff[]; cost: number; approvals: { id: number; title: string }[]; stopped: boolean };
+type Run = { handoffs: Handoff[]; cost: number; approvals: { id: number; title: string }[]; cards: Card[]; stopped: boolean };
 
 /** At most 4 cache breakpoints go in one request: the tool list, the prompt, the extra context and the thread. */
 export const CACHE_BREAKPOINTS = 4;
 
 async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<Pref>>>, input: TurnInput, d: TurnDeps & { client: LoopClient }, preloaded?: StoredMessage[] | null): Promise<Run> {
   const ws = input.workspace;
-  const run: Run = { handoffs: [], cost: 0, approvals: [], stopped: false };
+  const run: Run = { handoffs: [], cost: 0, approvals: [], cards: [], stopped: false };
   const say = async (text: string, meta: Record<string, unknown> = {}, extra: { stopped?: boolean; used?: string[] } = {}) => {
     await d.store.addMessage({ thread_id: input.threadId, workspace_id: ws.id, role: "agent", agent: key, content: text, meta });
     d.emit({ type: "message", agent: key, text, ...(extra.stopped ? { stopped: true } : {}), ...(extra.used?.length ? { used: extra.used } : {}) });
@@ -438,13 +472,19 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
   };
 
   let finalText = "";
+  // Text from steps that only showed cards. The next step's text adds to it instead of replacing it.
+  let kept = "";
+  const join = (a: string, b: string) => [a, b].filter(Boolean).join("\n\n");
   for (let step = 0; step < MAX_STEPS; step++) {
     d.emit({ type: "status", agent: key, text: step === 0 ? "Thinking" : "Working" });
-    // This step's text as it streams. The first piece tells the screen to start the reply over.
+    // This step's text as it streams. The first piece tells the screen to start the reply over, unless the step
+    // before only showed cards: then it carries on after a blank line.
     let written = "";
     const onText = (delta: string) => {
       if (!delta) return;
-      d.emit({ type: "delta", agent: key, text: delta, ...(written ? {} : { start: true }) });
+      if (written) d.emit({ type: "delta", agent: key, text: delta });
+      else if (kept) d.emit({ type: "delta", agent: key, text: `\n\n${delta}` });
+      else d.emit({ type: "delta", agent: key, text: delta, start: true });
       written += delta;
     };
     const call = await callClaude(
@@ -467,13 +507,13 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
     if (call.stopped) {
       await meter(call.partial?.model || model, stoppedTokens(call.partial, written));
       run.stopped = true;
-      finalText = written.trim() || finalText;
+      finalText = join(kept, written.trim()) || finalText;
       break;
     }
     const res = call.message;
     await meter(res.model || model, tokensOf(res.usage));
 
-    const text = textOf(res.content);
+    const text = join(kept, textOf(res.content));
     if (text) finalText = text;
     // Check how the reply ended before running any tool: a cut-off tool call may hold a half-written input.
     if (res.stop_reason === "refusal") {
@@ -494,6 +534,7 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
     }
     const calls = res.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
     if (res.stop_reason !== "tool_use" || !calls.length) break;
+    kept = calls.every((c) => byName.get(c.name)?.quiet) ? text : "";
 
     // The whole reply goes back unchanged (thinking blocks included), then every result in one message.
     messages.push({ role: "assistant", content: res.content });
@@ -511,15 +552,24 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
         }
         const tool = byName.get(c.name);
         if (!tool) return R("That tool isn't available.", true);
-        const face = { name: c.name, label: tool.label };
-        const name = usedName(face);
-        if (!used.includes(name)) used.push(name);
-        d.emit({ type: "tool", agent: key, text: tool.label, line: progressLine(AGENTS[key].god, face, args), used: name });
+        if (!tool.quiet) {
+          const face = { name: c.name, label: tool.label };
+          const name = usedName(face);
+          if (!used.includes(name)) used.push(name);
+          d.emit({ type: "tool", agent: key, text: tool.label, line: progressLine(AGENTS[key].god, face, args), used: name });
+        }
         try {
           const r = await tool.run(args, ctx);
           if (r.approval) {
             run.approvals.push(r.approval);
             d.emit({ type: "approval", agent: key, id: r.approval.id, title: r.approval.title });
+          }
+          if (r.cards?.length) {
+            if (run.cards.length + r.cards.length > LIMITS.cardsPerReply) return R(`That's too many cards for one reply (at most ${LIMITS.cardsPerReply}). Put what's left in words or in the next reply.`, true);
+            for (const card of r.cards) {
+              run.cards.push(card);
+              d.emit({ type: "card", agent: key, card });
+            }
           }
           return R(r.content || "(empty)", Boolean(r.isError));
         } catch (e) {
@@ -535,14 +585,16 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
     }
     if (step === MAX_STEPS - 1) finalText = finalText ? `${finalText}\n\n${TEAM_MESSAGES.tooManySteps}` : TEAM_MESSAGES.tooManySteps;
   }
-  const meta = { model, ...(run.approvals.length ? { approvals: run.approvals } : {}), ...(used.length ? { used } : {}) };
+  const meta = { model, ...(run.approvals.length ? { approvals: run.approvals } : {}), ...(run.cards.length ? { cards: run.cards } : {}), ...(used.length ? { used } : {}) };
+  // The services behind the team are never named to the person (src/lib/cards.ts).
+  finalText = hideNames(finalText);
   if (run.stopped) {
     // What was written stays, with the Stopped note. Nothing written means nothing to save.
-    if (finalText) await say(finalText, { ...meta, stopped: true }, { stopped: true, used });
+    if (finalText || run.cards.length) await say(finalText, { ...meta, stopped: true }, { stopped: true, used });
     return run;
   }
-  // The approvals this reply prepared, so the chat shows their cards under it.
-  await say(finalText || TEAM_MESSAGES.done, meta, { used });
+  // The approvals and cards this reply prepared, so the chat shows them under it. A reply that is only cards says nothing more.
+  await say(finalText || (run.cards.length ? "" : TEAM_MESSAGES.done), meta, { used });
   return run;
 }
 

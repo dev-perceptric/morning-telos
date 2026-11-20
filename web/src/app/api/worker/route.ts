@@ -4,6 +4,7 @@ import { brandJobHandlers, expireTrialsHandler } from "@/lib/closeoutDb";
 import { teamClient } from "@/lib/claude";
 import { cronAllowed } from "@/lib/cronAuth";
 import { STALE_AFTER } from "@/lib/approvals";
+import { goalJobHandlers } from "@/lib/goalsServer";
 import { runJob, type Handler, type Job } from "@/lib/jobs";
 import { lifecycleEmailsHandler } from "@/lib/lifecycleDb";
 import { partnerFor, type Product } from "@/lib/partner";
@@ -26,7 +27,7 @@ import { adminClient } from "@/lib/serverAuth";
 // Ticks may overlap: claim_jobs skips jobs another tick holds, and a job's lease brings it back if a tick dies.
 // Daily jobs need no cron line of their own: each tick calls queue_daily_jobs() (supabase/010_expire_trials.sql),
 // which queues each one once per UTC day. Hourly jobs the same way with queue_hourly_jobs() (018_email_log.sql).
-// Routines the same way: queue_routine_runs() queues each due one once.
+// Routines the same way: queue_routine_runs() queues each due one once. Goal check-ins too: queue_goal_checkins().
 // When the worker image (plan: Deploy, morningtelos-worker) lands, it calls this in a loop instead of cron.
 
 export const maxDuration = 300;
@@ -52,6 +53,8 @@ function handlers(db: SupabaseClient): Record<string, Handler> {
     ...knowledgeJobHandlers(db),
     // A routine's scheduled run: its teammate does the job in a new chat (src/lib/routinesServer.ts).
     ...routineJobHandlers(db, { client: teamClient, log: (m) => warn(m, "run_routine") }),
+    // Monday's check-in in each active goal's chat, from its owner (src/lib/goalCheckin.ts).
+    ...goalJobHandlers(db, { client: teamClient, log: (m) => warn(m, "goal_checkin") }),
     provision: async (job) => {
       const ws = job.workspace_id;
       if (!ws) return { status: "failed", error: "A provision job needs a workspace." };
@@ -116,6 +119,10 @@ export async function POST(request: Request) {
   // Routines due this minute in each workspace's time zone, queued once each (supabase/014_routines_skills_memory.sql).
   const routines = await db.rpc("queue_routine_runs");
   if (routines.error) warn(/queue_routine_runs/.test(routines.error.message) ? "Run supabase/014_routines_skills_memory.sql in Supabase." : `Routines: ${routines.error.message}`, "routines");
+
+  // Monday check-ins for active goals, once a week each in the workspace's time zone (supabase/022_goals.sql).
+  const checkins = await db.rpc("queue_goal_checkins");
+  if (checkins.error) warn(/queue_goal_checkins/.test(checkins.error.message) ? "Run supabase/022_goals.sql in Supabase." : `Goal check-ins: ${checkins.error.message}`, "goal_checkin");
 
   // An approved change whose call never finished (the server restarted mid-call) is failed, so a person checks it.
   const stale = await db.rpc("fail_stale_approvals", { p_older: STALE_AFTER });

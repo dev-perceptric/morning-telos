@@ -26,6 +26,7 @@ import {
   type TeamWorkspace,
   type UsageRow,
 } from "../src/lib/agentLoop.ts";
+import { INTERNAL_NAMES, readCard } from "../src/lib/cards.ts";
 import { CAP_MESSAGES, costOf } from "../src/lib/meter.ts";
 import { MODELS } from "../src/lib/models.ts";
 import { APP_ACCESS, appName } from "../src/lib/composio/catalog.ts";
@@ -919,4 +920,69 @@ test("a paused teammate is never picked by the router", async () => {
   const r = await streamTurn("Post this", client, { router: router as never, store: memoryStore({ prefs: { social: { enabled: false } } }) });
   assert.doesNotMatch(seen[0].split("\n")[0], /Aphrodite/);
   assert.deepEqual(r.events[0], { type: "route", agent: "chief", how: "fallback", reason: "Answers general questions" });
+});
+
+// ─────────────── answer cards ───────────────
+
+/** A show_card tool like the real one (src/lib/cardTools.ts): checks the card, says to wait, hands it back. */
+const cardTool = (): AgentTool => ({
+  definition: { name: "show_card", input_schema: { type: "object", properties: {} } },
+  label: "Showing a card",
+  quiet: true,
+  run: async (input) => {
+    const r = readCard(input, "social");
+    return r.ok ? { content: "The choices card is on screen. Stop here and wait.", cards: [r.card] } : { content: r.error, isError: true };
+  },
+});
+const CHOICES_IN = { kind: "choices", questions: [{ label: "How often?", options: ["2 a week", "3 a week"] }], submit: "Make the plan" };
+
+test("cards: a card is sent on the stream as it is made, kept with the reply, and the text before it stays", async () => {
+  const { client } = streamingClaude({
+    social: [{ content: [text("Three quick taps and I'll build the plan."), toolUse("c1", "show_card", CHOICES_IN)], stop_reason: "tool_use" }, say("Pick and tap the button.")],
+  });
+  const r = await streamTurn("@Aphrodite grow my LinkedIn", client, { tools: [cardTool()] });
+  const seq = r.events.map((e) => (e.type === "delta" ? `delta${e.start ? "*" : ""}` : e.type));
+  assert.ok(!seq.includes("tool"), "a card tool shows no progress line");
+  const card = r.events.find((e): e is Extract<ChatEvent, { type: "card" }> => e.type === "card")!;
+  assert.equal(card.agent, "social");
+  assert.equal(card.card.kind, "choices");
+  // The step after the card carries on after a blank line instead of starting the reply over.
+  const second = r.events.slice(r.events.indexOf(card)).find((e): e is Extract<ChatEvent, { type: "delta" }> => e.type === "delta")!;
+  assert.equal(second.start, undefined);
+  assert.match(second.text, /^\n\nPick/);
+  const saved = r.said.at(-1)!;
+  assert.equal(saved.content, "Three quick taps and I'll build the plan.\n\nPick and tap the button.");
+  assert.deepEqual(saved.meta.cards, [card.card], "saved with the reply, so it shows again after a reload");
+  assert.equal(saved.meta.used, undefined, "not in Used: ...");
+  assert.deepEqual(r.events.at(-1), { type: "message", agent: "social", text: "Three quick taps and I'll build the plan.\n\nPick and tap the button." });
+});
+
+test("cards: a reply that is only a card saves no Done text, and the next turn reads the card in words", async () => {
+  const { client } = fakeClaude({ social: [{ content: [toolUse("c1", "show_card", CHOICES_IN)], stop_reason: "tool_use" }, { content: [], stop_reason: "end_turn" }] });
+  const r = await turn("@Aphrodite grow my LinkedIn", { client, tools: [cardTool()] });
+  const saved = r.said.at(-1)!;
+  assert.equal(saved.content, "");
+  assert.equal((saved.meta.cards as unknown[]).length, 1);
+  const hist = historyFor([{ role: "user", agent: null, content: "grow my LinkedIn" }, { role: "agent", agent: "social", content: saved.content, meta: saved.meta }, { role: "user", agent: null, content: "How often: 3 a week." }], "social");
+  assert.equal(hist[1].role, "assistant");
+  assert.match(String(hist[1].content), /\[Card: choices\. How often\? \(2 a week, 3 a week\)\]/);
+});
+
+test("cards: a bad card goes back to the teammate as an error, and too many cards in one reply are refused", async () => {
+  const many = Array.from({ length: 7 }, (_, i) => toolUse(`c${i}`, "show_card", { kind: "quick_replies", replies: [`a${i}`, `b${i}`] }));
+  const { client, calls } = fakeClaude({ social: [{ content: [toolUse("x", "show_card", { kind: "quick_replies", replies: ["one"] }), ...many], stop_reason: "tool_use" }, say("Done.")] });
+  const r = await turn("@Aphrodite hi", { client, tools: [cardTool()] });
+  const results = calls[1].params.messages.at(-1)!.content as Anthropic.Beta.BetaToolResultBlockParam[];
+  assert.equal(results[0].is_error, true);
+  assert.match(String(results[0].content), /needs at least 2/);
+  assert.equal(results.filter((x) => x.is_error).length, 2, "the seventh card is refused");
+  assert.equal((r.said.at(-1)!.meta.cards as unknown[]).length, 6);
+  assert.equal(r.events.filter((e) => e.type === "card").length, 6);
+});
+
+test("replies never name the services behind the team", async () => {
+  const { client } = fakeClaude({ seo: [say("Arrowsterr shows you in 23% of answers, and Capybaroar has 3 drafts.")] });
+  const r = await turn("@Artemis how are we doing", { client });
+  assert.equal(r.said.at(-1)!.content, "your SEO tools shows you in 23% of answers, and your social tools has 3 drafts.");
+  for (const n of INTERNAL_NAMES) assert.ok(!JSON.stringify(r.events).includes(n), n);
 });

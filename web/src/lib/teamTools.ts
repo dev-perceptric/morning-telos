@@ -10,14 +10,18 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ToolRegistry } from "./agentLoop.ts";
 import type { Approval, Decision, NewApproval, RunResult } from "./approvals.ts";
+import { cardToolSource, type CardToolDeps } from "./cardTools.ts";
+import type { Metric } from "./cards.ts";
 import { appToolSource, isAppApproval, runApproval as runAppApproval, type AppToolDeps } from "./composio/appAction.ts";
 import { composioOn } from "./composio/composio.ts";
 import { connectionsOf, markReconnect } from "./composio/store.ts";
+import { activeGoal, approvalFace, pendingIn, planSteps, saveGoal, setStep } from "./goalStore.ts";
+import { METRIC_SOURCE, pickMetric } from "./goals.ts";
 import { knowledgeToolSource } from "./knowledgeTools.ts";
 import { searchKnowledge } from "./knowledgeServer.ts";
 import { mcpClient, type McpClient } from "./mcpClient.ts";
 import type { Product } from "./partner.ts";
-import { mcpUrls, productToolSource, runApproval as runProductApproval, type ActivityRow, type ProductToolDeps, type ServiceRow } from "./productTools.ts";
+import { mcpUrls, productRead, productToolSource, runApproval as runProductApproval, type ActivityRow, type ProductToolDeps, type ServiceRow } from "./productTools.ts";
 import { open } from "./sealing.ts";
 import { composeTools, type ToolSource } from "./toolRegistry.ts";
 import { wpNet } from "./wordpress/net.ts";
@@ -104,6 +108,33 @@ export function wordpressDeps(db: SupabaseClient, log?: (message: string) => voi
   };
 }
 
+/**
+ * A goal's raw number from real data: followers or reach from the social results, AI visibility from the SEO data,
+ * read with the workspace's own brand key. Null for a metric no product gives, or when it can't be read.
+ */
+export function goalReading(products: ProductToolDeps): (workspaceId: string, metric: Metric) => Promise<number | null> {
+  return async (workspaceId, metric) => {
+    const src = METRIC_SOURCE[metric];
+    if (!src) return null;
+    const answer = await productRead(workspaceId, src.product, src.tool, src.input, products);
+    return answer === null ? null : pickMetric(answer, src.keys);
+  };
+}
+
+/** What the card tools need on the server: approvals, goals and steps, and goal numbers from real data. */
+export function cardDeps(db: SupabaseClient, log?: (message: string) => void): CardToolDeps {
+  return {
+    approval: (ws, id) => approvalFace(db, ws, id),
+    activeGoal: (ws, thread) => activeGoal(db, ws, thread),
+    planSteps: (ws, thread) => planSteps(db, ws, thread),
+    setStep: (ws, id, status) => setStep(db, ws, id, status),
+    saveGoal: (ws, id, patch) => saveGoal(db, ws, id, patch),
+    reading: goalReading(productDeps(db, log)),
+    pending: (ws, thread) => pendingIn(db, ws, thread),
+    log,
+  };
+}
+
 /** Runs an approved change where it belongs: the customer's own app or WordPress site, or Arrowsterr and Capybaroar. */
 export function runTeamApproval(db: SupabaseClient, log?: (message: string) => void): (ap: Approval) => Promise<RunResult> {
   const products = productDeps(db, log);
@@ -123,6 +154,8 @@ export function toolSources(db: SupabaseClient, log?: (message: string) => void)
     wordpressToolSource(wordpressDeps(db, log)),
     // search_knowledge for every working agent.
     knowledgeToolSource((ws, q, n) => searchKnowledge(ws, q, n, db)),
+    // Answer cards and goals for every working agent (show_card, set_goal, set_plan, update_step, log_progress).
+    cardToolSource(cardDeps(db, log)),
   ];
 }
 
