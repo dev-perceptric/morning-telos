@@ -786,10 +786,44 @@ button.row:disabled:hover{background:none}
 }
 }
 
-/* Home, like ChatGPT's new chat screen: the question and the message box in the middle of the page. */
-.home-c{display:flex;flex-direction:column;min-height:calc(100dvh - 120px)}
-.home-mid{flex:1;display:flex;flex-direction:column;justify-content:center;gap:24px;padding:24px 0 12vh}
-.home-q{font:400 clamp(26px,3.6vw,34px)/1.15 var(--serif);letter-spacing:-.02em;text-align:center;color:var(--ink)}
+/* Home, like the approved demo: the Slack banner, the warm hero with the message box, the other ways to reach the
+   team under it, Finish setup and Suggested for you. */
+:root{--glow:#f8e7da}
+.home2{display:flex;flex-direction:column;padding-bottom:40px}
+.hbanner{display:flex;align-items:center;gap:12px;background:var(--sunk);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-top:8px}
+.hbanner .main{flex:1;min-width:0;font-size:13.5px;font-weight:500;color:var(--ink-2)}
+.hbanner .lg-img{width:28px;height:28px}
+.hhero{background:radial-gradient(60% 80% at 50% 0%,var(--glow),transparent 70%);border-radius:24px;padding:48px 0 8px;display:grid;gap:20px;text-align:center}
+.hhero-hi{font:400 22px/1.3 var(--serif);color:var(--ink-2)}
+.hhero-q{font:400 clamp(32px,5vw,52px)/1.05 var(--serif);letter-spacing:-.02em;text-wrap:balance;color:var(--ink)}
+.hbox{text-align:left}
+.reach{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 16px;margin:0 8px;background:var(--sunk);border:1px solid var(--line);border-top:0;border-radius:0 0 var(--r) var(--r);font-size:13.5px;color:var(--ink-3)}
+.reach div{display:flex;gap:14px;flex-wrap:wrap}
+.reach a,.reach .ch{color:var(--ink-2);font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.reach a:hover{color:var(--clay-2)}
+.reach img{width:16px;height:16px;border-radius:4px}
+.home2 .sec{margin-top:28px}
+.home2>.err-box,.home2>.note-box{margin-top:16px}
+.btn .btn-logo{width:16px;height:16px;border-radius:4px;object-fit:contain}
+.sug-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.sug-c{text-align:left;padding:14px;display:flex;flex-direction:column;gap:8px;transition:transform .15s,border-color .15s}
+.sug-c:hover:not(:disabled){transform:translateY(-1px);border-color:var(--clay)}
+.sug-c:disabled{cursor:default}
+.sug-top{display:flex;align-items:center;gap:8px}
+.sug-top small{font-size:12.5px;color:var(--ink-4)}
+.sug-c b{font-weight:500;font-size:14.5px}
+.sug-c>small{color:var(--ink-3);font-size:13px;line-height:1.45}
+.sug-c .ics{margin-top:auto}
+@media (max-width:900px){
+  .hhero{padding:24px 0 4px;gap:16px}
+  .hhero-hi{font-size:19px}
+}
+
+/* Use cases: the group filter and the cards' apps and teammate line. */
+.uc-tabs{margin:0 0 22px}
+.uc-apps{display:flex;align-items:center;min-height:28px;margin-bottom:12px}
+.uc-apps .ic{width:28px;height:28px}
+.uc-who{display:block;font-size:12.5px;color:var(--ink-4);margin-top:2px}
 
 /* Chat while a reply is written: Stop in Send's place, a soft cursor, the quiet line, answer actions, Jump to latest. */
 .send.stop{background:var(--ink)}

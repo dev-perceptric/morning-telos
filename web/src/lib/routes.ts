@@ -5,6 +5,7 @@ import { inviteTokenFromPath } from "./workspace.ts";
 export type SettingsTab = "general" | "members" | "social" | "apps" | "skills" | "extension";
 export type Route =
   | { page: "home" }
+  | { page: "useCases" }
   | { page: "thread"; id: string | null }
   | { page: "team" }
   | { page: "agent"; key: AgentKey }
@@ -39,6 +40,7 @@ export function parseRoute(path: string): Route {
   if (p === "/settings/apps") return { page: "settings", tab: "apps" };
   if (p === "/settings/skills") return { page: "settings", tab: "skills" };
   if (p === "/settings/extension") return { page: "settings", tab: "extension" };
+  if (p === "/use-cases") return { page: "useCases" };
   if (p === "/team") return { page: "team" };
   // One teammate's own page, like the current app's #agent/<key>.
   const agent = /^\/team\/([a-z]+)$/.exec(p);
@@ -65,6 +67,7 @@ export function routePath(r: Route): string {
   if (r.page === "settings") return r.tab === "general" ? "/settings" : `/settings/${r.tab}`;
   if (r.page === "invite") return `/invite/${r.token}`;
   if (r.page === "thread") return r.id ? `/chat/${r.id}` : "/chat";
+  if (r.page === "useCases") return "/use-cases";
   if (r.page === "team") return "/team";
   if (r.page === "agent") return `/team/${r.key}`;
   if (r.page === "billing") return "/billing";
