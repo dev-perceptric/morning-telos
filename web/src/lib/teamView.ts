@@ -7,7 +7,7 @@ import { AGENTS, type AgentKey } from "./team.ts";
 /** The small colored badges for our own products, like the old app's SVC_ICON. */
 export const PRODUCT_BADGE: Record<string, { label: string; color: string; name: string }> = {
   arrowsterr: { label: "SEO", color: "#d9a441", name: "SEO and AI visibility" },
-  capybaroar: { label: "Soc", color: "#c084a7", name: "Social media" },
+  capybaroar: { label: "Social", color: "#c084a7", name: "Social media" },
 };
 
 export type AgentStatus = { tone: "ok" | "wait" | "idle"; label: string };

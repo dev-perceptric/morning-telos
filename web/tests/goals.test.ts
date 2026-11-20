@@ -1,11 +1,12 @@
 // Goals (src/lib/goals.ts) and the Monday check-in job (src/lib/goalCheckin.ts), with fakes: no database, no Claude.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { NewMessage, Pref, TeamStore, TeamWorkspace, TurnInput } from "../src/lib/agentLoop.ts";
 import type { GoalPatch } from "../src/lib/cardTools.ts";
 import { readCard } from "../src/lib/cards.ts";
 import { checkinHandler, type CheckinDeps } from "../src/lib/goalCheckin.ts";
-import { CHECKIN_LABEL, checkinPrompt, goalLine, goalOf, progressCard, type GoalRow } from "../src/lib/goals.ts";
+import { CHECKIN_LABEL, checkinPrompt, goalInsert, goalLine, goalOf, progressCard, startError, stepInserts, type GoalRow } from "../src/lib/goals.ts";
 import type { Job } from "../src/lib/jobs.ts";
 import type { AgentKey } from "../src/lib/team.ts";
 import { withSoon } from "./soon.ts";
@@ -124,4 +125,33 @@ test("goal rows read as numbers, the progress card is built from the row, and th
   assert.equal(progressCard(goal({ current: 5 }), { now: NOW }).status, "needs_you", "behind the straight line to the due date");
   assert.equal(CHECKIN_LABEL, "Weekly check-in");
   assert.doesNotMatch(checkinPrompt(goal(), NOW), /—/);
+});
+
+// ─────────────── what the goal and plan cards insert ───────────────
+
+/** The columns 024_goals.sql lets signed-in people insert into a table. */
+function insertGrant(table: string): string[] {
+  const sql = readFileSync(new URL("../supabase/024_goals.sql", import.meta.url), "utf8");
+  const m = new RegExp(`grant insert \\(([^)]*)\\) on public\\.${table} to authenticated`).exec(sql);
+  assert.ok(m, `no insert grant for ${table}`);
+  return m[1].split(",").map((c) => c.trim());
+}
+
+test("goalInsert and stepInserts send only the columns people may insert, never created_by", () => {
+  const g = goalInsert({ workspaceId: WS.id, threadId: THREAD, card: { id: "c_abcdef123456", agent: "social", metric: "followers", lead: "Grow LinkedIn by", unit: "followers" }, target: 150, due: "2027-01-31" });
+  assert.deepEqual(g, { workspace_id: WS.id, thread_id: THREAD, card_id: "c_abcdef123456", agent: "social", metric: "followers", title: "Grow LinkedIn by", target: 150, unit: "followers", due_date: "2027-01-31" });
+  const goalCols = insertGrant("goals");
+  for (const k of Object.keys(g)) assert.ok(goalCols.includes(k), `goals.${k} isn't insertable`);
+  const steps = stepInserts({ workspaceId: WS.id, threadId: THREAD, goalId: GOAL_ID, planId: "c_plan12345678", steps: [{ title: "Learn the brand", agent: "social" }, { title: "Find topics", agent: "seo" }] });
+  assert.deepEqual(steps.map((s) => [s.position, s.title, s.agent]), [[1, "Learn the brand", "social"], [2, "Find topics", "seo"]]);
+  const stepCols = insertGrant("goal_steps");
+  for (const s of steps) for (const k of Object.keys(s)) assert.ok(stepCols.includes(k), `goal_steps.${k} isn't insertable`);
+  assert.ok(!("created_by" in g) && steps.every((s) => !("created_by" in s)));
+});
+
+test("startError says 'not set up' only when the table is missing, and never shows the database's words", () => {
+  assert.equal(startError({ code: "42P01", message: 'relation "goals" does not exist' }, "goal"), "Goals aren't set up on the server yet.");
+  assert.equal(startError({ code: "PGRST205", message: "Could not find the table 'public.goal_steps'" }, "plan"), "Plans aren't set up on the server yet.");
+  assert.equal(startError({ code: "42501", message: "permission denied for table goals" }, "goal"), "We couldn't start the goal. Try again.");
+  assert.equal(startError({ code: "42501", message: "permission denied for table goal_steps" }, "plan"), "We couldn't start the plan. Try again.");
 });

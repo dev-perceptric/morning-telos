@@ -44,9 +44,9 @@ export const CARD_TOOL_NAMES = ["show_card", "set_goal", "set_plan", "update_ste
 /** What the tools tell the teammate, by kind: stop and wait for the person, or carry on. */
 export const CARD_RESULTS: Record<CardKind, string> = {
   choices: "The choices card is on screen. Stop here and wait. The person's picks come as their next message.",
-  quick_replies: "The quick replies are under your answer.",
-  table: "The table is on screen. Don't repeat its rows in words.",
-  chart: "The chart is on screen. Don't repeat its numbers in words.",
+  quick_replies: "The quick replies are under your answer. Don't write your answer again. If you haven't answered in words yet, do it now in a sentence or two.",
+  table: "The table is on screen below your words. Don't repeat its rows; sum it up in a sentence instead.",
+  chart: "The chart is on screen below your words. Don't list its numbers; say in a sentence what it shows.",
   connect: "The connect card is on screen. Stop here and wait. When the app is connected, the person's next message says so. Then carry on.",
   post_preview: "The post preview is on screen. The owner can edit and approve each post there. Stop here and wait.",
   email_preview: "The email preview is on screen. The owner can edit and approve it there. Stop here and wait.",

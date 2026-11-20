@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import Anthropic from "@anthropic-ai/sdk";
 import {
+  CARD_GUIDE,
+  joinSteps,
+  needsWords,
   CACHE_BREAKPOINTS,
   callClaude,
   stoppedTokens,
@@ -340,7 +343,7 @@ test("Athena hands work to Iris, Hora, Hermes and Hestia, who run next with the 
   );
   // Hora can take one too.
   const h = fakeClaude({ chief: [{ content: [toolUse("d", "handoff", { teammate: "Hora", note: "Find times." })], stop_reason: "tool_use" }, say("OK.")], forms: [say("Three times found.")] });
-  const r2 = await turn("Book a call", { client: h.client });
+  const r2 = await turn("Sort this out for me", { client: h.client });
   assert.deepEqual(r2.said.filter((m) => m.role === "agent").map((m) => m.agent), ["chief", "forms"]);
 });
 
@@ -978,6 +981,55 @@ test("cards: a bad card goes back to the teammate as an error, and too many card
   assert.equal(results.filter((x) => x.is_error).length, 2, "the seventh card is refused");
   assert.equal((r.said.at(-1)!.meta.cards as unknown[]).length, 6);
   assert.equal(r.events.filter((e) => e.type === "card").length, 6);
+});
+
+const QUICK_IN = { kind: "quick_replies", replies: ["Show more", "Check my site"] };
+
+test("cards: words written again after a quick replies card are saved once", async () => {
+  const answer = "The special is a maple pecan croissant for $4.75.";
+  const { client } = fakeClaude({ chief: [{ content: [text(answer), toolUse("q1", "show_card", QUICK_IN)], stop_reason: "tool_use" }, say(answer)] });
+  const r = await turn("@Athena what's the special?", { client, tools: [cardTool()] });
+  assert.equal(r.said.at(-1)!.content, answer);
+});
+
+test("joinSteps: keeps both steps' words, but never the same words twice", () => {
+  assert.equal(joinSteps("", "Hi."), "Hi.");
+  assert.equal(joinSteps("Hi.", ""), "Hi.");
+  assert.equal(joinSteps("First.", "Second."), "First.\n\nSecond.");
+  assert.equal(joinSteps("Same words.", "Same  words.\n"), "Same words.");
+  assert.equal(joinSteps("Start. Then more.", "Then more."), "Start. Then more.");
+  assert.equal(joinSteps("Start.", "Start. And the rest."), "Start. And the rest.");
+});
+
+test("cards: a reply that is only quick replies or a table is asked once for its words", async () => {
+  const table = { kind: "table", columns: ["Item", "Price"], rows: [["Sourdough", "$9.50"]] };
+  const { client, calls } = fakeClaude({
+    chief: [{ content: [toolUse("t1", "show_card", table), toolUse("q1", "show_card", QUICK_IN)], stop_reason: "tool_use" }, { content: [], stop_reason: "end_turn" }, say("Here are your prices from Knowledge.")],
+  });
+  const r = await turn("@Athena show our prices as a table", { client, tools: [cardTool()] });
+  assert.equal(calls.length, 3, "one more call for the words");
+  const asked = calls[2].params.messages.at(-1)!;
+  assert.equal(asked.role, "user");
+  assert.match(JSON.stringify(asked.content), /no words yet/);
+  const saved = r.said.at(-1)!;
+  assert.equal(saved.content, "Here are your prices from Knowledge.");
+  assert.equal((saved.meta.cards as unknown[]).length, 2);
+});
+
+test("needsWords: only for result cards with no words, and only once", () => {
+  assert.equal(needsWords("", ["quick_replies"], false), true);
+  assert.equal(needsWords("", ["table", "quick_replies"], false), true);
+  assert.equal(needsWords("  ", ["chart"], false), true);
+  assert.equal(needsWords("", ["chart"], true), false, "asked already");
+  assert.equal(needsWords("Done.", ["chart"], false), false);
+  assert.equal(needsWords("", [], false), false);
+  assert.equal(needsWords("", ["choices"], false), false, "a question card speaks for itself");
+  assert.equal(needsWords("", ["connect", "quick_replies"], false), false);
+});
+
+test("card prompts point at cards below the words, and ask for words with every card", () => {
+  assert.ok(CARD_GUIDE.some((l) => /below, never above/.test(l)));
+  assert.ok(CARD_GUIDE.some((l) => /never only cards/.test(l)));
 });
 
 test("replies never name the services behind the team", async () => {

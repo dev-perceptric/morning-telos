@@ -47,7 +47,9 @@ export async function lastUserText(db: SupabaseClient, workspaceId: string, thre
 
 /** A thread's title: the first message on one line, cut to 70 letters at a word. */
 export function threadTitle(text: string): string {
-  const one = text.replace(/\s+/g, " ").trim();
+  const raw = text.replace(/\s+/g, " ").trim();
+  // Leading @teammates, /skills and a use case's "Start:" say who and how, not what the chat is about.
+  const one = raw.replace(/^(?:(?:@[a-z]+|\/[a-z0-9-]+)[,:]?\s+)+/i, "").replace(/^start:\s*/i, "").trim() || raw;
   if (one.length <= 70) return one;
   const cut = one.slice(0, 70);
   const space = cut.lastIndexOf(" ");

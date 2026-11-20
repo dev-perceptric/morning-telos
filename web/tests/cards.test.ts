@@ -5,6 +5,10 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { CARD_GUIDE, FORMAT_GUIDE, systemPrompt } from "../src/lib/agentLoop.ts";
 import {
+  CHART_BOX,
+  chartBoxFor,
+  labelEvery,
+  NARROW_CHART_BOX,
   approvalRequest,
   CARD_ID,
   cardsNote,
@@ -309,4 +313,17 @@ test("cards in words, for the teammate's own history", () => {
   const note = cardsNote([ok(CHOICES), ok({ kind: "post_preview", posts: [{ approval_id: 9, network: "linkedin", text: "x" }] })]);
   assert.match(note, /\[Card: choices\. Where should we post\? \(LinkedIn, Instagram, Facebook\)/);
   assert.match(note, /LinkedIn post \(approval #9\)/);
+});
+
+test("chartBoxFor: a phone-width card gets the narrow box, so labels stay readable; labels thin out to fit", () => {
+  assert.equal(chartBoxFor(320), NARROW_CHART_BOX);
+  assert.equal(chartBoxFor(479), NARROW_CHART_BOX);
+  assert.equal(chartBoxFor(480), CHART_BOX);
+  assert.equal(chartBoxFor(0), CHART_BOX, "not measured yet");
+  // At 320px the narrow box draws 11-unit text at about 10px, where the wide box drew it at about 5px.
+  assert.ok((320 / NARROW_CHART_BOX.w) * 11 >= 9.5);
+  assert.equal(labelEvery(6, CHART_BOX), 1);
+  assert.equal(labelEvery(12, CHART_BOX), 2);
+  assert.equal(labelEvery(6, NARROW_CHART_BOX), 2);
+  assert.equal(labelEvery(3, NARROW_CHART_BOX), 1);
 });

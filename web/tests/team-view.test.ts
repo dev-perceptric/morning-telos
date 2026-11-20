@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AGENTS, ORDER } from "../src/lib/team.ts";
-import { agentStatus, agentToolkits } from "../src/lib/teamView.ts";
+import { agentStatus, agentToolkits, PRODUCT_BADGE } from "../src/lib/teamView.ts";
 
 test("the Team page lists every teammate once", () => {
   assert.equal(new Set(ORDER).size, ORDER.length);
@@ -31,4 +31,8 @@ test("Hephaestus's card shows his site builders; Arrowsterr decides his status, 
   assert.deepEqual(agentStatus("web", { ...none, services: { arrowsterr: "ready" }, connected: ["framer"] }), { tone: "ok", label: "Working" });
   assert.deepEqual(agentStatus("web", { ...none, services: { arrowsterr: "ready" }, connected: ["wordpress"] }), { tone: "ok", label: "Working" });
   assert.deepEqual(agentToolkits("seo"), []);
+});
+
+test("product badges are whole words a customer can read", () => {
+  for (const b of Object.values(PRODUCT_BADGE)) assert.match(b.label, /^(SEO|[A-Z][a-z]{3,})$/, b.label);
 });

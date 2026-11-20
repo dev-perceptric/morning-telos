@@ -13,7 +13,9 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import {
   approvalRequest,
   CHART_BOX,
+  chartBoxFor,
   chartPoints,
+  labelEvery,
   chartRange,
   chartSummary,
   choicesReady,
@@ -51,7 +53,7 @@ import {
 } from "@/lib/cards";
 import { connectName } from "@/lib/cardTools";
 import { appLogo } from "@/lib/composio/catalog";
-import { GOAL_COLUMNS, goalOf, STEP_COLUMNS, type GoalRow, type StepRow } from "@/lib/goals";
+import { GOAL_COLUMNS, goalInsert, goalOf, startError, STEP_COLUMNS, stepInserts, type GoalRow, type StepRow } from "@/lib/goals";
 import { STATUS_LABEL, type ApprovalStatus } from "@/lib/approvals";
 import { AGENTS, type AgentKey } from "@/lib/team";
 import { networkName, sameNetwork } from "@/lib/socialChannels";
@@ -281,15 +283,26 @@ function TableView({ card }: { card: TableCard }) {
 /** A line or bars in the brand's accent, with the values in a hidden table for screen readers. */
 function ChartView({ card }: { card: ChartCard }) {
   const range = chartRange(card.values);
-  const pts = chartPoints(card.values, range);
-  const B = CHART_BOX;
-  const base = chartPoints([Math.max(range.min, 0)], range)[0].y;
-  const every = Math.max(1, Math.ceil(card.labels.length / 8));
+  // The box follows the card's width, so a phone gets a narrower box and labels it can read.
+  const ref = useRef<SVGSVGElement>(null);
+  const [B, setB] = useState(CHART_BOX);
+  useEffect(() => {
+    const el = ref.current?.parentElement;
+    if (!el) return;
+    setB(chartBoxFor(el.clientWidth));
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setB(chartBoxFor(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const pts = chartPoints(card.values, range, B);
+  const base = chartPoints([Math.max(range.min, 0)], range, B)[0].y;
+  const every = labelEvery(card.labels.length, B);
   const slot = (B.w - B.left - B.right) / card.values.length;
   const bars = card.type === "bar" ? chartPoints(card.values, range, { ...B, left: B.left + slot / 2, right: B.right + slot / 2 }) : pts;
   return (
     <Shell title={card.title ?? "Chart"} note={card.note ?? card.unit ?? undefined}>
-      <svg className="achart" viewBox={`0 0 ${B.w} ${B.h}`} role="img" aria-label={chartSummary(card)}>
+      <svg ref={ref} className="achart" viewBox={`0 0 ${B.w} ${B.h}`} role="img" aria-label={chartSummary(card)}>
         <line x1={B.left} x2={B.w - B.right} y1={base} y2={base} className="ax" />
         <line x1={B.left} x2={B.w - B.right} y1={B.top} y2={B.top} className="grid" />
         <text x={B.left - 6} y={B.top + 4} textAnchor="end">
@@ -763,10 +776,9 @@ function GoalView({ card, answered }: { card: GoalCard; answered: boolean }) {
     if (locked || !env.threadId) return;
     setBusy(true);
     setError("");
-    const { data: me } = await sb.auth.getUser();
-    const { error: e } = await sb.from("goals").insert({ workspace_id: ws.id, thread_id: env.threadId, card_id: card.id, agent: card.agent, metric: card.metric, title: card.lead, target, unit: card.unit, due_date: due, created_by: me.user?.id });
+    const { error: e } = await sb.from("goals").insert(goalInsert({ workspaceId: ws.id, threadId: env.threadId, card, target, due }));
     if (e && e.code !== "23505") {
-      setError(/goals/.test(e.message) ? "Goals aren't set up on the server yet." : e.message);
+      setError(startError(e, "goal"));
       setBusy(false);
       return;
     }
@@ -849,14 +861,13 @@ function PlanView({ card, answered }: { card: PlanCard; answered: boolean }) {
     if (!steps.length) return;
     setBusy(true);
     setError("");
-    const { data: me } = await sb.auth.getUser();
     const goal = await sb.from("goals").select("id").eq("workspace_id", ws.id).eq("thread_id", env.threadId).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
     const goalId = (goal.data as { id?: string } | null)?.id ?? null;
     const { error: e } = await sb
       .from("goal_steps")
-      .insert(steps.map((s, i) => ({ workspace_id: ws.id, thread_id: env.threadId, goal_id: goalId, plan_id: card.id, position: i + 1, title: s.title, agent: s.agent, created_by: me.user?.id })));
+      .insert(stepInserts({ workspaceId: ws.id, threadId: env.threadId, goalId, planId: card.id, steps }));
     if (e && e.code !== "23505") {
-      setError(/goal_steps/.test(e.message) ? "Plans aren't set up on the server yet." : e.message);
+      setError(startError(e, "plan"));
       setBusy(false);
       return;
     }

@@ -146,6 +146,10 @@ test("page routes", () => {
   assert.deepEqual(parseRoute("/team/seo"), { page: "agent", key: "seo" });
   assert.deepEqual(parseRoute("/team/seo/"), { page: "agent", key: "seo" });
   assert.deepEqual(parseRoute("/team/zeus"), { page: "home" });
+  // A teammate's name opens their page too.
+  assert.deepEqual(parseRoute("/team/athena"), { page: "agent", key: "chief" });
+  assert.deepEqual(parseRoute("/team/Artemis"), { page: "agent", key: "seo" });
+  assert.deepEqual(parseRoute("/team/hephaestus/"), { page: "agent", key: "web" });
   assert.deepEqual(parseRoute("/billing"), { page: "billing" });
   for (const r of [
     { page: "approvals", id: null },

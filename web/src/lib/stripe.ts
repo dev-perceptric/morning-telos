@@ -9,6 +9,9 @@ export const originOf = (request: Request) => process.env.APP_URL?.trim().replac
 
 export const stripeReady = () => Boolean(process.env.STRIPE_SECRET_KEY?.trim());
 
+/** What the owner sees while payments aren't turned on (no Stripe key on the server). Never the key's name. */
+export const PAYMENTS_OFF = "Payments aren't turned on yet, so plans can't be picked right now. Your free trial keeps working.";
+
 type Params = Record<string, unknown>;
 
 /** Stripe's form encoding: nested objects become a[b][c]=v, arrays a[0]=v. */

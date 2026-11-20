@@ -1,7 +1,7 @@
 import { syncSubscription } from "@/lib/billing";
 import { isPaidPlan, lookupKey } from "@/lib/plans";
 import { adminClient, requireRole } from "@/lib/serverAuth";
-import { getSubscription, originOf, priceFor, stripe, stripeReady, type Subscription } from "@/lib/stripe";
+import { getSubscription, originOf, priceFor, PAYMENTS_OFF, stripe, stripeReady, type Subscription } from "@/lib/stripe";
 
 // Pick or change a plan. Owner only. Copied from Arrowsterr's checkout route.
 // With no subscription yet, this opens Stripe Checkout. With one, it switches the plan at once and charges or credits the difference.
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const auth = await requireRole(request, body.workspaceId, "owner");
   if ("denied" in auth) return auth.denied;
-  if (!stripeReady()) return Response.json({ error: "STRIPE_SECRET_KEY is not set on the server." }, { status: 500 });
+  if (!stripeReady()) return Response.json({ error: PAYMENTS_OFF }, { status: 503 });
   const db = adminClient();
   if (!db) return Response.json({ error: "Add SUPABASE_SECRET_KEY to the server's settings." }, { status: 500 });
   const plan = body.plan;

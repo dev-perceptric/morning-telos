@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import pg from "pg";
+import { goalInsert, stepInserts } from "../src/lib/goals.ts";
 import { effectivePlan } from "../src/lib/plans.ts";
 
 // schema.sql first, then the numbered migrations in number order, the way they are run in Supabase.
@@ -2775,6 +2776,23 @@ test("goals: known values only, and they go with their chat and their workspace"
   await asCommit(owner, (q) => q(GOAL_INSERT, [ws, thread, "c_limits000010"]));
   await db.query("delete from threads where id = $1", [thread]);
   assert.equal((await db.query("select count(*)::int n from goals where workspace_id = $1", [ws])).rows[0].n, 0, "a deleted chat takes its goal");
+});
+
+// The rows the goal and plan cards send (src/lib/goals.ts), so the screen never sends a column the person can't write.
+test("goals: the goal card's and the plan card's own rows go in as an editor (no created_by from the screen)", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor } = await team("goal-card-rows");
+  const thread = await threadIn(ws, owner);
+  const insert = async (q: (sql: string, args?: unknown[]) => Promise<pg.QueryResult>, table: string, row: Record<string, unknown>) => {
+    const cols = Object.keys(row);
+    const marks = cols.map((_, i) => "$" + (i + 1)).join(", ");
+    return (await q("insert into " + table + " (" + cols.join(", ") + ") values (" + marks + ") returning *", Object.values(row))).rows[0];
+  };
+  const goal = await asCommit(editor, (q) => insert(q, "goals", goalInsert({ workspaceId: ws, threadId: thread, card: { id: "c_cardrows0001", agent: "social", metric: "followers", lead: "Grow LinkedIn by", unit: "followers" }, target: 150, due: "2027-01-31" })));
+  assert.equal(goal.created_by, editor.id);
+  const steps = stepInserts({ workspaceId: ws, threadId: thread, goalId: goal.id, planId: "c_cardplan0001", steps: [{ title: "Learn your brand", agent: "social" }, { title: "Find topics", agent: "seo" }] });
+  for (const row of steps) assert.equal((await asCommit(editor, (q) => insert(q, "goal_steps", row))).created_by, editor.id);
+  assert.equal((await db.query("select count(*)::int n from goal_steps where goal_id = $1", [goal.id])).rows[0].n, 2);
 });
 
 test("goal_steps: members read, editors and up add and remove them, only the server moves them; other workspaces see nothing", async (t) => {

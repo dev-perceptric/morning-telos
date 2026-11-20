@@ -600,7 +600,9 @@ export function AgentPage({
                 <h2>Recent work</h2>
               </div>
               <div className="card list">
-                {recent?.length ? (
+                {recent === null ? (
+                  <div className="empty">Loading...</div>
+                ) : recent.length ? (
                   recent.map((r) => (
                     <button
                       key={r.id}
