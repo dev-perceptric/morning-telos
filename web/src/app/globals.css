@@ -4,28 +4,29 @@
 /* Answer cards, goals and plans in chat. */
 @import "./cards.css";
 
-/* Morning Telos colors and fonts, the same as the current app (app/public/app.css). */
+/* Morning Telos colors and fonts: the MorningTelos design system (warm neutrals, Claude orange, Inter like Omniscient). Same values as :root in mt.css. */
 @theme {
-  --color-bg: #faf9f5;
-  --color-side: #f4f2eb;
+  --color-bg: #ffffff;
+  --color-side: #f5f3f2;
   --color-surface: #ffffff;
-  --color-sunk: #f5f4ed;
-  --color-sunk-2: #efede5;
-  --color-line: #e8e6dc;
-  --color-line-2: #dcd9cd;
-  --color-ink: #141413;
-  --color-ink-2: #3a3a37;
-  --color-ink-3: #65645f;
-  --color-ink-4: #8c8b84;
+  --color-sunk: #f5f3f2;
+  --color-sunk-2: #edecea;
+  --color-line: rgba(46, 41, 38, 0.1);
+  --color-line-2: rgba(46, 41, 38, 0.2);
+  --color-ink: #2e2926;
+  --color-ink-2: rgba(46, 41, 38, 0.86);
+  --color-ink-3: #6e6660;
+  --color-ink-4: rgba(46, 41, 38, 0.64);
   --color-clay: #d97757;
-  --color-clay-2: #c6613f;
-  --color-clay-bg: #fbefe8;
-  --color-green: #2f7d4f;
-  --color-green-bg: #e7f2eb;
-  --color-amber: #9a6412;
-  --color-amber-bg: #faf0dc;
+  --color-clay-2: #c15f3c;
+  --color-clay-bg: #fcefe9;
+  --color-green: #205525;
+  --color-green-bg: #e6f3e7;
+  --color-amber: #7d6222;
+  --color-amber-bg: #fcf1d8;
   --color-red: #b4410f;
-  --font-sans: var(--font-inter-tight), system-ui, -apple-system, sans-serif;
-  --font-serif: var(--font-newsreader), Georgia, serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Headings use Inter too, as in Omniscient. The name stays so existing font-serif classes keep working. */
+  --font-serif: var(--font-inter), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }

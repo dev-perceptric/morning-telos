@@ -21,9 +21,9 @@ export type BrandRow = {
 export const BRAND_COLUMNS = "primary_color, accent_color, heading_font, body_font, logo_url, tone, source, use_brand";
 
 /** The chat's background (--bg in src/app/mt.css). Colors in answers are checked against it. */
-export const CHAT_BG = "#faf9f5";
+export const CHAT_BG = "#ffffff";
 /** The app's own accent for answers, Morning Telos clay (--clay-2), used when there is no brand. */
-export const DEFAULT_ACCENT = "#c6613f";
+export const DEFAULT_ACCENT = "#c15f3c";
 /** The most a brand color may be darkened to read well. Past that, it stops looking like the brand and the default is used. */
 const MAX_DARKEN = 0.4;
 
