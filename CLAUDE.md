@@ -11,7 +11,7 @@ Morning Telos sells an AI team to small businesses. Each customer gets a workspa
   - `web/tests/*.test.ts`: `node --test`.
 - `app/`: **the old app**, replaced by `web/` at launch. It still runs on the server with its own data but has no public address. Plain Node. Don't change it.
 - `site/`: the marketing site (static HTML), built by `scripts/` from `content/`.
-- `docker-compose.yml`, `scripts/deploy.sh`: production for the old app and the site. Containers pull `main` from GitHub when they start, so anything merged to `main` under `app/` or `site/` goes live on the next restart.
+- `docker-compose.yml`: production for the old app and the site, on the OVH server. Every merge to `main` deploys on its own (`.github/workflows/build-images.yml` runs `deploy/deploy-web.sh` over SSH), and the run fails if chat.morningtelos.com or morningtelos.com doesn't show the new commit. `scripts/deploy.sh` starts the same deploy by hand.
 
 ## Copy before you write
 

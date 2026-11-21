@@ -2,12 +2,12 @@ services:
   web:
     image: nginx:1.27-alpine
     restart: unless-stopped
-    # On every start, download the latest site/ folder from GitHub (main branch).
+    # On every start, download site/ from GitHub: main, or the commit a deploy passes as SITE_REF (deploy/deploy-web.sh).
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
         set -e;
-        wget -qO /tmp/site.tgz https://codeload.github.com/dev-perceptric/morning-telos/tar.gz/refs/heads/main;
+        wget -qO /tmp/site.tgz https://codeload.github.com/dev-perceptric/morning-telos/tar.gz/${SITE_REF:-refs/heads/main};
         mkdir -p /tmp/src && tar -xzf /tmp/site.tgz -C /tmp/src;
         rm -rf /usr/share/nginx/html/* && cp -r /tmp/src/*/site/. /usr/share/nginx/html/;
         cp /tmp/src/*/deploy/nginx.conf /etc/nginx/conf.d/default.conf;
