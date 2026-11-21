@@ -4,7 +4,7 @@
 /* Answer cards, goals and plans in chat. */
 @import "./cards.css";
 
-/* Morning Telos colors and fonts: the MorningTelos design system (warm neutrals, Claude orange). Same values as :root in mt.css. */
+/* Morning Telos colors and fonts: the MorningTelos design system (warm neutrals, Claude orange, Inter like Omniscient). Same values as :root in mt.css. */
 @theme {
   --color-bg: #ffffff;
   --color-side: #f5f3f2;
@@ -25,7 +25,8 @@
   --color-amber: #7d6222;
   --color-amber-bg: #fcf1d8;
   --color-red: #b4410f;
-  --font-sans: var(--font-geist), "Geist", system-ui, -apple-system, sans-serif;
-  --font-serif: var(--font-google-sans), "Google Sans", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Headings use Inter too, as in Omniscient. The name stays so existing font-serif classes keep working. */
+  --font-serif: var(--font-inter), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
