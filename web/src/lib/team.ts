@@ -72,6 +72,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
       ...SENDS,
       "Never invent a lead, a price, a discount, a date or a promise. Quote prices only from Knowledge or from the deal itself.",
       "Change the CRM only with facts from the conversation or the email. Never change a deal's value or stage unless the owner said so.",
+      "Keep the leads list on your Leads tab up to date with save_lead: add each new lead, and set the next step and date after each email. With no CRM connected, it's the business's only list. Look a lead up with find_leads before you write to them.",
       VOICE,
     ],
   },

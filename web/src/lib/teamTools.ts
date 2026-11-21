@@ -6,6 +6,8 @@
 // To add tools, write a ToolSource (a function from ToolContext to { tools, missing }) and add it to the list in
 // teamTools() below. Each source decides which agents get its tools. composeTools runs them all at once, keeps the
 // first tool of each name, leaves out a source that fails, and cuts every result to a safe size.
+import { leadToolSource, type LeadToolDeps } from "./leadTools.ts";
+import { LEAD_COLUMNS, type Lead } from "./leads.ts";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ToolRegistry } from "./agentLoop.ts";
@@ -165,6 +167,31 @@ export function decideDeps(db: SupabaseClient, ws: string, log: (message: string
   };
 }
 
+/** The leads table for Hermes's tools (028_leads.sql), as the server. Every call is for one workspace. */
+export function leadDeps(db: SupabaseClient): LeadToolDeps {
+  const num = (l: Lead) => ({ ...l, value: l.value === null ? null : Number(l.value) });
+  const one = async (q: PromiseLike<{ data: unknown; error: { message: string } | null }>) => {
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data ? num(data as Lead) : null;
+  };
+  return {
+    async find(ws, q) {
+      let query = db.from("leads").select(LEAD_COLUMNS).eq("workspace_id", ws);
+      if (q.stage) query = query.eq("stage", q.stage);
+      const t = (q.text ?? "").replace(/[%,()*\\]/g, " ").trim();
+      if (t) query = query.or(`name.ilike.%${t}%,company.ilike.%${t}%,email.ilike.%${t}%`);
+      const { data, error } = await query.order("updated_at", { ascending: false }).limit(q.limit);
+      if (error) throw new Error(error.message);
+      return ((data ?? []) as Lead[]).map(num);
+    },
+    byEmail: (ws, email) => one(db.from("leads").select(LEAD_COLUMNS).eq("workspace_id", ws).ilike("email", email.replace(/[%_\\]/g, (c) => `\\${c}`)).maybeSingle()) as Promise<Lead | null>,
+    byId: (ws, id) => (/^[0-9a-f-]{36}$/i.test(id) ? (one(db.from("leads").select(LEAD_COLUMNS).eq("workspace_id", ws).eq("id", id).maybeSingle()) as Promise<Lead | null>) : Promise.resolve(null)),
+    insert: async (ws, f) => (await one(db.from("leads").insert({ ...f, workspace_id: ws, created_by: null }).select(LEAD_COLUMNS).single())) as Lead,
+    update: async (ws, id, f) => (await one(db.from("leads").update({ ...f, updated_at: new Date().toISOString() }).eq("workspace_id", ws).eq("id", id).select(LEAD_COLUMNS).single())) as Lead,
+  };
+}
+
 /** Every tool source, in order. The first source's tool wins when two share a name. */
 export function toolSources(db: SupabaseClient, log?: (message: string) => void): ToolSource[] {
   return [
@@ -178,6 +205,8 @@ export function toolSources(db: SupabaseClient, log?: (message: string) => void)
     knowledgeToolSource((ws, q, n) => searchKnowledge(ws, q, n, db)),
     // Answer cards and goals for every working agent (show_card, set_goal, set_plan, update_step, log_progress).
     cardToolSource(cardDeps(db, log)),
+    // Hermes's leads list (save_lead, find_leads).
+    leadToolSource(leadDeps(db)),
   ];
 }
 

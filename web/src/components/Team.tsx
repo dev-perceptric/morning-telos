@@ -32,6 +32,8 @@ import { SeoVisibility } from "./Visibility";
 import { BookingRules, HoraMeetings } from "./Meetings";
 import { AthenaGoals } from "./Goals";
 import { HephaestusPages } from "./Pages";
+import { HestiaInbox } from "./Inbox";
+import { HermesLeads } from "./Leads";
 import type { Workspace } from "./Settings";
 import { SocialSettings, useSocialReconnect } from "./Social";
 import { Empty, ErrorText, PageHead, Section, Switch, to } from "./ui";
@@ -359,7 +361,7 @@ function TrustChips({
 
 type Tab = "ov" | "chat" | "set";
 /** Each teammate's work tab. The others keep their overview until their own tab is built. */
-const WORK_TAB: Partial<Record<AgentKey, string>> = { chief: "Goals", social: "Posts", seo: "Visibility", forms: "Calendar", web: "Pages" };
+const WORK_TAB: Partial<Record<AgentKey, string>> = { chief: "Goals", social: "Posts", seo: "Visibility", forms: "Calendar", web: "Pages", support: "Inbox", sales: "Leads" };
 const WEEK = () => new Date(Date.now() - 7 * 864e5).toISOString();
 type ApRow = { id: number; title: string; tool: string; created_at: string };
 type ActRow = {
@@ -630,6 +632,14 @@ export function AgentPage({
       ) : tab === "ov" && k === "web" ? (
         <div className="tp on">
           <HephaestusPages sb={sb} ws={ws} editor={editor} onAsk={(text) => onAsk(k, text)} />
+        </div>
+      ) : tab === "ov" && k === "support" ? (
+        <div className="tp on">
+          <HestiaInbox sb={sb} ws={ws} editor={editor} onAsk={(text) => onAsk(k, text)} />
+        </div>
+      ) : tab === "ov" && k === "sales" ? (
+        <div className="tp on">
+          <HermesLeads sb={sb} ws={ws} editor={editor} onAsk={(text) => onAsk(k, text)} />
         </div>
       ) : tab === "ov" ? (
         <div className="tp on">

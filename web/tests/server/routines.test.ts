@@ -154,7 +154,10 @@ test("run_routine: Iris, Hora, Hermes and Hestia take routines, with their own s
     assert.match(requests[0].system[1].text, new RegExp(`The person picked the skill "${skill[agent]}"`), agent);
     assert.deepEqual(
       requests[0].tools?.map((x) => x.name),
-      ["log_progress", "remember", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"],
+      // Hermes also keeps the leads list (src/lib/leadTools.ts).
+      agent === "sales"
+        ? ["find_leads", "log_progress", "remember", "save_lead", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"]
+        : ["log_progress", "remember", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"],
       agent,
     );
     assert.equal(routine().last_note, null, agent);
