@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { menuPlace } from "@/lib/menuPlace";
 import type { ChatEvent, StoredMessage } from "@/lib/agentLoop";
 import { ACCEPT, BUCKET, checkFile, FILE_MESSAGES, filesOnMessage, fitFiles, formatSize, pastedName, wordsFor, type FileKind, type StoredFile } from "@/lib/attachments";
 import { readLines } from "@/lib/chat";
@@ -1214,27 +1215,38 @@ export function ThreadPage({
 
 /** A small menu of the other teammates who can take work. Picking one asks them the same message. */
 function AskElse({ current, onPick }: { current: AgentKey; onPick: (k: AgentKey) => void }) {
-  const [open, setOpen] = useState(false);
+  const [place, setPlace] = useState<React.CSSProperties | null>(null);
+  const open = place !== null;
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return;
-    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const close = () => setPlace(null);
+    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && close();
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && close();
     document.addEventListener("mousedown", away);
     document.addEventListener("keydown", esc);
+    // The menu sits on the page, not in the chat, so it closes when the chat scrolls or the window changes size.
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("mousedown", away);
       document.removeEventListener("keydown", esc);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
     };
   }, [open]);
+  function toggle(e: React.MouseEvent<HTMLButtonElement>) {
+    if (open) return setPlace(null);
+    setPlace(menuPlace(e.currentTarget.getBoundingClientRect(), window.innerWidth, window.innerHeight));
+  }
   return (
     <span ref={box} className="ask-else">
-      <button type="button" className="act" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" className="act" aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
         {LIVE_WORDS.askElse}
         <Icon name="down" small />
       </button>
-      {open ? (
-        <div className="ask-menu" role="menu" aria-label={LIVE_WORDS.askElse}>
+      {place ? (
+        <div className="ask-menu" role="menu" aria-label={LIVE_WORDS.askElse} style={place}>
           {workingAgents()
             .filter((k) => k !== current)
             .map((k) => (
@@ -1243,7 +1255,7 @@ function AskElse({ current, onPick }: { current: AgentKey; onPick: (k: AgentKey)
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  setOpen(false);
+                  setPlace(null);
                   onPick(k);
                 }}
               >

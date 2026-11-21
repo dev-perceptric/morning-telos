@@ -12,8 +12,10 @@ import { fieldLabel, setPath, STATUS_LABEL, type Approval, type ApprovalStatus, 
 import { AGENTS, isAgentKey, type AgentKey } from "@/lib/team";
 import { can } from "@/lib/workspace";
 import { ago } from "@/lib/home";
+import { editedApproval, reviewPosts } from "@/lib/socialWork";
 import { Face } from "./Chat";
 import { Icon } from "./icons";
+import { PostReview } from "./PostReview";
 import { callApi, message, navigate } from "./nav";
 import type { Workspace } from "./Settings";
 import { Dropdown, Empty, ErrorText, input, Notice, PageHead, to } from "./ui";
@@ -163,6 +165,8 @@ export function Review({ sb, ws, ap, onDecided, compact }: { sb: SupabaseClient;
   const [error, setError] = useState("");
   const [said, setSaid] = useState("");
   const set = useCallback((path: Path, next: unknown) => setDraft((d) => setPath(d, path, next)), []);
+  // Aphrodite's posts show as posts, not fields.
+  const posts = reviewPosts(ap.product, ap.tool, ap.input);
 
   const decide = async (action: "approve" | "deny") => {
     setBusy(true);
@@ -205,7 +209,11 @@ export function Review({ sb, ws, ap, onDecided, compact }: { sb: SupabaseClient;
       ) : (
         <div className="h-4" />
       )}
-      <div className={`draft${editing ? " editing" : ""}`}>{editing ? <EditFields value={draft} path={[]} onSet={set} /> : <Fields value={ap.input ?? {}} />}</div>
+      {posts ? (
+        <PostReview sb={sb} wsId={ws.id} posts={posts} editing={editing} onEdit={(index, edit) => setDraft((d) => editedApproval(ap.tool, d, index, edit))} />
+      ) : (
+        <div className={`draft${editing ? " editing" : ""}`}>{editing ? <EditFields value={draft} path={[]} onSet={set} /> : <Fields value={ap.input ?? {}} />}</div>
+      )}
       {ap.result && ap.status !== "pending" ? (
         <div className="mt-3">
           <p className="kv-k">{ap.status === "failed" ? "What went wrong" : "Result"}</p>

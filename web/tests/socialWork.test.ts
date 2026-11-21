@@ -271,3 +271,21 @@ test("disconnectSocial: owners and admins only, a known channel only, and a read
   assert.deepEqual(await disconnectSocial({ channelId: "li" }, off.deps), { status: 503, body: { error: SOCIAL_MESSAGES.disconnectFailed } });
   assert.equal(s.calls.length + editor.calls.length + off.calls.length, 0);
 });
+
+test("an approval's posts show as posts, with when each goes out", async () => {
+  const { reviewPosts, postWhen } = await import("../src/lib/socialWork.ts");
+  const input = { posts: [{ channel_ids: ["c1"], text: "Hi", publish_at: "2026-11-23T09:00:00-05:00", mode: "draft" }, { channel_ids: ["c2"], text: "Yo", mode: "now", media_ids: ["m1", "m2"] }, "junk"] };
+  const posts = reviewPosts("capybaroar", "create_posts", input)!;
+  assert.equal(posts.length, 2);
+  assert.deepEqual(posts[0], { index: 0, text: "Hi", at: "2026-11-23T09:00:00-05:00", best: false, channelIds: ["c1"], mode: "draft", media: 0 });
+  assert.equal(posts[1].media, 2);
+  assert.equal(reviewPosts("capybaroar", "update_post", { id: "p1", text: "New", mode: "schedule" })![0].index, null);
+  assert.equal(reviewPosts("capybaroar", "delete_post", { id: "p1" }), null);
+  assert.equal(reviewPosts("arrowsterr", "create_posts", input), null);
+  const f = () => "Mon, Nov 23 at 9:00 AM";
+  assert.equal(postWhen(posts[0], f), "Draft for Mon, Nov 23 at 9:00 AM. It won't go out until it's scheduled.");
+  assert.equal(postWhen(posts[1], f), "Goes out when you approve");
+  assert.equal(postWhen({ at: "2026-11-23T14:00:00Z", best: false, mode: "schedule" }, f), "Goes out Mon, Nov 23 at 9:00 AM");
+  assert.equal(postWhen({ at: null, best: true, mode: "schedule" }, f), "Goes out at your next best time");
+  assert.equal(postWhen({ at: null, best: false, mode: "queue" }, f), "Goes out at the next open time slot");
+});

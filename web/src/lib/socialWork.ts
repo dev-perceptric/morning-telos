@@ -309,3 +309,42 @@ export async function disconnectSocial(b: Record<string, unknown>, d: Disconnect
   await d.activity(`You disconnected ${chan.name || "a social account"}.`).catch(() => {});
   return { status: 200, body: { ok: true } };
 }
+
+/** One post inside an approval of Aphrodite's, as the approval card shows it. */
+export type ReviewPost = { index: number | null; text: string; at: string | null; best: boolean; channelIds: string[]; mode: "draft" | "schedule" | "now" | "queue"; media: number };
+
+const MODES = new Set(["draft", "schedule", "now", "queue"]);
+
+/**
+ * The posts in a Capybaroar create_posts or update_post approval, so the card shows them as posts instead of raw
+ * fields. Null for anything else, which keeps the plain field list.
+ */
+export function reviewPosts(product: string, tool: string, input: Record<string, unknown> | null): ReviewPost[] | null {
+  if (product !== "capybaroar" || !input) return null;
+  const one = (p: Record<string, unknown>, index: number | null): ReviewPost => ({
+    index,
+    text: str(p.text),
+    at: iso(p.publish_at),
+    best: p.publish_at === "best",
+    channelIds: ids(p.channel_ids),
+    mode: (MODES.has(str(p.mode)) ? str(p.mode) : "draft") as ReviewPost["mode"],
+    media: ids(p.media_ids).length,
+  });
+  if (tool === "create_posts") {
+    const list = Array.isArray(input.posts) ? (input.posts as unknown[]) : [];
+    const out = list.flatMap((p, i) => (p && typeof p === "object" ? [one(p as Record<string, unknown>, i)] : []));
+    return out.length ? out : null;
+  }
+  if (tool === "update_post" && typeof input.id === "string") return [one(input, null)];
+  return null;
+}
+
+/** When a post goes out, in a few words. `format` turns an ISO time into the person's local date and time. */
+export function postWhen(p: Pick<ReviewPost, "at" | "best" | "mode">, format: (iso: string) => string): string {
+  if (p.mode === "now") return "Goes out when you approve";
+  if (p.mode === "queue") return "Goes out at the next open time slot";
+  const at = p.at ? format(p.at) : p.best ? "your next best time" : null;
+  if (p.mode === "draft") return at ? `Draft for ${at}. It won't go out until it's scheduled.` : "Draft. It won't go out until it's scheduled.";
+  if (!at) return "Goes out when you approve";
+  return p.at ? `Goes out ${at}` : `Goes out at ${at}`;
+}
