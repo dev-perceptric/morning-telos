@@ -111,17 +111,34 @@ echo "deploy: restarting what changed"
 "${COMPOSE[@]}" up -d
 
 # The website: the nginx container that serves morningtelos.com, in its own compose project (docker-compose.yml from
-# this repo). It downloads site/ from GitHub each time it starts, so a fresh container serves the newest site. Its
-# download is set to ${SITE_REF:-refs/heads/main}: this deploy passes the exact commit, so GitHub's cache can't
-# hand back an older copy, and a plain restart takes main. An older copy pinned to one commit is switched over here.
+# this repo). It downloads site/ from GitHub each time it starts, so a fresh container serves the newest site.
+# The deploy user can't edit that project's compose file on the server, so this deploy adds a small file of its own on
+# top (SITE_OVERRIDE) that sets the download to the exact commit being deployed. GitHub's cache then can't hand back an
+# older copy, and a restart keeps that commit. The command below must match the web service in docker-compose.yml
+# (web/tests/deploy.test.ts checks).
 # The commit comes from GitHub Actions (ssh ... deploy-web.sh <commit>), or from the first argument by hand.
-SITE_REF=""
+SITE_REF=refs/heads/main
 for word in ${SSH_ORIGINAL_COMMAND:-} "$@"; do
   [[ "$word" =~ ^[0-9a-f]{40}$ ]] && SITE_REF=$word
 done
 SITE_FAILED=""
+write_site_override() {
+  cat > "$1" <<YAML
+# Written by deploy-web.sh on every deploy. It sets which commit of site/ the website downloads.
+services:
+  web:
+    command:
+      - >-
+        set -e;
+        wget -qO /tmp/site.tgz https://codeload.github.com/dev-perceptric/morning-telos/tar.gz/$SITE_REF;
+        mkdir -p /tmp/src && tar -xzf /tmp/site.tgz -C /tmp/src;
+        rm -rf /usr/share/nginx/html/* && cp -r /tmp/src/*/site/. /usr/share/nginx/html/;
+        cp /tmp/src/*/deploy/nginx.conf /etc/nginx/conf.d/default.conf;
+        exec /docker-entrypoint.sh nginx -g 'daemon off;'
+YAML
+}
 refresh_site() {
-  local c dir project files file args=()
+  local c dir project files file override args=()
   c=$(docker ps -aq --filter "label=traefik.http.routers.morningtelos.rule" | head -n 1)
   if [ -z "$c" ]; then
     echo "deploy: no website container (Traefik router morningtelos) on this server." >&2
@@ -130,26 +147,26 @@ refresh_site() {
   dir=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$c")
   project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$c")
   files=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.config_files"}}' "$c")
+  override=${SITE_OVERRIDE:-$HOME/.morningtelos/site-override.yml}
+  mkdir -p "$(dirname "$override")" 2>/dev/null || true
+  if ! write_site_override "$override" 2>/dev/null; then
+    override=$(mktemp --suffix=-site-override.yml)
+    write_site_override "$override"
+  fi
+  # The project's own files, without an override an earlier deploy added.
   IFS=, read -r -a list <<< "$files"
   for file in "${list[@]}"; do
-    [ -f "$file" ] || continue
-    args+=(-f "$file")
-    if ! grep -qF 'tar.gz/${SITE_REF' "$file" && grep -Eq 'tar\.gz/(refs/heads/main|[0-9a-f]{40})' "$file"; then
-      if sed -i -E 's#tar\.gz/(refs/heads/main|[0-9a-f]{40})#tar.gz/${SITE_REF:-refs/heads/main}#g' "$file"; then
-        echo "deploy: $file now downloads the commit each deploy asks for"
-      else
-        echo "deploy: can't write $file. The website will download main." >&2
-      fi
-    fi
+    case "$file" in *site-override.yml) continue ;; esac
+    [ -f "$file" ] && args+=(-f "$file")
   done
-  if [ -n "$project" ] && [ -n "$dir" ] && [ "${#args[@]}" -gt 0 ]; then
-    (cd "$dir" && SITE_REF="$SITE_REF" docker compose -p "$project" "${args[@]}" up -d --no-deps --force-recreate web)
-  else
+  if [ -z "$project" ] || [ -z "$dir" ] || [ "${#args[@]}" -eq 0 ]; then
     echo "deploy: the website's compose file isn't on this server. Restarting the container as it is." >&2
     docker restart "$c" >/dev/null
+    return 0
   fi
+  (cd "$dir" && docker compose -p "$project" "${args[@]}" -f "$override" up -d --no-deps --force-recreate web)
 }
-echo "deploy: refreshing the website${SITE_REF:+ to $SITE_REF}"
+echo "deploy: refreshing the website to $SITE_REF"
 refresh_site || SITE_FAILED=1
 
 # Old images pile up with every build. Remove the ones nothing uses.

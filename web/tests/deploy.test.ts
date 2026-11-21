@@ -218,12 +218,17 @@ test("every deploy refreshes the website at the commit being deployed", () => {
   assert.match(wf, /needs\.build\.result == 'skipped'/);
   // It fails unless morningtelos.com serves this commit's pages.
   assert.match(wf, /Check the website serves this commit/);
-  // The server script reads the commit and recreates only the website container.
+  // The server script reads the commit and recreates only the website container, with its own file on top.
   assert.match(sh, /SSH_ORIGINAL_COMMAND/);
-  assert.match(sh, /up -d --no-deps --force-recreate web/);
+  assert.match(sh, /-f "\$override" up -d --no-deps --force-recreate web/);
   assert.ok(sh.indexOf("refresh_site ||") > sh.indexOf('"${COMPOSE[@]}" up -d'), "the website refreshes after the app");
-  // The website downloads the commit a deploy asks for, and main on a plain restart.
-  assert.match(site, /tar\.gz\/\$\{SITE_REF:-refs\/heads\/main\}/);
+  // The command in that file is the same as the website's in docker-compose.yml, apart from the commit.
+  const lines = (text: string, from: string) => {
+    const start = text.indexOf("set -e;", text.indexOf(from));
+    const end = text.indexOf("daemon off;'", start);
+    return text.slice(start, end).split("\n").map((l) => l.trim().replace(/tar\.gz\/\S+;/, "tar.gz/REF;"));
+  };
+  assert.deepEqual(lines(sh, "write_site_override()"), lines(site, "  web:"));
   // The self-update keeps the commit passed by hand.
   assert.match(sh, /exec bash "\$NEW" "\$@"/);
 });
