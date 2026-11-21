@@ -34,6 +34,7 @@ import { AthenaGoals } from "./Goals";
 import { HephaestusPages } from "./Pages";
 import { HestiaInbox } from "./Inbox";
 import { HermesLeads } from "./Leads";
+import { IrisCampaigns, MailingSettings } from "./Campaigns";
 import type { Workspace } from "./Settings";
 import { SocialSettings, useSocialReconnect } from "./Social";
 import { Empty, ErrorText, PageHead, Section, Switch, to } from "./ui";
@@ -361,7 +362,7 @@ function TrustChips({
 
 type Tab = "ov" | "chat" | "set";
 /** Each teammate's work tab. The others keep their overview until their own tab is built. */
-const WORK_TAB: Partial<Record<AgentKey, string>> = { chief: "Goals", social: "Posts", seo: "Visibility", forms: "Calendar", web: "Pages", support: "Inbox", sales: "Leads" };
+const WORK_TAB: Partial<Record<AgentKey, string>> = { chief: "Goals", social: "Posts", seo: "Visibility", forms: "Calendar", web: "Pages", support: "Inbox", sales: "Leads", email: "Campaigns" };
 const WEEK = () => new Date(Date.now() - 7 * 864e5).toISOString();
 type ApRow = { id: number; title: string; tool: string; created_at: string };
 type ActRow = {
@@ -641,6 +642,10 @@ export function AgentPage({
         <div className="tp on">
           <HermesLeads sb={sb} ws={ws} editor={editor} onAsk={(text) => onAsk(k, text)} />
         </div>
+      ) : tab === "ov" && k === "email" ? (
+        <div className="tp on">
+          <IrisCampaigns sb={sb} ws={ws} editor={editor} onAsk={(text) => onAsk(k, text)} onSettings={() => setTab("set")} />
+        </div>
       ) : tab === "ov" ? (
         <div className="tp on">
           <div className="card kpis">
@@ -854,6 +859,7 @@ export function AgentPage({
             </div>
           </div>
           {k === "forms" ? <BookingRules sb={sb} ws={ws} admin={admin} /> : null}
+          {k === "email" ? <MailingSettings sb={sb} ws={ws} admin={admin} editor={editor} /> : null}
           {k === "social" ? (
             <section className="sec">
               <SocialSettings sb={sb} ws={ws} title="Accounts" inTeam />

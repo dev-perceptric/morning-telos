@@ -6,6 +6,7 @@
 // To add tools, write a ToolSource (a function from ToolContext to { tools, missing }) and add it to the list in
 // teamTools() below. Each source decides which agents get its tools. composeTools runs them all at once, keeps the
 // first tool of each name, leaves out a source that fails, and cuts every result to a safe size.
+import { campaignToolSource, type CampaignToolDeps } from "./campaignTools.ts";
 import { leadToolSource, type LeadToolDeps } from "./leadTools.ts";
 import { LEAD_COLUMNS, type Lead } from "./leads.ts";
 import "server-only";
@@ -192,6 +193,33 @@ export function leadDeps(db: SupabaseClient): LeadToolDeps {
   };
 }
 
+/** Iris's campaigns and lists (029_campaigns.sql), as the server. Every call is for one workspace. */
+export function campaignDeps(db: SupabaseClient): CampaignToolDeps {
+  return {
+    async byId(ws, id) {
+      const { data, error } = await db.from("campaigns").select("id, status, subject").eq("workspace_id", ws).eq("id", id).maybeSingle();
+      if (error) throw new Error(error.message);
+      return data as Awaited<ReturnType<CampaignToolDeps["byId"]>>;
+    },
+    async insert(ws, c) {
+      const { data, error } = await db.from("campaigns").insert({ ...c, workspace_id: ws, created_by: null }).select("id").single();
+      if (error) throw new Error(error.message);
+      return data as { id: string };
+    },
+    async update(ws, id, c) {
+      const { error } = await db.from("campaigns").update({ ...c, updated_at: new Date().toISOString() }).eq("workspace_id", ws).eq("id", id).eq("status", "draft");
+      if (error) throw new Error(error.message);
+    },
+    async lists(ws) {
+      const { data, error } = await db.from("contacts").select("list").eq("workspace_id", ws).is("unsubscribed_at", null).limit(20000);
+      if (error) throw new Error(error.message);
+      const n = new Map<string, number>();
+      for (const r of (data ?? []) as { list: string }[]) n.set(r.list, (n.get(r.list) ?? 0) + 1);
+      return [...n].map(([list, people]) => ({ list, people })).sort((a, b) => b.people - a.people);
+    },
+  };
+}
+
 /** Every tool source, in order. The first source's tool wins when two share a name. */
 export function toolSources(db: SupabaseClient, log?: (message: string) => void): ToolSource[] {
   return [
@@ -207,6 +235,8 @@ export function toolSources(db: SupabaseClient, log?: (message: string) => void)
     cardToolSource(cardDeps(db, log)),
     // Hermes's leads list (save_lead, find_leads).
     leadToolSource(leadDeps(db)),
+    // Iris's campaign drafts and lists (save_campaign, mailing_lists).
+    campaignToolSource(campaignDeps(db)),
   ];
 }
 

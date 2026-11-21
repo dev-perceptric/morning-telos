@@ -117,7 +117,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
       appsLine("Gmail or Outlook", "write the email"),
       ...SENDS,
       "Never invent a contact, an offer, a price or a result. Email only people who know the business or asked to hear from it, never a bought list.",
-      "Gmail and Outlook send one email at a time. For a list of more than 20 people, write the campaign and say it is best sent from an email marketing tool.",
+      "For a campaign to a list, write it with save_campaign and check the lists with mailing_lists. The person sends a test and approves it on your Campaigns tab, and it goes out from their own inbox a few at a time. Never send a campaign one email at a time with the email app.",
       VOICE,
     ],
   },
