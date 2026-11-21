@@ -1,6 +1,7 @@
 "use client";
 
-// Workspace settings: the business details, members and invites, social accounts, apps, and deleting the workspace.
+// Settings, laid out like Omniscient's: a grouped section list on the left (you, the workspace, connections) and one
+// panel at a time, each with one short line under its title. Sections and who sees them: SETTINGS_GROUPS in routes.ts.
 // Copied from Arrowsterr's SettingsPage.tsx, MembersPage.tsx and WorkspaceSettings.tsx (TimezoneSetting), trimmed down.
 // Row level security in Supabase decides what each person may change. These screens only hide what they can't do.
 
@@ -9,14 +10,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppsSettings } from "./Apps";
 import { BrandSettings } from "./Brand";
 import { ExtensionSettings } from "./Extension";
-import { SETTINGS_TABS, type SettingsTab } from "@/lib/routes";
+import { settingsGroups, settingsItem, settingsPath, type SettingsTab } from "@/lib/routes";
+import { BillingPage } from "./Billing";
+import { Icon, type IconName } from "./icons";
 import { ASSIGNABLE, can, cleanSettings, deleteConfirmMatches, inviteLink, memberActions, roleLabel, ROLES, type MemberRow, type Role } from "@/lib/workspace";
 import { initial } from "@/lib/home";
 import { callApi, message, navigate } from "./nav";
 import { SkillsSettings } from "./Skills";
 import { SocialSettings } from "./Social";
 import { TeamEmailSettings } from "./TeamEmail";
-import { ErrorText, input, label, Notice, PageHead, Switch } from "./ui";
+import { ErrorText, input, label, Notice, Switch } from "./ui";
 
 export type Workspace = { id: string; name: string; website: string | null; timezone: string; plan: string; status: string | null; trial_ends_at: string; created_at?: string; role: Role };
 type Invite = { id: string; email: string; role: Role; token: string; expires_at: string; expired?: boolean };
@@ -46,81 +49,112 @@ export function SettingsPage({
   name: string;
   onLogout: () => void;
 }) {
+  const groups = settingsGroups(ws.role);
+  // A section this person can't open (an old link, a role change) shows General.
+  const open = groups.some((g) => g.items.some((i) => i.id === tab)) ? tab : "general";
+  const item = settingsItem(open);
   return (
-    <>
-      <PageHead title="Settings" sub="Your business, your people and your account.">
-        <button type="button" className="btn" onClick={onLogout}>
-          Log out
-        </button>
-      </PageHead>
-      <nav className="tabs" aria-label="Settings">
-        {SETTINGS_TABS.map((t) => (
-          <a
-            key={t.id}
-            href={t.id === "general" ? "/settings" : `/settings/${t.id}`}
-            aria-current={tab === t.id ? "page" : undefined}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate(t.id === "general" ? "/settings" : `/settings/${t.id}`);
-            }}
-          >
-            {t.label}
-          </a>
+    <div className="set">
+      <nav className="set-nav" aria-label="Settings">
+        <h1 className="set-title">Settings</h1>
+        {groups.map((g) => (
+          <div key={g.label} className="set-grp">
+            <h6>{g.label}</h6>
+            {g.items.map((i) => (
+              <a
+                key={i.id}
+                href={settingsPath(i.id)}
+                aria-current={open === i.id ? "page" : undefined}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(settingsPath(i.id));
+                }}
+              >
+                <Icon name={i.icon as IconName} />
+                {i.label}
+              </a>
+            ))}
+          </div>
         ))}
       </nav>
-      {tab === "general" ? (
-        <>
-          <div className="two">
+      <div className="set-panel">
+        <div className="set-head">
+          <h2>{item.label}</h2>
+          <p>{item.sub}</p>
+        </div>
+        {open === "account" ? (
+          <Account email={email} name={name} role={ws.role} onLogout={onLogout} />
+        ) : open === "notifications" ? (
+          <EmailSettings key={`mail-${ws.id}`} sb={sb} ws={ws} userId={userId} />
+        ) : open === "general" ? (
+          <>
             <GeneralSettings key={ws.id} sb={sb} ws={ws} onChanged={onChanged} />
-            <Account email={email} name={name} role={ws.role} />
-          </div>
-          {can(ws.role, "editSettings") ? <BrandSettings key={`brand-${ws.id}`} sb={sb} ws={ws} /> : null}
+            {can(ws.role, "deleteWorkspace") ? <DeleteWorkspace key={`del-${ws.id}`} sb={sb} ws={ws} onGone={onGone} /> : null}
+            <p className="legal">
+              <a className="link" href="https://morningtelos.com/terms/" target="_blank" rel="noopener noreferrer">
+                Terms
+              </a>{" "}
+              ·{" "}
+              <a className="link" href="https://morningtelos.com/privacy/" target="_blank" rel="noopener noreferrer">
+                Privacy
+              </a>
+            </p>
+          </>
+        ) : open === "brand" ? (
+          <BrandSettings key={`brand-${ws.id}`} sb={sb} ws={ws} />
+        ) : open === "members" ? (
+          <MembersSettings key={ws.id} sb={sb} ws={ws} userId={userId} onGone={onGone} />
+        ) : open === "billing" ? (
+          <BillingPage sb={sb} ws={ws} onChanged={onChanged} embedded />
+        ) : open === "apps" ? (
+          <AppsSettings key={`apps-${ws.id}`} sb={sb} ws={ws} />
+        ) : open === "email" ? (
           <TeamEmailSettings key={`team-email-${ws.id}`} sb={sb} ws={ws} userId={userId} />
-          {ws.role === "owner" ? <EmailSettings key={`mail-${ws.id}`} sb={sb} ws={ws} userId={userId} /> : null}
-          {can(ws.role, "deleteWorkspace") ? <DeleteWorkspace key={`del-${ws.id}`} sb={sb} ws={ws} onGone={onGone} /> : null}
-          <p className="legal">
-            <a className="link" href="https://morningtelos.com/terms/" target="_blank" rel="noopener noreferrer">
-              Terms
-            </a>{" "}
-            ·{" "}
-            <a className="link" href="https://morningtelos.com/privacy/" target="_blank" rel="noopener noreferrer">
-              Privacy
-            </a>
-          </p>
-        </>
-      ) : tab === "members" ? (
-        <MembersSettings key={ws.id} sb={sb} ws={ws} userId={userId} onGone={onGone} />
-      ) : tab === "apps" ? (
-        <AppsSettings key={`apps-${ws.id}`} sb={sb} ws={ws} />
-      ) : tab === "skills" ? (
-        <SkillsSettings key={`skills-${ws.id}`} sb={sb} ws={ws} />
-      ) : tab === "extension" ? (
-        <ExtensionSettings sb={sb} />
-      ) : (
-        <SocialSettings key={`social-${ws.id}`} sb={sb} ws={ws} />
-      )}
-    </>
+        ) : open === "skills" ? (
+          <SkillsSettings key={`skills-${ws.id}`} sb={sb} ws={ws} />
+        ) : open === "extension" ? (
+          <ExtensionSettings sb={sb} />
+        ) : (
+          <SocialSettings key={`social-${ws.id}`} sb={sb} ws={ws} />
+        )}
+      </div>
+    </div>
   );
 }
 
-/** Who is signed in, and Log out. */
-function Account({ email, name, role }: { email: string; name: string; role: Role }) {
+/** Who is signed in, the password and Log out. */
+function Account({ email, name, role, onLogout }: { email: string; name: string; role: Role; onLogout: () => void }) {
   return (
-    <section className="card pad">
-      <div className="sh">
-        <h2>Your account</h2>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="avatar-me lg">{initial(name || email)}</span>
-        <span className="min-w-0">
-          <b className="block text-[14px]">{name || email}</b>
-          <small className="block text-[12.5px] text-ink-4 wrap">
-            {email} · {roleLabel(role)}
-          </small>
-        </span>
-      </div>
-      <p className="hint-s mt-4">To change your password, log out and pick Forgot password on the log in page.</p>
-    </section>
+    <>
+      <section className="card pad">
+        <div className="flex items-center gap-3">
+          <span className="avatar-me lg">{initial(name || email)}</span>
+          <span className="min-w-0 flex-1">
+            <b className="block text-[14px]">{name || email}</b>
+            <small className="block text-[12.5px] text-ink-4 wrap">
+              {email} · {roleLabel(role)}
+            </small>
+          </span>
+        </div>
+      </section>
+      <section className="card pad mt-4">
+        <div className="sh">
+          <h2>Password</h2>
+        </div>
+        <p className="text-[13.5px] text-ink-3">To change it, log out and pick Forgot password.</p>
+      </section>
+      <section className="card pad mt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="min-w-0">
+            <b className="block text-[14px]">Log out</b>
+            <small className="block text-[12.5px] text-ink-4">Sign out of Morning Telos on this device.</small>
+          </span>
+          <button type="button" className="btn" onClick={onLogout}>
+            Log out
+          </button>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -159,7 +193,7 @@ function EmailSettings({ sb, ws, userId }: { sb: SupabaseClient; ws: Workspace; 
   }
 
   return (
-    <section className="card pad mt-4">
+    <section className="card pad">
       <div className="sh">
         <h2>Emails</h2>
       </div>

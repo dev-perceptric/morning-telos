@@ -19,7 +19,8 @@ const BLURB: Record<PaidPlan, string> = {
   pro: "Your full AI team with a bigger AI allowance.",
 };
 
-export function BillingPage({ sb, ws, onChanged }: { sb: SupabaseClient; ws: Workspace; onChanged: () => void }) {
+/** `embedded`: drawn inside Settings, which shows the title, so only the Manage billing button stays. */
+export function BillingPage({ sb, ws, onChanged, embedded = false }: { sb: SupabaseClient; ws: Workspace; onChanged: () => void; embedded?: boolean }) {
   const owner = ws.role === "owner";
   const plan = effectivePlan(ws);
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -72,13 +73,21 @@ export function BillingPage({ sb, ws, onChanged }: { sb: SupabaseClient; ws: Wor
 
   return (
     <>
-      <PageHead title="Billing" sub="Your plan and how much of this period's AI allowance your team has used.">
-        {owner && usage?.hasBilling ? (
-          <button type="button" className="btn" onClick={portal} disabled={busy !== ""}>
-            {busy === "portal" ? "Opening..." : "Manage billing"}
-          </button>
-        ) : null}
-      </PageHead>
+      {(() => {
+        const manage =
+          owner && usage?.hasBilling ? (
+            <button type="button" className="btn" onClick={portal} disabled={busy !== ""}>
+              {busy === "portal" ? "Opening..." : "Manage billing"}
+            </button>
+          ) : null;
+        return embedded ? (
+          manage ? <div className="set-act">{manage}</div> : null
+        ) : (
+          <PageHead title="Billing" sub="Your plan and how much of this period's AI allowance your team has used.">
+            {manage}
+          </PageHead>
+        );
+      })()}
       {done ? <Notice>{done}</Notice> : null}
       {error ? <ErrorText>{error}</ErrorText> : null}
       <div className="card pad">

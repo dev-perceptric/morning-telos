@@ -1,8 +1,8 @@
 // Pages inside the one client app (src/app/[[...slug]]). The address bar holds the page, so links and Back work.
 import { agentByGod, isAgentKey, type AgentKey } from "./team.ts";
-import { inviteTokenFromPath } from "./workspace.ts";
+import { can, inviteTokenFromPath, type Action, type Role } from "./workspace.ts";
 
-export type SettingsTab = "general" | "members" | "social" | "apps" | "skills" | "extension";
+export type SettingsTab = "general" | "account" | "notifications" | "brand" | "members" | "billing" | "social" | "apps" | "skills" | "email" | "extension";
 export type Route =
   | { page: "home" }
   | { page: "useCases" }
@@ -23,14 +23,47 @@ export type Route =
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
-  { id: "general", label: "General" },
-  { id: "members", label: "Members" },
-  { id: "social", label: "Social accounts" },
-  { id: "apps", label: "Apps" },
-  { id: "skills", label: "Skills" },
-  { id: "extension", label: "Chrome extension" },
+/** One Settings section: its address, its label, its icon and who sees it. */
+export type SettingsItem = { id: SettingsTab; label: string; icon: string; sub: string; need?: Action; ownerOnly?: boolean };
+/** Settings, grouped like Omniscient's: you, the workspace, then what it connects to. One panel at a time. */
+export const SETTINGS_GROUPS: { label: string; items: SettingsItem[] }[] = [
+  {
+    label: "You",
+    items: [
+      { id: "account", label: "Account", icon: "user", sub: "Who you are signed in as." },
+      { id: "notifications", label: "Notifications", icon: "bell", sub: "Which emails you get from us.", ownerOnly: true },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { id: "general", label: "General", icon: "building", sub: "Your business name, website and time zone." },
+      { id: "brand", label: "Brand", icon: "palette", sub: "The colors and fonts your team writes in.", need: "editSettings" },
+      { id: "members", label: "Members", icon: "team", sub: "The people in this workspace and what they can do." },
+      { id: "billing", label: "Plans & billing", icon: "card", sub: "Your plan and this period's AI use." },
+    ],
+  },
+  {
+    label: "Connections",
+    items: [
+      { id: "social", label: "Social accounts", icon: "message", sub: "The accounts your team posts to." },
+      { id: "apps", label: "Apps", icon: "grid", sub: "The tools your team can read and work in." },
+      { id: "email", label: "Team email", icon: "mail", sub: "An address that sends email straight to your team." },
+      { id: "skills", label: "Skills", icon: "idea", sub: "How your team does each job." },
+      { id: "extension", label: "Chrome extension", icon: "puzzle", sub: "Send any web page to your team." },
+    ],
+  },
 ];
+
+/** The sections this person can open. */
+export const settingsGroups = (role: Role) =>
+  SETTINGS_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (i.ownerOnly ? role === "owner" : i.need ? can(role, i.need) : true)) })).filter((g) => g.items.length);
+
+/** A section's address. Billing keeps /billing, where Stripe sends people back. */
+export const settingsPath = (tab: SettingsTab) => (tab === "general" ? "/settings" : tab === "billing" ? "/billing" : `/settings/${tab}`);
+
+/** A section's label and short line. */
+export const settingsItem = (tab: SettingsTab) => SETTINGS_GROUPS.flatMap((g) => g.items).find((i) => i.id === tab)!;
 
 export function parseRoute(path: string): Route {
   const token = inviteTokenFromPath(path);
@@ -43,6 +76,11 @@ export function parseRoute(path: string): Route {
   if (p === "/settings/apps") return { page: "settings", tab: "apps" };
   if (p === "/settings/skills") return { page: "settings", tab: "skills" };
   if (p === "/settings/extension") return { page: "settings", tab: "extension" };
+  if (p === "/settings/account") return { page: "settings", tab: "account" };
+  if (p === "/settings/notifications") return { page: "settings", tab: "notifications" };
+  if (p === "/settings/brand") return { page: "settings", tab: "brand" };
+  if (p === "/settings/email") return { page: "settings", tab: "email" };
+  if (p === "/settings/billing") return { page: "billing" };
   if (p === "/use-cases") return { page: "useCases" };
   if (p === "/team") return { page: "team" };
   // One teammate's own page, like the current app's #agent/<key>.
@@ -69,7 +107,7 @@ export function parseRoute(path: string): Route {
 }
 
 export function routePath(r: Route): string {
-  if (r.page === "settings") return r.tab === "general" ? "/settings" : `/settings/${r.tab}`;
+  if (r.page === "settings") return settingsPath(r.tab);
   if (r.page === "invite") return `/invite/${r.token}`;
   if (r.page === "socialReturn") return "/settings/social/return";
   if (r.page === "thread") return r.id ? `/chat/${r.id}` : "/chat";
