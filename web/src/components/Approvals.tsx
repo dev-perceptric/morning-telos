@@ -335,6 +335,14 @@ export function ApprovalsPage({ sb, ws, id, onDecided }: { sb: SupabaseClient; w
         />
       </PageHead>
       {list.error ? <ErrorText>{list.error}</ErrorText> : null}
+      {list.rows !== null && !rows.length && !picked ? (
+        // Nothing in the list: one empty card across the page, not an empty list beside an empty review pane.
+        <div className="card">
+          <Empty icon={tab === "open" ? "inbox" : "tick"} title={tab === "open" ? "All caught up" : "Nothing here yet"}>
+            {tab === "open" ? "When your team prepares a change, it shows up here." : "Approved and denied changes show up here."}
+          </Empty>
+        </div>
+      ) : (
       <div className={`split${id ? " has-pick" : ""}`}>
         <div className="card list">
           {list.rows === null ? null : rows.length ? (
@@ -358,6 +366,7 @@ export function ApprovalsPage({ sb, ws, id, onDecided }: { sb: SupabaseClient; w
           {picked ? <Review key={`${picked.id}:${picked.status}`} sb={sb} ws={ws} ap={picked} onDecided={refresh} /> : <Empty title="Nothing to review">New changes will show up here.</Empty>}
         </div>
       </div>
+      )}
     </>
   );
 }

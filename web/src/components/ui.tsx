@@ -4,7 +4,7 @@
 // app/public/app.css): buttons, inputs, cards, page heads, empty states, the drawer, the dropdown and the switch.
 
 import { useEffect, useRef, useState } from "react";
-import { Icon, Mark } from "./icons";
+import { Icon, Mark, type IconName } from "./icons";
 
 export const input = "inp";
 export const label = "fld-l";
@@ -79,9 +79,15 @@ export function Section({ title, num, more, className = "", children }: { title:
   );
 }
 
-export function Empty({ title, children }: { title: string; children?: React.ReactNode }) {
+/** An empty screen: an optional icon, a short title and one line. */
+export function Empty({ title, icon, children }: { title: string; icon?: IconName; children?: React.ReactNode }) {
   return (
     <div className="empty">
+      {icon ? (
+        <span className="empty-ic">
+          <Icon name={icon} />
+        </span>
+      ) : null}
       <b>{title}</b>
       {children}
     </div>
