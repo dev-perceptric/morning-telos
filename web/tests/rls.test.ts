@@ -728,6 +728,25 @@ test("social_channels: members read their own workspace's channels, never anothe
   assert.equal((await db.query("select count(*)::int n from social_channels where workspace_id = $1", [xws])).rows[0].n, 0);
 });
 
+test("work_cache: server only, gone with its workspace", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("cache1@example.com", { business: "Cache Co" });
+  const ws = await wsOf(o);
+  await db.query("insert into work_cache (workspace_id, agent, data) values ($1, 'seo', '{\"questions\":[]}')", [ws]);
+  // One statement per session: a refused one ends its transaction.
+  for (const sql of ["select * from work_cache", "insert into work_cache (workspace_id, agent) values ($1, 'social')", "delete from work_cache where workspace_id = $1"]) {
+    await as(o, async (q) => {
+      await assert.rejects(q(sql, sql.includes("$1") ? [ws] : []), /permission denied/);
+    });
+  }
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from work_cache"), /permission denied/);
+  });
+  await assert.rejects(db.query("insert into work_cache (workspace_id, agent) values ($1, 'nobody')", [ws]), /check constraint/);
+  await db.query("delete from workspaces where id = $1", [ws]);
+  assert.equal((await db.query("select count(*)::int n from work_cache where workspace_id = $1", [ws])).rows[0].n, 0);
+});
+
 test("save_social_channel: a lost event for an account we removed doesn't bring it back", async (t) => {
   if (!db) return t.skip("no test database");
   const o = await signUp("soc4@example.com", { business: "Soc4 Co" });

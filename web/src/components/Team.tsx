@@ -28,6 +28,7 @@ import { Face, useSkillRows } from "./Chat";
 import { Icon } from "./icons";
 import { navigate } from "./nav";
 import { SocialPosts } from "./Posts";
+import { SeoVisibility } from "./Visibility";
 import type { Workspace } from "./Settings";
 import { SocialSettings, useSocialReconnect } from "./Social";
 import { Empty, ErrorText, PageHead, Section, Switch, to } from "./ui";
@@ -227,7 +228,7 @@ export function TeamPage({
 }: {
   sb: SupabaseClient;
   ws: Workspace;
-  onAsk: (agent: AgentKey) => void;
+  onAsk: (agent: AgentKey, text?: string) => void;
 }) {
   const admin = can(ws.role, "changeTeam");
   const editor = can(ws.role, "chat");
@@ -355,7 +356,7 @@ function TrustChips({
 
 type Tab = "ov" | "chat" | "set";
 /** Each teammate's work tab. The others keep their overview until their own tab is built. */
-const WORK_TAB: Partial<Record<AgentKey, string>> = { social: "Posts" };
+const WORK_TAB: Partial<Record<AgentKey, string>> = { social: "Posts", seo: "Visibility" };
 const WEEK = () => new Date(Date.now() - 7 * 864e5).toISOString();
 type ApRow = { id: number; title: string; tool: string; created_at: string };
 type ActRow = {
@@ -390,7 +391,7 @@ export function AgentPage({
   sb: SupabaseClient;
   ws: Workspace;
   agent: AgentKey;
-  onAsk: (agent: AgentKey) => void;
+  onAsk: (agent: AgentKey, text?: string) => void;
 }) {
   const a = AGENTS[k];
   const admin = can(ws.role, "changeTeam");
@@ -610,6 +611,10 @@ export function AgentPage({
       {tab === "ov" && k === "social" ? (
         <div className="tp on">
           <SocialPosts sb={sb} ws={ws} editor={editor} onAsk={() => onAsk(k)} onReconnect={(n) => (social.admin ? void social.reconnect(n) : setTab("set"))} />
+        </div>
+      ) : tab === "ov" && k === "seo" ? (
+        <div className="tp on">
+          <SeoVisibility sb={sb} ws={ws} editor={editor} onAsk={() => onAsk(k)} onAskWeb={(text) => onAsk("web", text)} />
         </div>
       ) : tab === "ov" ? (
         <div className="tp on">

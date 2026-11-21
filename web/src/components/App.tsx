@@ -338,8 +338,8 @@ function Frame2({
     },
     [reload],
   );
-  const ask = useCallback((k: AgentKey) => {
-    setDraft(`@${AGENTS[k].god} `);
+  const ask = useCallback((k: AgentKey, text = "") => {
+    setDraft(`@${AGENTS[k].god} ${text}`);
     navigate("/");
     focusComposer();
   }, []);

@@ -1286,3 +1286,36 @@ p.trust-err{margin-top:8px}
 .po-pill.failed .st{background:var(--red);-webkit-mask-image:var(--i-alert);mask-image:var(--i-alert)}
 .po-pill.draft .st{background:var(--ink-4);-webkit-mask-image:var(--i-pause);mask-image:var(--i-pause)}
 .po-mpill.failed{background:#fbeae4;color:var(--red)}
+
+/* ─────────────── Artemis's Visibility tab (src/components/Visibility.tsx) ─────────────── */
+.vis .row .main b,.vis .row .main small{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:break-word}
+.row.wait{background:var(--clay-bg)}
+.row.wait:hover{background:#f9e6dd}
+.seg-n{color:var(--ink-4);font-weight:500;margin-left:2px}
+.eng{display:inline-flex;gap:4px;flex:none}
+.eng-lg{width:20px;height:20px;border-radius:999px;background:var(--surface);box-shadow:0 0 0 1px var(--line);object-fit:contain;padding:2px}
+.eng-lg.off{opacity:.28;filter:grayscale(1)}
+.tag.wt:before,.tag.ok:before{content:"";width:13px;height:13px;margin-right:5px;background:currentColor;-webkit-mask:var(--i-alert) center/contain no-repeat;mask:var(--i-alert) center/contain no-repeat}
+.tag.ok:before{-webkit-mask-image:var(--i-check-circle);mask-image:var(--i-check-circle)}
+.dq{font-size:16px;font-weight:600;line-height:1.35;margin:0 0 16px;overflow-wrap:break-word}
+.dsec{margin-bottom:18px}
+.dsec>h4{font-size:12.5px;font-weight:500;color:var(--ink-3);margin:0 0 8px}
+.ans{border-radius:var(--r);box-shadow:inset 0 0 0 1px var(--line)}
+.ans>div{padding:12px 14px;border-top:1px solid var(--line)}
+.ans>div:first-child{border-top:0}
+.ans .hd{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;margin-bottom:6px;flex-wrap:wrap}
+.ans .hd .tag{margin-left:auto}
+.ans p{font-size:13.5px;line-height:1.55;color:var(--ink-2);margin-bottom:6px;overflow-wrap:break-word}
+.ans .ans-n{font-size:12.5px;color:var(--ink-3)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);border-radius:var(--r);box-shadow:inset 0 0 0 1px var(--line)}
+.facts div{padding:12px 14px;border-left:1px solid var(--line);min-width:0}
+.facts div:first-child{border-left:0}
+.facts small{display:block;font-size:12px;color:var(--ink-4)}
+.facts b{font-size:16px;font-weight:500}
+@media (max-width:860px){
+  .facts{grid-template-columns:1fr}
+  .facts div{border-left:0;border-top:1px solid var(--line)}
+  .facts div:first-child{border-top:0}
+  .vis .row{flex-wrap:wrap}
+}

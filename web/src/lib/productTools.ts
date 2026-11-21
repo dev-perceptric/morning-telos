@@ -216,9 +216,9 @@ export async function productRead(workspaceId: string, product: Product, tool: s
   }
 }
 
-/** The changes a person may make from a screen (Aphrodite's calendar), by product. Every other tool is refused. */
+/** The changes a person may make from a screen (Aphrodite's calendar, Artemis's Visibility tab), by product. Every other tool is refused. */
 export const SCREEN_WRITES: Record<Product, ReadonlySet<string>> = {
-  arrowsterr: new Set(),
+  arrowsterr: new Set(["add_prompts", "add_to_content_plan", "update_content_plan", "remove_from_content_plan"]),
   capybaroar: new Set(["create_posts", "update_post", "delete_post"]),
 };
 

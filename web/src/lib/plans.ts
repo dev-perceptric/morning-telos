@@ -12,18 +12,20 @@ export type Plan = {
   name: string;
   price: number; // US dollars a month. 0 for the trial.
   aiAllowance: number; // US dollars of Claude a month, the most one workspace can spend on AI
+  // AI questions Artemis tracks in Arrowsterr. Each one is asked of every AI tool daily, about $0.27 a month (Arrowsterr's cost_ledger).
+  aiQuestions: number;
 };
 
 export const TRIAL_DAYS = 14;
 
 export const PLANS: Record<PlanId, Plan> = {
   // 14 days free, no card. Starts when the person signs up (trial_from_signup in schema.sql).
-  trial: { id: "trial", name: "Free trial", price: 0, aiAllowance: 5 },
-  starter: { id: "starter", name: "Starter", price: 49, aiAllowance: 12 },
-  pro: { id: "pro", name: "Pro", price: 149, aiAllowance: 50 },
+  trial: { id: "trial", name: "Free trial", price: 0, aiAllowance: 5, aiQuestions: 15 },
+  starter: { id: "starter", name: "Starter", price: 49, aiAllowance: 12, aiQuestions: 15 },
+  pro: { id: "pro", name: "Pro", price: 149, aiAllowance: 50, aiQuestions: 40 },
   // Our own workspaces. Never sold and never set by Stripe: staff set it in the database (015_internal_plan.sql).
   // The allowance is high enough to never stop the team.
-  internal: { id: "internal", name: "Internal", price: 0, aiAllowance: 1_000_000 },
+  internal: { id: "internal", name: "Internal", price: 0, aiAllowance: 1_000_000, aiQuestions: 500 },
 };
 
 /** Plans sold by card. */
@@ -80,3 +82,6 @@ export function effectivePlan(ws: PlanFields, now = Date.now()): PlanState {
   }
   return { plan: "expired", trial: false, daysLeft: 0, paid: false, status, aiAllowance: 0 };
 }
+
+/** How many AI questions Artemis may track for a workspace on this plan. None once the plan has ended. */
+export const questionLimit = (plan: EffectivePlan) => (plan === "expired" ? 0 : PLANS[plan].aiQuestions);
