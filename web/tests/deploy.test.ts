@@ -182,7 +182,9 @@ test("deploy-web.sh updates the database with the new image before it restarts t
 
 test("the deploy finds the database itself and never prints its password", () => {
   const sh = readFileSync(new URL("../../deploy/deploy-web.sh", import.meta.url), "utf8");
-  assert.match(sh, /supabase\/postgres\*/);
+  assert.match(sh, /supabase\/postgres:\*/);
+  assert.match(sh, /MIGRATE_DB_NETWORK:-sb-morningtelos/);
+  assert.match(sh, /docker run --rm --network "\$\{DB#\*@\}"/);
   assert.match(sh, /sed -n 's\/\^POSTGRES_PASSWORD=\/\/p'/);
   assert.equal(/echo[^\n]*PGPASSWORD|set -x/.test(sh), false);
 });
