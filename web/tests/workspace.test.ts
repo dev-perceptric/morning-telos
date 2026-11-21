@@ -1,7 +1,7 @@
 // Roles, invite links, the delete check, settings and page routes. Pure functions, no network.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseRoute, routePath } from "../src/lib/routes.ts";
+import { parseRoute, routePath, SETTINGS_GROUPS, settingsGroups, settingsPath } from "../src/lib/routes.ts";
 import {
   ASSIGNABLE,
   atLeast,
@@ -205,4 +205,29 @@ test("sendMail skips without a key and posts to Resend with one", async () => {
   assert.equal(body.from, "MT <hi@mt.com>");
   const failing = (async () => new Response("no", { status: 422 })) as unknown as typeof fetch;
   await assert.rejects(sendMail({ key: "re_test", from: "x", fetch: failing }, "a@b.com", mail), /422/);
+});
+
+test("settings sections: addresses, routes and who sees them", () => {
+  for (const tab of ["account", "notifications", "brand", "email"] as const) {
+    assert.deepEqual(parseRoute(`/settings/${tab}`), { page: "settings", tab });
+    assert.equal(routePath({ page: "settings", tab }), `/settings/${tab}`);
+  }
+  // Billing keeps /billing, where Stripe sends people back.
+  assert.equal(settingsPath("billing"), "/billing");
+  assert.equal(settingsPath("general"), "/settings");
+  assert.deepEqual(parseRoute("/settings/billing"), { page: "billing" });
+  assert.equal(routePath({ page: "settings", tab: "billing" }), "/billing");
+  // Every section opens at an address that leads back to it.
+  for (const i of SETTINGS_GROUPS.flatMap((g) => g.items)) {
+    const back = parseRoute(settingsPath(i.id));
+    assert.ok(i.id === "billing" ? back.page === "billing" : back.page === "settings" && back.tab === i.id, i.id);
+  }
+  const ids = (role: "owner" | "admin" | "editor" | "viewer") => settingsGroups(role).flatMap((g) => g.items.map((i) => i.id));
+  assert.ok(ids("owner").includes("notifications"));
+  assert.ok(!ids("admin").includes("notifications"));
+  assert.ok(ids("admin").includes("brand"));
+  assert.ok(!ids("editor").includes("brand"));
+  assert.deepEqual(ids("viewer").slice(0, 2), ["account", "general"]);
+  // No empty groups.
+  for (const role of ["owner", "admin", "editor", "viewer"] as const) assert.ok(settingsGroups(role).every((g) => g.items.length > 0));
 });

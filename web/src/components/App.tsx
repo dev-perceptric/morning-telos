@@ -16,10 +16,10 @@ import { cleanLink, LINK_NOTICES, readLink } from "@/lib/authLinks";
 import { cleanWebsite } from "@/lib/signup";
 import { agentFace, AGENTS, ORDER, type AgentKey } from "@/lib/team";
 import { can, inviteTokenFromPath, roleLabel } from "@/lib/workspace";
+import { effectivePlan, PLANS } from "@/lib/plans";
 import { ApprovalsPage } from "./Approvals";
 import { GoalsNav } from "./Cards";
 import { AuthScreen, NewPassword } from "./AuthScreen";
-import { BillingPage } from "./Billing";
 import { ThreadPage, type StartChat } from "./Chat";
 import { Home } from "./Home";
 import { Icon, Mark, type IconName } from "./icons";
@@ -252,18 +252,17 @@ const MAIN_NAV: NavItem[] = [
 const SETUP_NAV: NavItem[] = [
   { page: "knowledge", label: "Knowledge", path: "/knowledge", icon: "book" },
   { page: "memory", label: "Memory", path: "/memory", icon: "memory" },
-  { page: "billing", label: "Billing", path: "/billing", icon: "card" },
   { page: "settings", label: "Settings", path: "/settings", icon: "gear" },
 ];
 // The phone's bottom bar, like the current app: four pages and More.
 const navItem = (page: string) => [...MAIN_NAV, ...SETUP_NAV].find((n) => n.page === page)!;
 const TAB_NAV = ["home", "approvals", "team", "knowledge"].map(navItem);
-const MORE_NAV = ["useCases", "routines", "memory", "billing", "settings"].map(navItem);
+const MORE_NAV = ["useCases", "routines", "memory", "settings"].map(navItem);
 // Only for Morning Telos staff (STAFF_EMAILS on the server). Everyone else never sees it.
 const STAFF_NAV: NavItem = { page: "staff", label: "Staff", path: "/staff", icon: "shield" };
 
 /** Which nav item a page lights up: a chat is Home's, a teammate is Team's. */
-const navPage = (page: string) => (page === "thread" ? "home" : page === "agent" ? "team" : page === "socialReturn" ? "settings" : page);
+const navPage = (page: string) => (page === "thread" ? "home" : page === "agent" ? "team" : page === "socialReturn" || page === "billing" ? "settings" : page);
 
 function go(e: React.MouseEvent, path: string) {
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -382,7 +381,7 @@ function Frame2({
   return (
     <div className="shell">
       <aside className="sb" aria-label="Main navigation">
-        <WorkspaceButton list={list} ws={ws} onPick={onPick} />
+        <WorkspaceButton list={list} ws={ws} onPick={onPick} email={email} onLogout={logout} />
         <div className="sb-actions">
           <button type="button" className="search-btn" onClick={() => setPalette(true)}>
             <Icon name="search" small />
@@ -414,7 +413,7 @@ function Frame2({
           )}
         </div>
         <div className="sb-foot">
-          <a className="me-btn" href={to("/settings")} onClick={(e) => go(e, "/settings")}>
+          <a className="me-btn" href={to("/settings/account")} onClick={(e) => go(e, "/settings/account")}>
             <span className="avatar-me">{initial(name || email)}</span>
             <span className="min-w-0">
               <b>{name || email}</b>
@@ -476,7 +475,7 @@ function Frame2({
             ) : route.page === "memory" ? (
               <MemoryPage sb={sb} ws={ws} />
             ) : route.page === "billing" ? (
-              <BillingPage sb={sb} ws={ws} onChanged={onChanged} />
+              <SettingsPage sb={sb} ws={ws} userId={session.user.id} tab="billing" onChanged={onChanged} onGone={onGone} email={email} name={name} onLogout={logout} />
             ) : route.page === "staff" ? (
               <StaffPage sb={sb} id={route.id} />
             ) : route.page === "approvals" ? (
@@ -562,57 +561,110 @@ function focusComposer() {
   }, 80);
 }
 
-/** The business at the top of the sidebar. With more than one workspace it opens a menu to switch. */
-function WorkspaceButton({ list, ws, onPick }: { list: Workspace[]; ws: Workspace; onPick: (id: string) => void }) {
+/**
+ * The business at the top of the sidebar. It opens the workspace menu, like Omniscient's and Lindy's: the workspace and
+ * your plan, the other workspaces to switch to, then Invite people, Settings, Plans & billing and Log out.
+ */
+function WorkspaceButton({ list, ws, onPick, email, onLogout }: { list: Workspace[]; ws: Workspace; onPick: (id: string) => void; email: string; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", away);
-    return () => document.removeEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
   }, [open]);
-  const face = (
-    <>
-      <Mark />
-      <span className="min-w-0">
-        <b>{ws.name}</b>
-        <small>AI team</small>
-      </span>
-    </>
-  );
-  if (list.length < 2)
-    return (
-      <a className="ws" href={to("/settings")} onClick={(e) => go(e, "/settings")}>
-        {face}
-      </a>
-    );
+  const plan = planLabel(ws);
+  const others = list.filter((w) => w.id !== ws.id);
+  const goTo = (e: React.MouseEvent, path: string) => {
+    setOpen(false);
+    go(e, path);
+  };
   return (
     <div className="dd ws-dd" ref={box}>
-      <button type="button" className="ws" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {face}
+      <button type="button" className="ws" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Mark />
+        <span className="min-w-0">
+          <b>{ws.name}</b>
+          <small>{plan}</small>
+        </span>
         <Icon name="down" small />
       </button>
-      <div className={`dd-menu${open ? " on" : ""}`} role="listbox" aria-label="Workspaces">
-        {list.map((w) => (
-          <button
-            key={w.id}
-            type="button"
-            role="option"
-            aria-selected={w.id === ws.id}
-            onClick={() => {
-              setOpen(false);
-              if (w.id !== ws.id) onPick(w.id);
-            }}
-          >
-            {w.id === ws.id ? <Icon name="tick" small className="tick" /> : <span className="tick" />}
-            <span className="dd-t">{w.name}</span>
-            <span className="n">{roleLabel(w.role)}</span>
-          </button>
-        ))}
+      <div className={`dd-menu ws-menu${open ? " on" : ""}`} role="menu" aria-label="Workspace">
+        <div className="ws-head">
+          <Mark />
+          <span className="min-w-0">
+            <b className="wrap">{ws.name}</b>
+            <small className="wrap">
+              {plan} · {email}
+            </small>
+          </span>
+        </div>
+        {others.length ? (
+          <>
+            <div className="dd-sep" />
+            <p className="dd-h">Switch workspace</p>
+            {others.map((w) => (
+              <button
+                key={w.id}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onPick(w.id);
+                }}
+              >
+                <span className="dd-t wrap">{w.name}</span>
+                <span className="n">{roleLabel(w.role)}</span>
+              </button>
+            ))}
+          </>
+        ) : null}
+        <div className="dd-sep" />
+        {can(ws.role, "invite") ? (
+          <a role="menuitem" href={to("/settings/members")} onClick={(e) => goTo(e, "/settings/members")}>
+            <Icon name="team" small />
+            Invite people
+          </a>
+        ) : null}
+        <a role="menuitem" href={to("/settings")} onClick={(e) => goTo(e, "/settings")}>
+          <Icon name="gear" small />
+          Settings
+        </a>
+        <a role="menuitem" href={to("/billing")} onClick={(e) => goTo(e, "/billing")}>
+          <Icon name="card" small />
+          Plans &amp; billing
+        </a>
+        <div className="dd-sep" />
+        <button
+          type="button"
+          role="menuitem"
+          className="danger"
+          onClick={() => {
+            setOpen(false);
+            onLogout();
+          }}
+        >
+          <Icon name="logout" small />
+          Log out
+        </button>
       </div>
     </div>
   );
+}
+
+/** The plan in a few words, under the workspace's name: "Free trial, 9 days left", "Pro". */
+function planLabel(ws: Workspace) {
+  const p = effectivePlan(ws);
+  if (p.plan === "trial") return `Free trial, ${p.daysLeft} day${p.daysLeft === 1 ? "" : "s"} left`;
+  if (p.plan === "expired") return "No plan";
+  if (p.plan === "internal") return "Morning Telos team";
+  return PLANS[p.plan].name;
 }
 
 const PAGES: PaletteItem[] = [
@@ -623,7 +675,9 @@ const PAGES: PaletteItem[] = [
   { label: "Routines", group: "Pages", path: "/routines", keywords: "schedule" },
   { label: "Knowledge", group: "Pages", path: "/knowledge", keywords: "docs" },
   { label: "Memory", group: "Pages", path: "/memory", keywords: "facts" },
-  { label: "Billing", group: "Pages", path: "/billing", keywords: "plan" },
+  { label: "Plans & billing", group: "Pages", path: "/billing", keywords: "plan billing settings" },
+  { label: "Account", group: "Pages", path: "/settings/account", keywords: "settings profile password log out" },
+  { label: "Brand", group: "Pages", path: "/settings/brand", keywords: "settings colors fonts" },
   { label: "Settings", group: "Pages", path: "/settings", keywords: "business" },
   { label: "Members", group: "Pages", path: "/settings/members", keywords: "settings people invite" },
   { label: "Social accounts", group: "Pages", path: "/settings/social", keywords: "settings" },

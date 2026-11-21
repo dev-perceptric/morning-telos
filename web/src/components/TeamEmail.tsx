@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { checkSlug, cleanSender, teamAddress, TEAM_EMAIL_MESSAGES as M } from "@/lib/teamEmail";
 import { callApi, message } from "./nav";
 import type { Workspace } from "./Settings";
-import { ErrorText, input, label, Switch } from "./ui";
+import { Empty, ErrorText, input, label, Switch } from "./ui";
 
 type Row = { slug: string; enabled: boolean; slug_changed_at: string | null };
 
@@ -25,12 +25,15 @@ export function TeamEmailSettings({ sb, ws, userId }: { sb: SupabaseClient; ws: 
   const [slug, setSlug] = useState("");
   const [extra, setExtra] = useState("");
   const [copied, setCopied] = useState(false);
+  // The server has no TEAM_EMAIL_DOMAIN, so receiving email isn't set up yet.
+  const [off, setOff] = useState(false);
 
   useEffect(() => {
     let live = true;
     (async () => {
       const on = await callApi<{ domain: string | null }>(sb, "/api/email/team", { workspaceId: ws.id }).catch(() => ({ domain: null }));
-      if (!live || !on.domain) return;
+      if (!live) return;
+      if (!on.domain) return setOff(true);
       const [a, s] = await Promise.all([
         sb.from("team_email").select("slug, enabled, slug_changed_at").eq("workspace_id", ws.id).maybeSingle(),
         sb.from("team_email_senders").select("email").eq("workspace_id", ws.id).order("created_at"),
@@ -46,6 +49,12 @@ export function TeamEmailSettings({ sb, ws, userId }: { sb: SupabaseClient; ws: 
     };
   }, [sb, ws.id]);
 
+  if (off)
+    return (
+      <section className="card">
+        <Empty title="Not available yet">Team email isn&apos;t turned on for Morning Telos yet.</Empty>
+      </section>
+    );
   if (!domain || !row) return null;
   const address = teamAddress(row.slug, domain);
 
@@ -103,7 +112,7 @@ export function TeamEmailSettings({ sb, ws, userId }: { sb: SupabaseClient; ws: 
     });
 
   return (
-    <section className="card pad mt-4">
+    <section className="card pad">
       <div className="sh">
         <h2>{M.title}</h2>
         {owner ? <Switch on={row.enabled} label={M.on} disabled={busy} onChange={toggle} /> : null}
