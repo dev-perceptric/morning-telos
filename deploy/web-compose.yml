@@ -1,6 +1,7 @@
 # The Morning Telos app at chat.morningtelos.com. A separate project from docker-compose.yml. The old app still runs
 # there with its data, but this router has a higher priority, so chat.morningtelos.com always reaches this app.
-# GitHub Actions builds the image (.github/workflows/build-images.yml). To update: docker compose -f deploy/web-compose.yml pull && docker compose -f deploy/web-compose.yml up -d
+# GitHub Actions builds the image and deploys it to the OVH server on every push to main (.github/workflows/build-images.yml
+# runs deploy/deploy-web.sh over SSH). By hand: ./deploy-web.sh in this folder on the server.
 # Keys come from the server's environment, with the names in web/.env.example. Never put a value in this file.
 services:
   web-new:
