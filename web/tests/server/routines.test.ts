@@ -157,7 +157,10 @@ test("run_routine: Iris, Hora, Hermes and Hestia take routines, with their own s
       // Hermes also keeps the leads list (src/lib/leadTools.ts).
       agent === "sales"
         ? ["find_leads", "log_progress", "remember", "save_lead", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"]
-        : ["log_progress", "remember", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"],
+        : agent === "email"
+          ? // Iris also writes campaign drafts (src/lib/campaignTools.ts).
+            ["log_progress", "mailing_lists", "remember", "save_campaign", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"]
+          : ["log_progress", "remember", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"],
       agent,
     );
     assert.equal(routine().last_note, null, agent);

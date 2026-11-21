@@ -68,6 +68,9 @@ test("every System skill parses cleanly: its folder is its name, a title, and a 
   assert.equal(new Set(SYSTEM_SKILLS.map((s) => s.key)).size, SYSTEM_SKILLS.length);
 });
 
+// Morning Telos's own tools that only one teammate gets: Hermes's leads list and Iris's campaigns.
+const OWN: Partial<Record<AgentKey, string[]>> = { sales: ["save_lead", "find_leads"], email: ["save_campaign", "mailing_lists"] };
+
 test("System skills name only tools their teammate has: its products' tools from the fixture, the app tools if it may use apps, or Morning Telos's own", () => {
   const product = { arrowsterr: [...TOOLS.arrowsterr.read, ...TOOLS.arrowsterr.write], capybaroar: [...TOOLS.capybaroar.read, ...TOOLS.capybaroar.write] };
   const writes = new Set([...TOOLS.arrowsterr.write, ...TOOLS.capybaroar.write]);
@@ -77,14 +80,14 @@ test("System skills name only tools their teammate has: its products' tools from
     const apps = a.apps.includes("*") ? (["arrowsterr", "capybaroar"] as const) : a.apps.filter((x): x is "arrowsterr" | "capybaroar" => x !== "*");
     // app_search_actions and app_action only for a teammate in APP_ACCESS (src/lib/composio/catalog.ts).
     // The WordPress tools (src/lib/wordpress/tools.ts) only for a teammate who may use WordPress.
-    const allowed = new Set([...TOOLS.morningtelos, ...apps.flatMap((p) => product[p]), ...(APP_ACCESS[s.agent!] ? appTools : []), ...(mayUseWordpress(s.agent!) ? Object.keys(WP_TOOLS) : [])]);
+    const allowed = new Set([...TOOLS.morningtelos, ...(OWN[s.agent!] ?? []), ...apps.flatMap((p) => product[p]), ...(APP_ACCESS[s.agent!] ? appTools : []), ...(mayUseWordpress(s.agent!) ? Object.keys(WP_TOOLS) : [])]);
     for (const t of s.tools) assert.ok(allowed.has(t), `${s.key} names ${t}, which ${a.god} doesn't have`);
     if (a.readOnly) for (const t of s.tools) assert.ok(!writes.has(t) && !WP_WRITES.includes(t), `${s.key}: ${a.god} only reads, but the skill names ${t}`);
     // Tools Morning Telos never gives an agent (src/lib/productTools.ts HIDDEN).
     for (const t of s.tools) for (const p of apps) assert.ok(!HIDDEN[p].has(t), `${s.key} names ${t}, which agents never get`);
     // Each tool in the header is used in the steps, and each tool the steps lean on is in the header.
     for (const t of s.tools) assert.ok(s.body.includes(t), `${s.key} lists ${t} but never says how to use it`);
-    const known = new Set([...product.arrowsterr, ...product.capybaroar, ...TOOLS.morningtelos, ...appTools, ...Object.keys(WP_TOOLS)]);
+    const known = new Set([...product.arrowsterr, ...product.capybaroar, ...TOOLS.morningtelos, ...Object.values(OWN).flat(), ...appTools, ...Object.keys(WP_TOOLS)]);
     for (const w of s.body.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? []) if (known.has(w)) assert.ok(s.tools.includes(w), `${s.key} uses ${w} but doesn't list it in tools`);
   }
 });
@@ -96,7 +99,8 @@ test("Iris, Hora, Hermes and Hestia each have their three skills; app skills say
   assert.deepEqual(names("sales"), ["follow-up-new-leads", "quote-follow-up", "update-the-crm"]);
   assert.deepEqual(names("support"), ["answer-an-email", "build-an-faq", "daily-inbox-triage"]);
   for (const s of SYSTEM_SKILLS.filter((x) => ["email", "forms", "sales", "support"].includes(x.agent!))) {
-    assert.ok(s.tools.includes("app_search_actions") && s.tools.includes("app_action"), `${s.key} works through the apps`);
+    // A campaign is saved for the Campaigns tab, which sends it; it only checks the inbox with app_search_actions.
+    assert.ok(s.tools.includes("app_search_actions") && (s.tools.includes("app_action") || s.tools.includes("save_campaign")), `${s.key} works through the apps`);
     assert.match(s.body, /in Settings, Apps/, `${s.key} says where to connect an app`);
     assert.match(s.body, /approv|Read only\./, `${s.key} says what waits for the owner's OK, or that it only reads`);
     assert.ok(!/delete/i.test(s.body) || /Never delete|never.*delete/i.test(s.body) || /close, delete or merge/.test(s.body), `${s.key} never deletes`);

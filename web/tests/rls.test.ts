@@ -762,6 +762,80 @@ test("leads: members read, editors and up change, viewers and strangers can't; k
   assert.equal((await db.query("select count(*)::int n from leads where workspace_id = $1", [ws])).rows[0].n, 0);
 });
 
+test("contacts and campaigns: members read, editors write drafts, only the server schedules and sends", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, editor, viewer } = await team("mail");
+  const other = await team("mail-other");
+  const c1 = (await db.query("insert into contacts (workspace_id, email, name, list) values ($1, 'maria@lopez.com', 'Maria', 'VIP') returning id, token", [ws])).rows[0];
+  const k1 = (await db.query("insert into campaigns (workspace_id, subject, body) values ($1, 'News', 'Hi') returning id", [ws])).rows[0].id;
+  await as(editor, async (q) => {
+    await q("insert into contacts (workspace_id, email) values ($1, 'dan@price.com')", [ws]);
+    assert.equal((await q("update contacts set list = 'Leads' where workspace_id = $1 and email = 'maria@lopez.com'", [ws])).rowCount, 1);
+    await q("insert into campaigns (workspace_id, subject, body, list) values ($1, 'Sale', 'Hi', 'VIP')", [ws]);
+    assert.equal((await q("update campaigns set subject = 'Big news' where id = $1", [k1])).rowCount, 1);
+    assert.equal((await q("update campaigns set status = 'canceled' where id = $1", [k1])).rowCount, 1);
+  });
+  // A person can't schedule, mark sent or change counts and tokens: only the server does.
+  for (const sql of [
+    "update campaigns set status = 'scheduled' where id = $1",
+    "update campaigns set status = 'sent' where id = $1",
+    "update campaigns set sent_count = 99 where id = $1",
+    "update campaigns set send_at = now() where id = $1",
+  ]) {
+    await as(editor, async (q) => {
+      await assert.rejects(q(sql, [k1]), /row-level security|permission denied/, sql);
+    });
+  }
+  for (const sql of ["update contacts set token = 'x' where id = $1", "update contacts set unsubscribed_at = null where id = $1"]) {
+    await as(editor, async (q) => {
+      await assert.rejects(q(sql, [c1.id]), /permission denied/, sql);
+    });
+  }
+  await as(viewer, async (q) => {
+    assert.equal((await q("select * from contacts where workspace_id = $1", [ws])).rowCount, 1);
+    assert.equal((await q("select * from campaigns where workspace_id = $1", [ws])).rowCount, 1);
+    assert.equal((await q("update campaigns set subject = 'x' where id = $1", [k1])).rowCount, 0);
+    assert.equal((await q("delete from contacts where workspace_id = $1", [ws])).rowCount, 0);
+  });
+  await as(other.owner, async (q) => {
+    assert.equal((await q("select * from contacts where workspace_id = $1", [ws])).rowCount, 0);
+    assert.equal((await q("select * from campaigns where workspace_id = $1", [ws])).rowCount, 0);
+  });
+  for (const sql of ["select * from campaign_sends", "select next_campaign_contacts($1, 10)", "select unsubscribe_contact($1)"]) {
+    await as(editor, async (q) => {
+      await assert.rejects(q(sql, sql.includes("$1") ? [sql.includes("next") ? k1 : c1.token] : []), /permission denied/, sql);
+    });
+  }
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from contacts"), /permission denied/);
+  });
+  // Emails are stored lowercase, once a workspace.
+  await assert.rejects(db.query("insert into contacts (workspace_id, email) values ($1, 'Upper@Case.com')", [ws]), /check constraint/);
+  await assert.rejects(db.query("insert into contacts (workspace_id, email) values ($1, 'maria@lopez.com')", [ws]), /duplicate key/);
+});
+
+test("next_campaign_contacts and unsubscribe_contact: the list, minus who got it and who left", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws } = await team("mail2");
+  const add = async (email: string, list: string) => (await db!.query("insert into contacts (workspace_id, email, list) values ($1, $2, $3) returning id, token", [ws, email, list])).rows[0];
+  const a = await add("a@x.com", "VIP"), b = await add("b@x.com", "VIP"), c = await add("c@x.com", "Leads");
+  const vip = (await db.query("insert into campaigns (workspace_id, subject, body, list) values ($1, 'S', 'B', 'VIP') returning id", [ws])).rows[0].id;
+  const all = (await db.query("insert into campaigns (workspace_id, subject, body) values ($1, 'S', 'B') returning id", [ws])).rows[0].id;
+  const next = async (id: string, n = 10) => (await db!.query("select email from next_campaign_contacts($1, $2)", [id, n])).rows.map((r) => r.email);
+  assert.deepEqual(await next(vip), ["a@x.com", "b@x.com"]);
+  assert.deepEqual(await next(all), ["a@x.com", "b@x.com", "c@x.com"]);
+  assert.deepEqual(await next(all, 1), ["a@x.com"]);
+  await db.query("insert into campaign_sends (campaign_id, contact_id, workspace_id, status) values ($1, $2, $3, 'sent')", [vip, a.id, ws]);
+  assert.deepEqual(await next(vip), ["b@x.com"]);
+  assert.equal((await db.query("select unsubscribe_contact($1) ok", [b.token])).rows[0].ok, true);
+  assert.deepEqual(await next(vip), []);
+  assert.equal((await db.query("select unsubscribe_contact('nope') ok")).rows[0].ok, false);
+  assert.equal((await db.query("select unsubscribe_contact($1) ok", ["0".repeat(32)])).rows[0].ok, false);
+  void c;
+  // A person who already got it is never sent it twice.
+  await assert.rejects(db.query("insert into campaign_sends (campaign_id, contact_id, workspace_id, status) values ($1, $2, $3, 'sent')", [vip, a.id, ws]), /duplicate key/);
+});
+
 test("work_cache: server only, gone with its workspace", async (t) => {
   if (!db) return t.skip("no test database");
   const o = await signUp("cache1@example.com", { business: "Cache Co" });

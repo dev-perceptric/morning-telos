@@ -1,4 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
+import { sendDue } from "@/lib/campaignSend";
+import { sendDeps } from "@/lib/campaignSendServer";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { brandJobHandlers, expireTrialsHandler } from "@/lib/closeoutDb";
 import { teamClient } from "@/lib/claude";
@@ -132,6 +134,14 @@ export async function POST(request: Request) {
   // An approved change whose call never finished (the server restarted mid-call) is failed, so a person checks it.
   const stale = await db.rpc("fail_stale_approvals", { p_older: STALE_AFTER });
   if (stale.error) warn(/fail_stale_approvals/.test(stale.error.message) ? "Run supabase/013_approvals.sql in Supabase." : `Stale approvals: ${stale.error.message}`);
+
+  // Iris's scheduled campaigns, a few emails a minute from each business's own inbox (src/lib/campaignSend.ts).
+  try {
+    const mail = await sendDue(sendDeps(db));
+    if (mail.failed) warn(`Campaigns: ${mail.failed} emails didn't go out this run.`, "campaigns");
+  } catch (e) {
+    warn(`Campaigns: ${e instanceof Error ? e.message : String(e)}`, "campaigns");
+  }
 
   const limit = Math.min(50, Math.max(1, Number(new URL(request.url).searchParams.get("limit")) || 10));
   const { data, error } = await db.rpc("claim_jobs", { n: limit, lease: LEASE });
