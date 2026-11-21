@@ -1158,3 +1158,12 @@ select.sel,.sel{appearance:none;-webkit-appearance:none;padding-right:36px;backg
   .setup .row-act{margin-left:44px}
 }
 @media (max-width:380px){.trialbar>.ico{display:none}}
+
+/* ─────────────── Trust switch: the picked side is plain to see ─────────────── */
+.trust-row .seg button{display:inline-flex;align-items:center;gap:6px;transition:background .15s ease,color .15s ease,transform .1s ease}
+.trust-row .seg button:active{transform:scale(.97)}
+.trust-row .seg button[aria-checked="true"]{background:var(--ink);color:#fff;box-shadow:none}
+.trust-row .seg button[aria-checked="true"]:last-child:before{content:"";width:12px;height:12px;background:var(--clay);-webkit-mask:var(--i-bolt) center/contain no-repeat;mask:var(--i-bolt) center/contain no-repeat}
+.trust-row .seg[aria-busy="true"] button{cursor:progress}
+.trust-err{flex-basis:100%;margin:2px 0 0;font-size:12.5px;line-height:1.45;color:var(--red)}
+p.trust-err{margin-top:8px}
