@@ -160,3 +160,24 @@ export function checkinPrompt(g: Pick<GoalRow, "title" | "target" | "unit" | "du
 /** The short line the chat shows for a check-in note. */
 export const CHECKIN_LABEL = "Weekly check-in";
 
+
+/** How far along a goal is, 0 to 100: from where it started (baseline, else 0) to the target. */
+export function goalPercent(g: Pick<GoalRow, "current" | "target" | "baseline" | "status">): number {
+  if (g.status === "done") return 100;
+  const from = g.baseline ?? 0;
+  const span = g.target - from;
+  if (span <= 0) return g.current >= g.target ? 100 : 0;
+  return Math.max(0, Math.min(100, Math.round(((g.current - from) / span) * 100)));
+}
+
+/** Athena's line at the top of her Goals tab. Null with no goals yet. */
+export function goalsSummary(statuses: readonly string[]): string | null {
+  if (!statuses.length) return null;
+  const active = statuses.filter((s) => s !== "done").length;
+  const needs = statuses.filter((s) => s === "needs_you").length;
+  const done = statuses.filter((s) => s === "done").length;
+  const parts = [`${active === 1 ? "1 goal" : `${active} goals`} in progress`];
+  if (needs) parts.push(`${needs === 1 ? "1 needs" : `${needs} need`} you`);
+  if (done) parts.push(`${done} done`);
+  return `${parts.join(", ")}.`;
+}

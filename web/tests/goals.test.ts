@@ -6,7 +6,7 @@ import type { NewMessage, Pref, TeamStore, TeamWorkspace, TurnInput } from "../s
 import type { GoalPatch } from "../src/lib/cardTools.ts";
 import { readCard } from "../src/lib/cards.ts";
 import { checkinHandler, type CheckinDeps } from "../src/lib/goalCheckin.ts";
-import { CHECKIN_LABEL, checkinPrompt, goalInsert, goalLine, goalOf, progressCard, startError, stepInserts, type GoalRow } from "../src/lib/goals.ts";
+import { CHECKIN_LABEL, checkinPrompt, goalInsert, goalLine, goalOf, progressCard, startError, stepInserts, type GoalRow, goalPercent, goalsSummary } from "../src/lib/goals.ts";
 import type { Job } from "../src/lib/jobs.ts";
 import type { AgentKey } from "../src/lib/team.ts";
 import { withSoon } from "./soon.ts";
@@ -154,4 +154,19 @@ test("startError says 'not set up' only when the table is missing, and never sho
   assert.equal(startError({ code: "PGRST205", message: "Could not find the table 'public.goal_steps'" }, "plan"), "Plans aren't set up on the server yet.");
   assert.equal(startError({ code: "42501", message: "permission denied for table goals" }, "goal"), "We couldn't start the goal. Try again.");
   assert.equal(startError({ code: "42501", message: "permission denied for table goal_steps" }, "plan"), "We couldn't start the plan. Try again.");
+});
+
+test("goalPercent: from the start to the target, never past 0 or 100", () => {
+  assert.equal(goalPercent({ current: 50, target: 100, baseline: null, status: "active" }), 50);
+  assert.equal(goalPercent({ current: 1200, target: 2000, baseline: 1000, status: "active" }), 20);
+  assert.equal(goalPercent({ current: 900, target: 2000, baseline: 1000, status: "active" }), 0);
+  assert.equal(goalPercent({ current: 2500, target: 2000, baseline: 1000, status: "active" }), 100);
+  assert.equal(goalPercent({ current: 3, target: 100, baseline: null, status: "done" }), 100);
+  assert.equal(goalPercent({ current: 5, target: 5, baseline: 5, status: "active" }), 100);
+});
+
+test("goalsSummary: one plain line for Athena", () => {
+  assert.equal(goalsSummary([]), null);
+  assert.equal(goalsSummary(["on_track"]), "1 goal in progress.");
+  assert.equal(goalsSummary(["on_track", "needs_you", "needs_you", "done"]), "3 goals in progress, 2 need you, 1 done.");
 });
