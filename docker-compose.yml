@@ -2,7 +2,7 @@ services:
   web:
     image: nginx:1.27-alpine
     restart: unless-stopped
-    # On every start, download site/ from GitHub: main, or the commit a deploy passes as SITE_REF (deploy/deploy-web.sh).
+    # On every start, download site/ from GitHub. Deploys set the exact commit with a file on top (deploy/deploy-web.sh).
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
