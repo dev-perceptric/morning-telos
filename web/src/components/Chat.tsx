@@ -30,7 +30,7 @@ import { AnswerCards, CardsProvider, GoalPin, type CardsEnv } from "./Cards";
 import { Icon, type IconName } from "./icons";
 import { callApi, message, navigate } from "./nav";
 import type { Workspace } from "./Settings";
-import { ErrorText, Notice, to } from "./ui";
+import { Empty, ErrorText, Notice, to } from "./ui";
 
 type Item =
   /**
@@ -1158,7 +1158,11 @@ export function ThreadPage({
       <CardsProvider value={cardsEnv}>
       <div className="msgs" aria-live="polite" aria-busy={busy} style={theme.vars as React.CSSProperties}>
         {loading ? <div className="step">Opening the chat...</div> : null}
-        {!loading && !items.length && !busy && !error ? <div className="step">No messages yet.</div> : null}
+        {!loading && !items.length && !busy && !error ? (
+          <Empty icon="message" title="Start the conversation">
+            Ask anything, or type @ to bring in a teammate.
+          </Empty>
+        ) : null}
         {items.map((it, i) => (
           <ItemView key={i} item={it} sb={sb} ws={ws} last={i === lastAnswer} canAgain={canAgain} onAgain={askAgain} answer={answers[i]} />
         ))}

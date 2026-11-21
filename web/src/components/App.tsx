@@ -385,7 +385,7 @@ function Frame2({
         <div className="sb-actions">
           <button type="button" className="search-btn" onClick={() => setPalette(true)}>
             <Icon name="search" small />
-            Search or jump to
+            <span className="sb-q">Search</span>
             <kbd>⌘K</kbd>
           </button>
           <button type="button" className="new-btn" aria-label="New chat" title="New chat" onClick={newChat}>

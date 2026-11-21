@@ -193,7 +193,14 @@ export function Home({
             navigate("/billing");
           }}
         >
-          {pill.lead} <b>{pill.strong}</b> · {pill.cta} →
+          <Icon name="clock" small />
+          <span>
+            {pill.lead} <b>{pill.strong}</b>
+          </span>
+          <span className="tb-cta">
+            {pill.cta}
+            <Icon name="next" small />
+          </span>
         </a>
       ) : null}
       {banner ? (
