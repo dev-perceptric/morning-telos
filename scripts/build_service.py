@@ -32,11 +32,11 @@ def part(a, b):
 LOGOS = part("  <!-- LOGOS -->", "  <!-- 5. HOW -->")
 HOW = part("  <!-- 5. HOW -->", "  <!-- 6. DEMO -->")
 RIBBONS = part("  <!-- RIBBONS -->", "  <!-- 9. FINAL -->")
-FINAL = part("  <!-- 9. FINAL -->", None)
+FINAL = part("  <!-- 9. FINAL -->", "<!-- VIZ -->")
 FOOTER = H[H.index("</main>"):]
 AVS = re.search(r'<div class="avs".*?</div>', H, re.S).group(0)
-VIZ_YOU = re.search(r'<div class="viz viz-you".*?</svg>\s*</div>', H, re.S).group(0)
-VIZ_TOOLS = re.search(r'<div class="viz viz-tools".*?Nothing connects</span></div>', H, re.S).group(0)
+VIZ_YOU = re.search(r'<div class="viz viz-you".*?</svg>\s*</div>', P, re.S).group(0)
+VIZ_TOOLS = re.search(r'<div class="viz viz-tools".*?Nothing connects</span></div>', P, re.S).group(0)
 CK = '<span class="ck"><svg viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></svg></span>'
 CHECK = '<svg viewBox="0 0 12 12"><path d="M2 6.5l2.5 2.5L10 3"/></svg>'
 

@@ -239,8 +239,9 @@
       dots.forEach((d, k) => d.classList.toggle('on', k === i));
       items.forEach((el, k) => { el.tabIndex = k === i ? 0 : -1; el.setAttribute('aria-hidden', k === i ? 'false' : 'true'); });
       const fill = () => {
-        info.querySelector('small').textContent = it.dataset.role;
         info.querySelector('b').textContent = it.dataset.name;
+        info.querySelector('small').textContent = it.dataset.role;
+        info.querySelector('p').textContent = it.dataset.line;
         const a = info.querySelector('a'); a.href = it.getAttribute('href'); a.textContent = `Meet ${it.dataset.first} →`;
       };
       if (first || still) { fill(); return; }
