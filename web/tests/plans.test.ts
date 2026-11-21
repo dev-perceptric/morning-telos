@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PAID_PLANS, PLANS, TRIAL_DAYS, effectivePlan, isPaidPlan, lookupKey, planOfLookup, priceCents } from "../src/lib/plans.ts";
+import { PAID_PLANS, PLANS, TRIAL_DAYS, effectivePlan, isPaidPlan, lookupKey, planOfLookup, priceCents, questionLimit } from "../src/lib/plans.ts";
 
 const now = Date.parse("2026-11-17T12:00:00Z");
 const day = 864e5;
@@ -79,3 +79,7 @@ test("the internal plan is always in force, never expires and is never sold", as
   assert.equal(isPaidPlan("internal"), false);
 });
 
+
+test("questionLimit: the AI questions Artemis may track on each plan", () => {
+  assert.deepEqual(["trial", "starter", "pro", "internal", "expired"].map((p) => questionLimit(p as Parameters<typeof questionLimit>[0])), [15, 15, 40, 500, 0]);
+});
