@@ -728,6 +728,40 @@ test("social_channels: members read their own workspace's channels, never anothe
   assert.equal((await db.query("select count(*)::int n from social_channels where workspace_id = $1", [xws])).rows[0].n, 0);
 });
 
+test("leads: members read, editors and up change, viewers and strangers can't; known values only", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, owner, editor, viewer } = await team("leads");
+  const other = await team("leads-other");
+  await db.query("insert into leads (workspace_id, name, email, value) values ($1, 'Maria Lopez', 'maria@lopez.com', 4800)", [ws]);
+  for (const u of [owner, editor]) {
+    await as(u, async (q) => {
+      await q("insert into leads (workspace_id, name) values ($1, 'Dan Price')", [ws]);
+      assert.equal((await q("update leads set stage = 'won' where workspace_id = $1 and name = 'Maria Lopez'", [ws])).rowCount, 1);
+      assert.equal((await q("delete from leads where workspace_id = $1 and name = 'Maria Lopez'", [ws])).rowCount, 1);
+    });
+  }
+  await as(viewer, async (q) => {
+    assert.equal((await q("select name from leads where workspace_id = $1", [ws])).rowCount, 1);
+    assert.equal((await q("update leads set stage = 'lost' where workspace_id = $1", [ws])).rowCount, 0);
+    assert.equal((await q("delete from leads where workspace_id = $1", [ws])).rowCount, 0);
+  });
+  await as(viewer, async (q) => {
+    await assert.rejects(q("insert into leads (workspace_id, name) values ($1, 'Nope')", [ws]), /row-level security/);
+  });
+  await as(other.owner, async (q) => {
+    assert.equal((await q("select * from leads where workspace_id = $1", [ws])).rowCount, 0);
+    assert.equal((await q("update leads set stage = 'lost' where workspace_id = $1", [ws])).rowCount, 0);
+  });
+  await as(null, async (q) => {
+    await assert.rejects(q("select * from leads"), /permission denied/);
+  });
+  await assert.rejects(db.query("insert into leads (workspace_id, name, stage) values ($1, 'X', 'maybe')", [ws]), /check constraint/);
+  await assert.rejects(db.query("insert into leads (workspace_id, name, email) values ($1, 'X', 'not an email')", [ws]), /check constraint/);
+  await assert.rejects(db.query("insert into leads (workspace_id, name, email) values ($1, 'Twin', 'MARIA@lopez.com'), ($1, 'Twin2', 'maria@LOPEZ.com')", [ws]), /leads_ws_email_idx/);
+  await db.query("delete from workspaces where id = $1", [ws]);
+  assert.equal((await db.query("select count(*)::int n from leads where workspace_id = $1", [ws])).rows[0].n, 0);
+});
+
 test("work_cache: server only, gone with its workspace", async (t) => {
   if (!db) return t.skip("no test database");
   const o = await signUp("cache1@example.com", { business: "Cache Co" });
