@@ -1,5 +1,8 @@
-# Build the new app's Docker image when web/ changes on main, publish it to GitHub's container registry (ghcr.io),
-# then deploy it to the OVH server: SSH in, run deploy/deploy-web.sh there, and wait until /api/version shows this commit.
+# On every push to main that changes the app or the website, deploy both to the OVH server.
+# When web/ changed: build the app's Docker image and publish it to GitHub's container registry (ghcr.io).
+# Then SSH in, run deploy/deploy-web.sh there (it restarts the app if its image changed and always refreshes the
+# website), wait until /api/version shows this commit, and check morningtelos.com serves this commit's site/.
+# To deploy by hand: Actions, Build images, Run workflow (or: gh workflow run build-images.yml).
 # The deploy job runs only once the repo has the variable DEPLOY_HOST. It needs (Settings, Secrets and variables, Actions):
 #   variables: DEPLOY_HOST (the server's address), DEPLOY_USER (the SSH user), DEPLOY_PORT (optional, default 22),
 #              APP_URL (optional, default https://chat.morningtelos.com)
@@ -12,6 +15,9 @@ on:
     branches: [main]
     paths:
       - "web/**"
+      - "site/**"
+      - "deploy/**"
+      - "docker-compose.yml"
       - ".github/workflows/build-images.yml"
   workflow_dispatch:
 
@@ -24,7 +30,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Rebuild the app only when its code changed, so a website change doesn't restart the app.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.app == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            app:
+              - "web/**"
+              - "deploy/deploy-web.sh"
+              - ".github/workflows/build-images.yml"
+
   build:
+    needs: changes
+    if: ${{ needs.changes.outputs.app == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -64,8 +88,9 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
   deploy:
-    needs: build
-    if: ${{ vars.DEPLOY_HOST != '' }}
+    needs: [changes, build]
+    # Runs after a build, or with no build when only the website changed.
+    if: ${{ !cancelled() && needs.changes.result == 'success' && vars.DEPLOY_HOST != '' && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     runs-on: ubuntu-latest
     # One deploy at a time.
     concurrency:
@@ -85,8 +110,10 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           # The server's authorized_keys locks this key to deploy-web.sh, so the command here is only a fallback.
-          ssh -i ~/.ssh/deploy_key -p "$PORT" -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER_NAME@$HOST" deploy-web.sh
+          # The commit tells the server which site/ to download.
+          ssh -i ~/.ssh/deploy_key -p "$PORT" -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER_NAME@$HOST" deploy-web.sh "$GITHUB_SHA"
       - name: Wait for the new version to answer
+        if: ${{ needs.changes.outputs.app == 'true' }}
         env:
           APP_URL: ${{ vars.APP_URL || 'https://chat.morningtelos.com' }}
           WANT: ${{ github.sha }}
@@ -98,4 +125,25 @@ jobs:
             sleep 5
           done
           echo "The server didn't switch to $WANT within 3 minutes." >&2
+          exit 1
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: site
+      - name: Check the website serves this commit
+        env:
+          SITE_URL: ${{ vars.SITE_URL || 'https://morningtelos.com' }}
+        run: |
+          # Every page in site/ is compared, so a page that is missing or old fails the deploy.
+          for i in $(seq 1 24); do
+            bad=""
+            for f in $(cd site && find . -name index.html | sed 's|^\./||; s|index\.html$||'); do
+              want=$(sha256sum "site/${f}index.html" | cut -d' ' -f1)
+              got=$(curl -fsS "$SITE_URL/$f" | sha256sum | cut -d' ' -f1 || true)
+              [ "$got" = "$want" ] || bad="$bad /$f"
+            done
+            if [ -z "$bad" ]; then echo "Website is live at this commit."; exit 0; fi
+            echo "Waiting for:$bad"
+            sleep 5
+          done
+          echo "morningtelos.com still serves old or missing pages:$bad" >&2
           exit 1

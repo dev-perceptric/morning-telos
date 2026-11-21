@@ -206,3 +206,30 @@ test("the app image carries the newest deploy script", () => {
   const docker = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
   assert.match(docker, /COPY --from=build \/app\/deploy-web\.sh \.\/deploy-web\.sh/);
 });
+
+test("every deploy refreshes the website at the commit being deployed", () => {
+  const sh = readFileSync(new URL("../../deploy/deploy-web.sh", import.meta.url), "utf8");
+  const wf = readFileSync(new URL("../../.github/workflows/build-images.yml", import.meta.url), "utf8");
+  const site = readFileSync(new URL("../../docker-compose.yml", import.meta.url), "utf8");
+  // The workflow runs on website changes and hands the server this commit.
+  assert.match(wf, /- "site\/\*\*"/);
+  assert.match(wf, /deploy-web\.sh "\$GITHUB_SHA"/);
+  // The deploy can run with no app build, when only the website changed.
+  assert.match(wf, /needs\.build\.result == 'skipped'/);
+  // It fails unless morningtelos.com serves this commit's pages.
+  assert.match(wf, /Check the website serves this commit/);
+  // The server script reads the commit and recreates only the website container.
+  assert.match(sh, /SSH_ORIGINAL_COMMAND/);
+  assert.match(sh, /up -d --no-deps --force-recreate web/);
+  assert.ok(sh.indexOf("refresh_site ||") > sh.indexOf('"${COMPOSE[@]}" up -d'), "the website refreshes after the app");
+  // The website downloads the commit a deploy asks for, and main on a plain restart.
+  assert.match(site, /tar\.gz\/\$\{SITE_REF:-refs\/heads\/main\}/);
+  // The self-update keeps the commit passed by hand.
+  assert.match(sh, /exec bash "\$NEW" "\$@"/);
+});
+
+test("scripts/deploy.sh no longer talks to the destroyed Hostinger server", () => {
+  const sh = readFileSync(new URL("../../scripts/deploy.sh", import.meta.url), "utf8");
+  assert.equal(/hostinger/i.test(sh), false);
+  assert.match(sh, /gh workflow run build-images\.yml/);
+});

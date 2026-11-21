@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Runs on the OVH server, from the app's folder (/docker/morningtelos-web). Pulls the newest images and restarts the
 # containers whose image changed. Docker leaves the rest running.
-# GitHub Actions calls it over SSH after every image build (.github/workflows/build-images.yml, job "deploy").
+# It also refreshes the website (morningtelos.com), so a push to main that changes site/ goes live too.
+# GitHub Actions calls it over SSH on every push to main (.github/workflows/build-images.yml, job "deploy"), as
+# "deploy-web.sh <commit>". By hand: ./deploy-web.sh, or ./deploy-web.sh <commit> to put the site on that commit.
 #
 # Setup, once, on the server:
 #   1. Keep this file next to the app's compose file (docker-compose.yml, or web-compose.yml from this repo), with the
@@ -55,7 +57,7 @@ if [ -z "${DEPLOY_TMP:-}" ] && [ -n "$IMAGE" ]; then
   if docker run --rm --entrypoint cat "$IMAGE" deploy-web.sh > "$NEW" 2>/dev/null && head -n 1 "$NEW" | grep -q '^#!' && ! cmp -s "$NEW" "$SELF"; then
     cp "$NEW" "$SELF" 2>/dev/null || true
     echo "deploy: running the newest deploy script"
-    DEPLOY_TMP="$NEW" DEPLOY_DIR="$PWD" exec bash "$NEW"
+    DEPLOY_TMP="$NEW" DEPLOY_DIR="$PWD" exec bash "$NEW" "$@"
   fi
   rm -f "$NEW"
 fi
@@ -107,6 +109,53 @@ else
 fi
 echo "deploy: restarting what changed"
 "${COMPOSE[@]}" up -d
+
+# The website: the nginx container that serves morningtelos.com, in its own compose project (docker-compose.yml from
+# this repo). It downloads site/ from GitHub each time it starts, so a fresh container serves the newest site. Its
+# download is set to ${SITE_REF:-refs/heads/main}: this deploy passes the exact commit, so GitHub's cache can't
+# hand back an older copy, and a plain restart takes main. An older copy pinned to one commit is switched over here.
+# The commit comes from GitHub Actions (ssh ... deploy-web.sh <commit>), or from the first argument by hand.
+SITE_REF=""
+for word in ${SSH_ORIGINAL_COMMAND:-} "$@"; do
+  [[ "$word" =~ ^[0-9a-f]{40}$ ]] && SITE_REF=$word
+done
+SITE_FAILED=""
+refresh_site() {
+  local c dir project files file args=()
+  c=$(docker ps -aq --filter "label=traefik.http.routers.morningtelos.rule" | head -n 1)
+  if [ -z "$c" ]; then
+    echo "deploy: no website container (Traefik router morningtelos) on this server." >&2
+    return 1
+  fi
+  dir=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$c")
+  project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$c")
+  files=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.config_files"}}' "$c")
+  IFS=, read -r -a list <<< "$files"
+  for file in "${list[@]}"; do
+    [ -f "$file" ] || continue
+    args+=(-f "$file")
+    if ! grep -qF 'tar.gz/${SITE_REF' "$file" && grep -Eq 'tar\.gz/(refs/heads/main|[0-9a-f]{40})' "$file"; then
+      if sed -i -E 's#tar\.gz/(refs/heads/main|[0-9a-f]{40})#tar.gz/${SITE_REF:-refs/heads/main}#g' "$file"; then
+        echo "deploy: $file now downloads the commit each deploy asks for"
+      else
+        echo "deploy: can't write $file. The website will download main." >&2
+      fi
+    fi
+  done
+  if [ -n "$project" ] && [ -n "$dir" ] && [ "${#args[@]}" -gt 0 ]; then
+    (cd "$dir" && SITE_REF="$SITE_REF" docker compose -p "$project" "${args[@]}" up -d --no-deps --force-recreate web)
+  else
+    echo "deploy: the website's compose file isn't on this server. Restarting the container as it is." >&2
+    docker restart "$c" >/dev/null
+  fi
+}
+echo "deploy: refreshing the website${SITE_REF:+ to $SITE_REF}"
+refresh_site || SITE_FAILED=1
+
 # Old images pile up with every build. Remove the ones nothing uses.
 docker image prune -f >/dev/null
+if [ -n "$SITE_FAILED" ]; then
+  echo "deploy: the app is updated, but the website wasn't." >&2
+  exit 1
+fi
 echo "deploy: done"
