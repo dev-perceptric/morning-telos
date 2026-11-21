@@ -60,6 +60,17 @@ TEAM = [
     ("theseus", "Theseus", "the Librarian", "SEO", "ai-seo-specialist"),
     ("archon", "Archon", "the Builder", "Website Builder", "ai-website-builder"),
 ]
+# One short line per teammate, shown under their name in the team wheel.
+LINES = dict(
+    alexander="Sees the whole business at once. He plans your week and hands each job to the right teammate.",
+    midas="Turns leads into gold. He replies in minutes and follows up until the call is booked.",
+    irene="Keeps the peace in your inbox. She answers every customer kindly, in your voice, day or night.",
+    cleo="Master of the hours. She finds a time that works for everyone and books it for you.",
+    cyrus="Carries your news to every inbox. He writes your emails and sends them at the right moment.",
+    leo="Tells your story every day. He plans your posts and writes captions people stop for.",
+    theseus="The diligent librarian. He writes and publishes articles on your site, so you show up on Google and in AI answers.",
+    archon="Builds pages that sell. Name the page you need and he puts it live.",
+)
 IMG_H = dict(alexander=974, midas=955, irene=926, cleo=924, cyrus=910, leo=890, theseus=912, archon=900)
 
 
@@ -71,9 +82,9 @@ def team_strip(current=None, head='Meet the rest of <span class="clay">the team.
     i0 = next((i for i, x in enumerate(TEAM) if x[0] == current), None)
     rest = TEAM if i0 is None else TEAM[i0 + 1:] + TEAM[:i0]
     items = ''.join(
-        f'<a class="roul-item" href="/{SECTION}/{slug}/" data-name="{n} {t}" data-role="AI {roles[k]}" data-first="{n}">'
+        f'<a class="roul-item" href="/{SECTION}/{slug}/" data-name="{n} {t}" data-role="The AI {roles[k]}" data-line="{LINES[k]}" data-first="{n}">'
         f'<img src="/img/team/{k}.webp" alt="{n} {t}, AI {roles[k]}" width="900" height="{IMG_H[k]}" loading="lazy" draggable="false">'
-        f'<span class="roul-cap"><b>{n} {t}</b><small>AI {roles[k]}</small></span></a>'
+        f'<span class="roul-cap"><b>{n} {t}</b><small>The AI {roles[k]}</small></span></a>'
         for k, n, t, r, slug in rest)
     dots = ''.join(f'<button class="roul-dot" type="button" aria-label="Show {n} {t}"></button>' for k, n, t, r, slug in rest)
     k, n, t, r, slug = rest[0]
@@ -86,7 +97,7 @@ def team_strip(current=None, head='Meet the rest of <span class="clay">the team.
       <div class="roul-stage">{items}<i class="roul-floor" aria-hidden="true"></i></div>
       <div class="wrap roul-info">
         <button class="roul-btn" type="button" data-step="-1" aria-label="Previous teammate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <div class="roul-name" aria-live="polite"><small>AI {roles[k]}</small><b>{n} {t}</b><a href="/{SECTION}/{slug}/">Meet {n} &rarr;</a></div>
+        <div class="roul-name" aria-live="polite"><b>{n} {t}</b><small>The AI {roles[k]}</small><p>{LINES[k]}</p><a href="/{SECTION}/{slug}/">Meet {n} &rarr;</a></div>
         <button class="roul-btn" type="button" data-step="1" aria-label="Next teammate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
       <div class="roul-dots">{dots}</div>
