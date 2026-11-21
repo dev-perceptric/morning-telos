@@ -388,9 +388,6 @@ function Frame2({
             <span className="sb-q">Search</span>
             <kbd>⌘K</kbd>
           </button>
-          <button type="button" className="new-btn" aria-label="New chat" title="New chat" onClick={newChat}>
-            <Icon name="plus" small />
-          </button>
         </div>
         <nav className="grp" aria-label="Main">
           {MAIN_NAV.map(navLink)}
