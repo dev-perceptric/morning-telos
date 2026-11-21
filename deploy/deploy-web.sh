@@ -11,7 +11,10 @@
 #        command="/path/to/deploy-web.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA... github-deploy
 set -euo pipefail
 
-cd "$(dirname "$(readlink -f "$0")")"
+SELF=$(readlink -f "$0")
+# A newer copy of this script, run from a temp file (below), works in the app's folder all the same.
+cd "${DEPLOY_DIR:-$(dirname "$SELF")}"
+[ -n "${DEPLOY_TMP:-}" ] && trap 'rm -f "$DEPLOY_TMP"' EXIT
 if [ -f docker-compose.yml ]; then FILE=docker-compose.yml; else FILE=web-compose.yml; fi
 COMPOSE=(docker compose -f "$FILE")
 # The app's service in the compose file: the first one that uses the morningtelos-web image.
@@ -31,8 +34,31 @@ if [ -z "${SUPABASE_URL:-}" ]; then
   exit 1
 fi
 
-echo "deploy: pulling images"
-"${COMPOSE[@]}" pull
+if [ -z "$SERVICE" ]; then
+  echo "deploy: no service in $FILE uses the morningtelos-web image. Not restarting the app." >&2
+  exit 1
+fi
+# The app's image, as the compose file names it, to run the update with.
+IMAGE=$(awk -v svc="$SERVICE" '/^  [A-Za-z0-9_.-]+:[[:space:]]*$/{cur=$1; sub(":","",cur)} cur==svc && /^    image:/{print $2; exit}' "$FILE")
+
+# Pulled already when an older copy of this script handed over to this one.
+if [ -z "${DEPLOY_TMP:-}" ]; then
+  echo "deploy: pulling images"
+  "${COMPOSE[@]}" pull
+fi
+
+# This script keeps itself current: every new image carries the newest copy (deploy-web.sh). If it differs from this
+# one, run that one instead, so a change to the deploy needs nothing done on the server. The copy on disk is replaced
+# too when this user may write it.
+if [ -z "${DEPLOY_TMP:-}" ] && [ -n "$IMAGE" ]; then
+  NEW=$(mktemp)
+  if docker run --rm --entrypoint cat "$IMAGE" deploy-web.sh > "$NEW" 2>/dev/null && head -n 1 "$NEW" | grep -q '^#!' && ! cmp -s "$NEW" "$SELF"; then
+    cp "$NEW" "$SELF" 2>/dev/null || true
+    echo "deploy: running the newest deploy script"
+    DEPLOY_TMP="$NEW" DEPLOY_DIR="$PWD" exec bash "$NEW"
+  fi
+  rm -f "$NEW"
+fi
 
 # New tables first, then the code that reads them. The new image runs scripts/migrate.mjs, which runs only the SQL
 # files this database hasn't had yet. If one fails, stop here: the old app keeps running on the old tables.
@@ -58,12 +84,6 @@ find_db() {
   echo "$found"
 }
 
-if [ -z "$SERVICE" ]; then
-  echo "deploy: no service in $FILE uses the morningtelos-web image. Not restarting the app." >&2
-  exit 1
-fi
-# The app's image, as the compose file names it, to run the update with.
-IMAGE=$(awk -v svc="$SERVICE" '/^  [A-Za-z0-9_.-]+:[[:space:]]*$/{cur=$1; sub(":","",cur)} cur==svc && /^    image:/{print $2; exit}' "$FILE")
 if [ -n "${MIGRATE_DATABASE_URL:-}" ]; then
   echo "deploy: updating the database"
   "${COMPOSE[@]}" run --rm --no-deps -e MIGRATE_DATABASE_URL "$SERVICE" node scripts/migrate.mjs

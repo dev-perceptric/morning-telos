@@ -189,6 +189,17 @@ test("the deploy finds the database itself and never prints its password", () =>
   assert.equal(/echo[^\n]*PGPASSWORD|set -x/.test(sh), false);
 });
 
+test("the deploy script updates itself from the new image", () => {
+  const sh = readFileSync(new URL("../../deploy/deploy-web.sh", import.meta.url), "utf8");
+  const pull = sh.indexOf('"${COMPOSE[@]}" pull');
+  const swap = sh.indexOf('exec bash "$NEW"');
+  const migrate = sh.indexOf("node scripts/migrate.mjs");
+  assert.ok(pull > 0 && swap > pull && migrate > swap, "it swaps in the newest copy after pull and before the database update");
+  assert.match(sh, /--entrypoint cat "\$IMAGE" deploy-web\.sh/);
+  assert.match(sh, /DEPLOY_DIR:-/);
+  assert.match(sh, /trap 'rm -f "\$DEPLOY_TMP"' EXIT/);
+});
+
 test("the app image carries the newest deploy script", () => {
   const wf = readFileSync(new URL("../../.github/workflows/build-images.yml", import.meta.url), "utf8");
   assert.match(wf, /cp deploy\/deploy-web\.sh web\/deploy-web\.sh/);
