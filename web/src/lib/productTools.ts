@@ -215,3 +215,27 @@ export async function productRead(workspaceId: string, product: Product, tool: s
     return null;
   }
 }
+
+/** The changes a person may make from a screen (Aphrodite's calendar), by product. Every other tool is refused. */
+export const SCREEN_WRITES: Record<Product, ReadonlySet<string>> = {
+  arrowsterr: new Set(),
+  capybaroar: new Set(["create_posts", "update_post", "delete_post"]),
+};
+
+/**
+ * Runs a change a person made on a screen, with the workspace's brand key. The route has already checked the person
+ * may make it. Only SCREEN_WRITES tools. The brand key never leaves this function.
+ */
+export async function productWrite(workspaceId: string, product: Product, tool: string, input: Record<string, unknown>, deps: ProductToolDeps): Promise<RunResult> {
+  if (!SCREEN_WRITES[product].has(tool) || HIDDEN[product].has(tool)) return { ok: false, text: "This change isn't allowed." };
+  const c = await connect(product, workspaceId, await deps.services(workspaceId), deps);
+  if (!c.ok) return { ok: false, text: blockedText(product, c.status) };
+  if (!c.tools.some((t) => t.name === tool)) return { ok: false, text: "This action isn't available any more." };
+  try {
+    const r = await deps.mcp.callTool(c.server, tool, input);
+    return { ok: !r.isError, text: r.text };
+  } catch (e) {
+    deps.log?.(`${product} ${tool} from a screen for workspace ${workspaceId} failed: ${errText(e)}`);
+    return { ok: false, text: "We couldn't reach this service right now. Try again in a few minutes." };
+  }
+}

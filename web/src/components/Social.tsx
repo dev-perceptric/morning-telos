@@ -13,6 +13,7 @@ import { networkLogo, networkName, sameNetwork, sortChannels, type SocialChannel
 import { can } from "@/lib/workspace";
 import { callApi, getApi, message, navigate } from "./nav";
 import type { Workspace } from "./Settings";
+import { Icon } from "./icons";
 import { Drawer, Empty, ErrorText, Notice } from "./ui";
 
 type Mode = "branded" | "link";
@@ -156,6 +157,19 @@ function useChannels(sb: SupabaseClient, workspaceId: string) {
 /** The partner's id for a channel's network ("linkedin_page" is "linkedin-page" in the list). */
 const listId = (networks: readonly Connectable[], network: string) => networks.find((n) => sameNetwork(n.id, network))?.id ?? network;
 
+/** Reconnect one network's account: its own sign-in, or the older connect page. `opened` turns true for the page. */
+export function useSocialReconnect(sb: SupabaseClient, ws: Workspace, from: ConnectOrigin = { to: "settings" }) {
+  const admin = can(ws.role, "connectSocial");
+  const nets = useNetworks(sb, ws.id, admin);
+  const { start, busy, error } = useStartConnect(sb, ws.id);
+  const [opened, setOpened] = useState(false);
+  const reconnect = async (network: string) => {
+    if (!nets.mode) return;
+    if ((await start(nets.mode === "link" ? "" : listId(nets.networks, network), nets.mode, from)) && nets.mode === "link") setOpened(true);
+  };
+  return { reconnect, ready: Boolean(nets.mode), busy: Boolean(busy), error, opened, admin };
+}
+
 /** Home: a card when connected accounts need a new sign-in. Connecting the first ones is in Finish setup. */
 export function ConnectSocialCard({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {
   const { rows } = useChannels(sb, ws.id);
@@ -183,26 +197,41 @@ export function ConnectSocialCard({ sb, ws }: { sb: SupabaseClient; ws: Workspac
 
 const OPENED = "We opened the sign-in in a new tab. Your accounts show up here when you're done.";
 
-/** Settings: every connected account, with Reconnect on the ones that were lost, and the networks to add. */
-export function SocialSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {
+/**
+ * Settings: every connected account, with Reconnect on the ones that were lost, Disconnect for owners and admins, and
+ * the networks to add. Aphrodite's own Settings tab shows the same list under "Accounts".
+ */
+export function SocialSettings({ sb, ws, title = "Social accounts", inTeam = false }: { sb: SupabaseClient; ws: Workspace; title?: string; inTeam?: boolean }) {
   const admin = can(ws.role, "connectSocial");
-  const { rows, error: loadError } = useChannels(sb, ws.id);
-  const nets = useNetworks(sb, ws.id, admin);
-  const { start, busy, error } = useStartConnect(sb, ws.id);
+  const { rows, error: loadError, load } = useChannels(sb, ws.id);
+  const re = useSocialReconnect(sb, ws);
   const [opened, setOpened] = useState(false);
-  const reconnect = async (network: string) => {
-    if (!nets.mode) return;
-    if ((await start(nets.mode === "link" ? "" : listId(nets.networks, network), nets.mode, { to: "settings" })) && nets.mode === "link") setOpened(true);
+  const [asking, setAsking] = useState("");
+  const [gone, setGone] = useState("");
+  const [discError, setDiscError] = useState("");
+  const error = re.error || discError;
+  const disconnect = async (c: SocialChannel) => {
+    setDiscError("");
+    setGone("");
+    try {
+      await callApi(sb, "/api/social/disconnect", { workspaceId: ws.id, channelId: c.channel_id });
+      setAsking("");
+      setGone(`${networkName(c.network)} is disconnected. Aphrodite won't post there.`);
+      await load();
+    } catch (e) {
+      setDiscError(message(e));
+    }
   };
   return (
     <>
       <div className="sh">
-        <h2>Social accounts</h2>
+        <h2>{title}</h2>
       </div>
       <p className="hint-s mb-3">{admin ? "The accounts Aphrodite posts to. You sign in to each one on the network's own page." : "The accounts Aphrodite posts to. Admins and the owner can connect more."}</p>
       {error ? <ErrorText>{error}</ErrorText> : null}
       {loadError ? <ErrorText>{loadError}</ErrorText> : null}
-      {opened ? <Notice>{OPENED}</Notice> : null}
+      {opened || re.opened ? <Notice>{OPENED}</Notice> : null}
+      {gone ? <Notice>{gone}</Notice> : null}
       <div className="card list">
         {(rows ?? []).map((c) => (
           <div key={c.channel_id} className="row">
@@ -215,7 +244,7 @@ export function SocialSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace }
               <>
                 <span className="pillst error">Needs you to sign in again</span>
                 {admin ? (
-                  <button type="button" className="btn sm" onClick={() => reconnect(c.network)} disabled={Boolean(busy) || !nets.mode}>
+                  <button type="button" className="btn sm" onClick={() => re.reconnect(c.network)} disabled={re.busy || !re.ready}>
                     Reconnect
                   </button>
                 ) : null}
@@ -223,6 +252,22 @@ export function SocialSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace }
             ) : (
               <span className="pillst ok">Connected</span>
             )}
+            {admin ? (
+              asking === c.channel_id ? (
+                <span className="inline-flex flex-wrap items-center justify-end gap-2">
+                  <button type="button" className="btn sm danger" onClick={() => disconnect(c)}>
+                    Disconnect
+                  </button>
+                  <button type="button" className="btn sm" onClick={() => setAsking("")}>
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="icon-btn" aria-label={`Disconnect ${networkName(c.network)}`} title="Disconnect" onClick={() => setAsking(c.channel_id)}>
+                  <Icon name="logout" />
+                </button>
+              )
+            ) : null}
           </div>
         ))}
         {rows === null && !loadError ? <div className="empty">Loading...</div> : null}
@@ -236,7 +281,7 @@ export function SocialSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace }
           <NetworkChooser sb={sb} ws={ws} from={{ to: "settings" }} onOpened={(_, mode) => mode === "link" && setOpened(true)} />
         </section>
       ) : null}
-      {rows?.length ? (
+      {rows?.length && !inTeam ? (
         <p className="hint-s mt-3">
           <button type="button" className="link-u" onClick={() => navigate("/team/social")}>
             See what Aphrodite does

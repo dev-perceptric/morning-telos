@@ -31,7 +31,16 @@ export type Partner = {
   removeBrand(brandId: string): Promise<PartnerResult<null>>;
   /** Capybaroar only: a one-time page, good for 24 hours, where the customer signs in to their social networks for this brand. */
   connectLink(brandId: string): Promise<PartnerResult<ConnectLink>>;
+  /**
+   * Capybaroar only: disconnects one social channel from the brand. A channel that is already gone answers 404
+   * not_found, which counts as done (channelGone). Capybaroar then sends channel.lost to our webhook.
+   */
+  disconnectChannel(brandId: string, channelId: string): Promise<PartnerResult<null>>;
 };
+
+/** True when a disconnect failed only because the channel is already gone: the end the person wanted. A 404 with any
+ * other code (an older Capybaroar without the route answers http_404) is a real failure. */
+export const channelGone = (r: PartnerFailure) => r.status === 404 && r.code === "not_found" && /channel/i.test(r.message);
 
 type Env = Record<string, string | undefined>;
 const ENV: Record<Product, { url: string; key: string }> = {
@@ -119,6 +128,7 @@ export function partnerClient(o: ClientOptions): Partner {
     },
     revokeKeys: (brandId) => call<null>("DELETE", `/brands/${id(brandId)}/keys`),
     removeBrand: (brandId) => call<null>("DELETE", `/brands/${id(brandId)}`),
+    disconnectChannel: (brandId, channelId) => call<null>("DELETE", `/brands/${id(brandId)}/channels/${id(channelId)}`),
     async connectLink(brandId) {
       const r = await call<ConnectLink>("POST", `/brands/${id(brandId)}/connect-link`);
       if (r.ok && (typeof r.data.url !== "string" || !/^https?:\/\/\S+$/.test(r.data.url))) return { ok: false, status: r.status, code: "bad_response", message: "The connect link came back without an address.", retryable: true };
