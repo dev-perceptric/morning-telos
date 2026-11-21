@@ -1084,6 +1084,28 @@ test("messages only take known roles, agents and shapes", async (t) => {
   await assert.rejects(db.query("insert into messages (thread_id, workspace_id, role, content) values ($1, $2, 'user', $3)", [id, ws, "x".repeat(40001)]), /violates check constraint/);
 });
 
+test("agent_prefs.settings: Hora's booking rules, set by admins and the owner, read by members, objects only", async (t) => {
+  if (!db) return t.skip("no test database");
+  const { ws, admin, editor, viewer } = await team("booking");
+  const rules = JSON.stringify({ booking: { days: [1, 2, 3], start: "09:00", end: "15:00", length: 30, gap: 10 } });
+  // Each session is rolled back at its end, so the saved row is put in first and each role is tried on it.
+  await as(admin, async (q) => {
+    await q("insert into agent_prefs (workspace_id, agent, settings) values ($1, 'email', $2::jsonb)", [ws, rules]);
+    assert.equal((await q("update agent_prefs set settings = $2::jsonb where workspace_id = $1 and agent = 'email'", [ws, rules])).rowCount, 1);
+  });
+  await db!.query("insert into agent_prefs (workspace_id, agent, settings) values ($1, 'forms', $2::jsonb)", [ws, rules]);
+  await as(viewer, async (q) => {
+    assert.deepEqual((await q("select settings from agent_prefs where workspace_id = $1 and agent = 'forms'", [ws])).rows[0].settings.booking.days, [1, 2, 3]);
+  });
+  await as(editor, async (q) => {
+    assert.equal((await q("update agent_prefs set settings = '{}' where workspace_id = $1", [ws])).rowCount, 0);
+  });
+  await assert.rejects(db!.query("update agent_prefs set settings = '[1]' where workspace_id = $1", [ws]), /agent_prefs_settings_check/);
+  // Older rows get an empty object.
+  await db!.query("insert into agent_prefs (workspace_id, agent) values ($1, 'seo')", [ws]);
+  assert.deepEqual((await db!.query("select settings from agent_prefs where workspace_id = $1 and agent = 'seo'", [ws])).rows[0].settings, {});
+});
+
 test("agent_prefs: members read, admins and the owner change, others can't; known values only", async (t) => {
   if (!db) return t.skip("no test database");
   const { ws, owner, admin, editor, viewer } = await team("prefs");

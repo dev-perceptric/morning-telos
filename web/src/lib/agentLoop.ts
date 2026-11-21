@@ -19,6 +19,7 @@
 //   context  PromptContext: extra cached system sections per agent (knowledge search, skills, memory).
 //   runTurn  routines call it with `forced` set to the routine's agent.
 
+import { bookingLine, type Booking } from "./booking.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { aiBlock, CAP_MESSAGES, costOf, spendWindowStart, tokensOf, type MeterWorkspace, type Tokens } from "./meter.ts";
 import { EFFORT, FALLBACK_BETA, MAX_TOKENS, modelFor, SERVER_FALLBACK, type ModelChoice } from "./models.ts";
@@ -67,11 +68,11 @@ export const HISTORY = 30;
 
 /** 0: every change waits for approval. 1: reserved for "ask for big changes only" (later). 2: autopilot. */
 export type Trust = 0 | 1 | 2;
-export type Pref = { enabled: boolean; trust: Trust; model: ModelChoice };
+export type Pref = { enabled: boolean; trust: Trust; model: ModelChoice; booking?: Booking | null };
 export const DEFAULT_PREF: Pref = { enabled: true, trust: 0, model: "auto" };
 
 /** tone: the brand's tone when "Use my brand in answers" is on (supabase/021_brand.sql), else null. */
-export type TeamWorkspace = MeterWorkspace & { id: string; name: string; website: string | null; tone?: string | null };
+export type TeamWorkspace = MeterWorkspace & { id: string; name: string; website: string | null; tone?: string | null; timezone?: string | null };
 
 export type StoredMessage = { role: "user" | "agent" | "note"; agent: AgentKey | null; content: string; meta?: Record<string, unknown> | null };
 export type NewMessage = { thread_id: string; workspace_id: string; role: "user" | "agent" | "note"; agent: AgentKey | null; content: string; meta: Record<string, unknown> };
@@ -277,7 +278,7 @@ export const CARD_GUIDE = [
   "Never name the services or tools behind the team. Say what they do, like your social calendar, your SEO data or your email.",
 ];
 
-export function systemPrompt(ws: { name: string; website: string | null; tone?: string | null }, key: AgentKey, o: { tools: boolean; writes?: WriteMode; missing: string[]; teammates: AgentKey[] }): string {
+export function systemPrompt(ws: { name: string; website: string | null; tone?: string | null; timezone?: string | null }, key: AgentKey, o: { tools: boolean; writes?: WriteMode; missing: string[]; teammates: AgentKey[]; booking?: Booking | null }): string {
   const a = AGENTS[key];
   const team = ORDER.filter((k) => k !== key)
     .map((k) => `- ${AGENTS[k].god}: ${AGENTS[k].name}.${AGENTS[k].soon ? " (Coming soon, can't take work yet.)" : o.teammates.includes(k) ? ` ${AGENTS[k].job}` : " (Paused right now.)"}`)
@@ -295,6 +296,8 @@ export function systemPrompt(ws: { name: string; website: string | null; tone?: 
     o.missing.length ? `Not available right now: ${o.missing.join("; ")}. If the job needs it, say so plainly.` : null,
     // The teammate's own rules (team.ts), like which app to connect and what Hestia hands to the owner.
     ...(a.rules ?? []),
+    // Hora's booking rules, from her Settings tab.
+    key === "forms" && o.booking ? bookingLine(o.booking, ws.timezone) : null,
     "Write in plain English at a 9th grade level. Short sentences. No em dashes. Keep replies short and easy to skim.",
     toneRule(ws.tone),
   ].filter(Boolean);
@@ -492,7 +495,7 @@ async function runAgent(key: AgentKey, prefs: Partial<Record<AgentKey, Partial<P
   const system: Anthropic.Beta.BetaTextBlockParam[] = [
     {
       type: "text",
-      text: systemPrompt(ws, key, { tools: set.tools.length > 0, writes: !set.tools.some((t) => t.write) ? "none" : pref.trust >= 2 ? "autopilot" : "ask", missing: set.missing, teammates }),
+      text: systemPrompt(ws, key, { tools: set.tools.length > 0, writes: !set.tools.some((t) => t.write) ? "none" : pref.trust >= 2 ? "autopilot" : "ask", missing: set.missing, teammates, booking: pref.booking ?? null }),
       cache_control: { type: "ephemeral" },
     },
     ...(extra.length ? [{ type: "text" as const, text: extra.join("\n\n"), cache_control: { type: "ephemeral" as const } }] : []),

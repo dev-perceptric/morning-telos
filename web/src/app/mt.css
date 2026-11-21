@@ -1319,3 +1319,17 @@ p.trust-err{margin-top:8px}
   .facts div:first-child{border-top:0}
   .vis .row{flex-wrap:wrap}
 }
+
+/* ─────────────── Hora's Calendar tab and booking rules (src/components/Meetings.tsx) ─────────────── */
+.po-pill.busy{background:var(--sunk);box-shadow:none;color:var(--ink-4);cursor:default}
+.po-pill.busy:active{transform:none}
+.po-pill.done .st{background:var(--green);-webkit-mask-image:var(--i-check-circle);mask-image:var(--i-check-circle)}
+.po-f .row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.pick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.pick button{height:32px;padding:0 12px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line);font-size:13px;color:var(--ink-2)}
+.pick button[aria-pressed="true"]{box-shadow:inset 0 0 0 1.5px var(--ink);color:var(--ink);font-weight:500}
+.pick button:disabled,.seg button:disabled{cursor:default;opacity:.7}
+.book-r{padding:16px 18px}
+.book-r .seg{flex-wrap:wrap}
+@media (max-width:860px){.po-f .row3{grid-template-columns:1fr 1fr}}
+.book-r .seg{margin-bottom:14px}
