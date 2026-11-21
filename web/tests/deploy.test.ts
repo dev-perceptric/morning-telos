@@ -42,11 +42,13 @@ const BACKUP_ONLY = new Set(["BACKUP_DATABASE_URL", "BACKUP_PUBLIC_KEY", "BACKUP
 const R2_KEYS = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"];
 // The storage keys can read and delete backups, and the web app never uses them, so only the backup service gets them.
 const BACKUP_SERVICE_ONLY = new Set([...BACKUP_ONLY, ...R2_KEYS]);
+// Only deploy-web.sh uses it, to run scripts/migrate.mjs. The running app never gets the database password.
+const DEPLOY_ONLY = new Set(["MIGRATE_DATABASE_URL"]);
 
 test("web-compose.yml passes every key in .env.example from the server environment", () => {
   const web = service("web-new");
   for (const key of exampleKeys) {
-    if (BACKUP_SERVICE_ONLY.has(key)) continue;
+    if (BACKUP_SERVICE_ONLY.has(key) || DEPLOY_ONLY.has(key)) continue;
     assert.ok(web.includes(`${key}: \${${key}:-}`), `the web-new service is missing ${key}: \${${key}:-}`);
   }
 });
@@ -162,4 +164,18 @@ test("the app answers at chat.morningtelos.com only, ahead of the old app's rout
   assert.match(web, /routers\.morningtelos-web\.rule=Host\(`chat\.morningtelos\.com`\)\n/);
   assert.match(web, /routers\.morningtelos-web\.priority=\d{3,}/);
   assert.doesNotMatch(compose, /new\.morningtelos\.com/);
+});
+
+test("the app never gets the deploy's database address", () => {
+  assert.equal(compose.includes("MIGRATE_DATABASE_URL"), false);
+});
+
+test("deploy-web.sh updates the database with the new image before it restarts the app", () => {
+  const sh = readFileSync(new URL("../../deploy/deploy-web.sh", import.meta.url), "utf8");
+  const migrate = sh.indexOf("node scripts/migrate.mjs");
+  assert.ok(migrate > sh.indexOf("pull"), "migrate after pull");
+  assert.ok(migrate < sh.indexOf(" up -d"), "migrate before up -d");
+  const docker = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
+  assert.match(docker, /COPY --from=build \/app\/supabase \.\/supabase/);
+  assert.match(docker, /COPY --from=build \/app\/scripts\/migrate\.mjs/);
 });

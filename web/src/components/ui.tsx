@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Icon, Mark, type IconName } from "./icons";
+import { plainError } from "@/lib/plainError";
 
 export const input = "inp";
 export const label = "fld-l";
@@ -26,10 +27,11 @@ export function Logo() {
   );
 }
 
+/** One short red line. A technical message (database, network, code) never shows as it is: plainError swaps it. */
 export function ErrorText({ children }: { children: React.ReactNode }) {
   return (
     <p role="alert" className="err-box">
-      {children}
+      {typeof children === "string" ? plainError(children) : children}
     </p>
   );
 }

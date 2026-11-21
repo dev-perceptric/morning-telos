@@ -4,7 +4,6 @@ node_modules
 .env*
 !.env.example
 tests
-supabase
 coverage
 email-previews
 *.tsbuildinfo

@@ -132,7 +132,7 @@ function useChannels(sb: SupabaseClient, workspaceId: string) {
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     const { data, error } = await sb.from("social_channels").select("channel_id, network, name, status, updated_at").eq("workspace_id", workspaceId);
-    if (error) return setError(/social_channels/.test(error.message) ? "" : error.message);
+    if (error) return setError("We couldn't load your accounts. Try again.");
     setError("");
     setRows(sortChannels((data ?? []) as SocialChannel[]));
   }, [sb, workspaceId]);

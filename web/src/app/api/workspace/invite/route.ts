@@ -1,6 +1,7 @@
 import { appOrigin, resendSettings, roleGate } from "@/lib/serverAuth";
 import { sendMail } from "@/lib/workspaceMail";
 import { createInvite, type Invite } from "@/lib/workspaceRoutes";
+import { routeError } from "@/lib/routeError";
 
 // Invite someone to a workspace by email (admins and the owner). Emails the link through Resend when
 // RESEND_API_KEY is set. Either way the answer has the link, so the screen can show it to copy.
@@ -28,6 +29,6 @@ export async function POST(request: Request) {
     });
     return Response.json(out.body, { status: out.status, headers: { "Cache-Control": "no-store" } });
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : "Something went wrong. Try again." }, { status: 500 });
+    return routeError(e, "workspace-invite", "We couldn't send the invite. Try again.");
   }
 }

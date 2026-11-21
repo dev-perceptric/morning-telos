@@ -17,6 +17,7 @@ import { Icon } from "./icons";
 import { callApi, message, navigate } from "./nav";
 import type { Workspace } from "./Settings";
 import { Dropdown, Empty, ErrorText, input, Notice, PageHead, to } from "./ui";
+import { plainError } from "@/lib/plainError";
 
 type Row = Pick<Approval, "id" | "thread_id" | "agent" | "product" | "tool" | "input" | "title" | "why" | "status" | "result" | "created_at" | "decided_at">;
 const COLUMNS = "id, thread_id, agent, product, tool, input, title, why, status, result, created_at, decided_at";
@@ -30,8 +31,8 @@ export function StatusTag({ status }: { status: ApprovalStatus }) {
   return <span className={`tag ${TONE[status] ?? "clay"}`}>{STATUS_LABEL[status] ?? status}</span>;
 }
 
-/** Before 013_approvals.sql runs there is no approvals table. Say nothing rather than show a database error. */
-const quiet = (e: { message: string }) => (/approvals|activity/.test(e.message) ? "" : e.message);
+/** A failed load says so in one plain line. The database's own words go to the console (plainError). */
+const quiet = (e: { message: string }) => plainError(e, "We couldn't load approvals. Try again.");
 
 function useApprovals(sb: SupabaseClient, workspaceId: string, open: boolean, limit: number, version: number) {
   const [rows, setRows] = useState<Row[] | null>(null);
