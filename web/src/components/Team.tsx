@@ -125,26 +125,44 @@ function useTeam(sb: SupabaseClient, ws: Workspace) {
   };
 
   // Ask me first (0): every change waits in Approvals. Autopilot (2): changes run right away and are logged.
+  // The switch flips on click and flips back if the save fails, with the reason shown under it.
+  const [trustError, setTrustError] = useState<{ agent: AgentKey; message: string } | null>(null);
+  const [saving, setSaving] = useState<AgentKey | null>(null);
   const setTrust = async (k: AgentKey, on: boolean) => {
-    setError("");
-    const { error } = await sb
-      .from("agent_prefs")
-      .upsert(
-        {
-          workspace_id: ws.id,
-          agent: k,
-          trust: on ? 2 : 0,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "workspace_id,agent" },
-      );
-    if (error) return setError(error.message);
-    setAutopilot((s) => {
-      const n = new Set(s);
-      if (on) n.add(k);
-      else n.delete(k);
-      return n;
-    });
+    if (saving === k) return;
+    const flip = (v: boolean) =>
+      setAutopilot((s) => {
+        const n = new Set(s);
+        if (v) n.add(k);
+        else n.delete(k);
+        return n;
+      });
+    setTrustError(null);
+    setSaving(k);
+    flip(on);
+    let message = "";
+    try {
+      const { error } = await sb
+        .from("agent_prefs")
+        .upsert(
+          {
+            workspace_id: ws.id,
+            agent: k,
+            trust: on ? 2 : 0,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "workspace_id,agent" },
+        );
+      if (error) message = error.message;
+    } catch (e) {
+      message = e instanceof Error ? e.message : String(e);
+    }
+    setSaving(null);
+    if (message) {
+      flip(!on);
+      console.error("agent_prefs trust save failed:", message);
+      setTrustError({ agent: k, message: "That didn't save. Try again." });
+    }
   };
 
   const status = (k: AgentKey): AgentStatus =>
@@ -157,6 +175,8 @@ function useTeam(sb: SupabaseClient, ws: Workspace) {
     error,
     toggle,
     setTrust,
+    trustError,
+    saving,
     status,
   };
 }
@@ -246,6 +266,8 @@ export function TeamPage({
                     agent={k}
                     on={team.autopilot.has(k)}
                     admin={admin}
+                    saving={team.saving === k}
+                    error={team.trustError?.agent === k ? team.trustError.message : ""}
                     onChange={(on) => team.setTrust(k, on)}
                   />
                 ) : null}
@@ -283,11 +305,15 @@ function TrustChips({
   agent,
   on,
   admin,
+  saving,
+  error,
   onChange,
 }: {
   agent: AgentKey;
   on: boolean;
   admin: boolean;
+  saving: boolean;
+  error: string;
   onChange: (on: boolean) => void;
 }) {
   return (
@@ -298,6 +324,7 @@ function TrustChips({
           className="seg"
           role="radiogroup"
           aria-label={`How ${AGENTS[agent].god} makes changes`}
+          aria-busy={saving}
         >
           {[
             { v: false, l: "Ask me first" },
@@ -317,6 +344,7 @@ function TrustChips({
       ) : (
         <span className="trust-v">{on ? "Autopilot" : "Ask me first"}</span>
       )}
+      {error ? <p className="trust-err">{error}</p> : null}
     </div>
   );
 }
@@ -704,6 +732,9 @@ export function AgentPage({
               </div>
               {makesChanges(k) && !admin ? (
                 <p className="hint-s">Owners and admins can change this.</p>
+              ) : null}
+              {team.trustError?.agent === k ? (
+                <p className="trust-err">{team.trustError.message}</p>
               ) : null}
             </div>
             <div>
