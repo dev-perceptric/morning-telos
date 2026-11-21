@@ -64,13 +64,32 @@ IMG_H = dict(alexander=974, midas=955, irene=926, cleo=924, cyrus=910, leo=890, 
 
 
 def team_strip(current):
-    cards = ''.join(
-        f'<a class="tcard rv{" on" if k == current else ""}" style="--d:{i*0.05:.2f}s" href="/{SECTION}/{slug}/">'
-        f'<img src="/img/team/{k}-face.webp" alt="" width="52" height="52" loading="lazy"><span><b>{n} {t}</b><small>{r}</small></span></a>'
-        for i, (k, n, t, r, slug) in enumerate(TEAM))
-    return f'''  <section class="team wrap" id="team">
-    <h2 class="big rv">Meet the rest of <span class="clay">the team.</span></h2>
-    <div class="tgrid">{cards}</div>
+    """The rest of the team as a wheel of full statues. Scrolling spins it, and the name below follows the front one.
+    site/assets/site.js (block "team wheel") drives it. Without JS it is a row you can swipe."""
+    roles = {x["key"]: x["role_long"] for x in AGENTS}
+    i0 = next(i for i, x in enumerate(TEAM) if x[0] == current)
+    rest = TEAM[i0 + 1:] + TEAM[:i0]
+    items = ''.join(
+        f'<a class="roul-item" href="/{SECTION}/{slug}/" data-name="{n} {t}" data-role="AI {roles[k]}" data-first="{n}">'
+        f'<img src="/img/team/{k}.webp" alt="{n} {t}, AI {roles[k]}" width="900" height="{IMG_H[k]}" loading="lazy" draggable="false">'
+        f'<span class="roul-cap"><b>{n} {t}</b><small>AI {roles[k]}</small></span></a>'
+        for k, n, t, r, slug in rest)
+    dots = ''.join(f'<button class="roul-dot" type="button" aria-label="Show {n} {t}"></button>' for k, n, t, r, slug in rest)
+    k, n, t, r, slug = rest[0]
+    return f'''  <section class="roul" id="team" style="--n:{len(rest)}">
+    <div class="roul-pin">
+      <div class="wrap roul-head">
+        <h2 class="big rv">Meet the rest of <span class="clay">the team.</span></h2>
+        <p class="roul-hint">Scroll to spin</p>
+      </div>
+      <div class="roul-stage">{items}<i class="roul-floor" aria-hidden="true"></i></div>
+      <div class="wrap roul-info">
+        <button class="roul-btn" type="button" data-step="-1" aria-label="Previous teammate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <div class="roul-name" aria-live="polite"><small>AI {roles[k]}</small><b>{n} {t}</b><a href="/{SECTION}/{slug}/">Meet {n} &rarr;</a></div>
+        <button class="roul-btn" type="button" data-step="1" aria-label="Next teammate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+      <div class="roul-dots">{dots}</div>
+    </div>
   </section>
 
 '''
@@ -153,17 +172,41 @@ CSS = '''
   .apbtns { display: flex; gap: 8px; padding: 0 14px 14px; flex-wrap: wrap; }
   .apbtns span { font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); }
   .apbtns span.ok { background: var(--clay); color: #fff; border-color: var(--clay); }
-  .team { padding: 10px 0 110px; }
-  .team h2 { margin-bottom: 32px; }
-  .tgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  .tcard { display: flex; gap: 12px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); color: inherit; text-decoration: none; transition: border-color .2s, transform .3s var(--ease); }
-  .tcard:hover { border-color: var(--ink); transform: translateY(-2px); }
-  .tcard.on { border-color: var(--clay); background: rgba(217,119,87,.06); }
-  .tcard img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; flex: none; }
-  .tcard b { display: block; font-weight: 600; font-size: 15px; }
-  .tcard small { font-size: 13px; color: var(--ink-3); }
-  @media (max-width: 1000px) { .agsig .head { grid-template-columns: 1fr; gap: 18px; } .agsig-grid { grid-template-columns: 1fr; } .tgrid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 640px) { .tgrid { grid-template-columns: 1fr; } .chat-body { padding: 16px; min-height: 0; } .agsig { padding-bottom: 80px; } }
+  /* team wheel: a row you can swipe without JS; site.js adds .live and spins it as you scroll */
+  .roul { position: relative; padding: 20px 0 100px; }
+  .roul-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; }
+  .roul-hint { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); display: none; transition: opacity .6s; }
+  .roul-stage { display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 28px 16px 8px; }
+  .roul-item { flex: none; width: 240px; scroll-snap-align: center; color: inherit; text-decoration: none; text-align: center; }
+  .roul-item img { width: 100%; height: 300px; object-fit: contain; object-position: center bottom; display: block; }
+  .roul-cap b { display: block; font-family: var(--serif); font-weight: 400; font-size: 21px; margin-top: 10px; }
+  .roul-cap small { font-size: 13px; color: var(--ink-3); }
+  .roul-floor, .roul-info, .roul-dots { display: none; }
+  .roul.live { height: calc(100vh + var(--n) * 42vh); padding: 0; }
+  .roul.live.still { height: auto; }
+  .roul.live .roul-pin { position: sticky; top: 0; height: 100vh; height: 100svh; display: grid; grid-template-rows: auto 1fr auto auto; padding: 96px 0 28px; overflow: hidden; }
+  .roul.live.still .roul-pin { position: relative; height: auto; min-height: 640px; }
+  .roul.live .roul-hint { display: block; }
+  .roul.live .roul-stage { display: block; position: relative; overflow: visible; padding: 0; margin: 18px 0 8px; min-height: 260px; }
+  .roul.live .roul-item { position: absolute; left: 50%; bottom: 0; top: 0; width: auto; transform-origin: 50% 100%; will-change: transform, opacity; -webkit-tap-highlight-color: transparent; }
+  .roul.live .roul-item img { height: 100%; width: auto; max-width: none; user-select: none; }
+  .roul.live .roul-cap { display: none; }
+  .roul.live .roul-floor { display: block; position: absolute; left: 50%; bottom: -14px; width: min(520px, 70vw); height: 46px; transform: translateX(-50%); background: radial-gradient(closest-side, rgba(20,20,19,.16), transparent); pointer-events: none; }
+  .roul.live .roul-info { display: flex; align-items: center; justify-content: center; gap: 28px; }
+  .roul-name { min-width: 0; width: min(520px, 100%); text-align: center; transition: opacity .25s, transform .35s var(--ease); }
+  .roul-name.swap { opacity: 0; transform: translateY(10px); }
+  .roul-name small { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--clay); }
+  .roul-name b { display: block; font-family: var(--serif); font-weight: 400; font-size: clamp(32px, 3.8vw, 52px); line-height: 1.1; letter-spacing: -.02em; margin: 6px 0 8px; }
+  .roul-name a { font-size: 15px; font-weight: 600; color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--clay); padding-bottom: 2px; }
+  .roul-name a:hover { color: var(--clay); }
+  .roul-btn { flex: none; width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--white); display: grid; place-items: center; cursor: pointer; transition: border-color .2s, transform .2s; }
+  .roul-btn:hover { border-color: var(--ink); transform: scale(1.05); }
+  .roul-btn svg { width: 20px; height: 20px; fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .roul.live .roul-dots { display: flex; justify-content: center; gap: 8px; margin-top: 18px; }
+  .roul-dot { width: 8px; height: 8px; padding: 0; border-radius: 99px; border: 0; background: var(--line-2); cursor: pointer; transition: width .3s var(--ease), background .3s; }
+  .roul-dot.on { width: 26px; background: var(--clay); }
+  @media (max-width: 1000px) { .agsig .head { grid-template-columns: 1fr; gap: 18px; } .agsig-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .roul.live { height: calc(100vh + var(--n) * 32vh); } .roul.live .roul-pin { padding: 84px 0 20px; } .roul-head { display: block; } .roul-hint { margin-top: 8px; } .roul.live .roul-info { gap: 12px; } .roul-btn { width: 44px; height: 44px; } .chat-body { padding: 16px; min-height: 0; } .agsig { padding-bottom: 80px; } }
 '''
 
 
