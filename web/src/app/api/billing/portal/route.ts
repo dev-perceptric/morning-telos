@@ -1,5 +1,6 @@
 import { adminClient, requireRole } from "@/lib/serverAuth";
 import { originOf, PAYMENTS_OFF, stripe, stripeReady } from "@/lib/stripe";
+import { routeError } from "@/lib/routeError";
 
 // Stripe's customer portal: card, invoices, plan changes and canceling. Owner only.
 // Copied from Arrowsterr's billing portal route.
@@ -16,6 +17,6 @@ export async function POST(request: Request) {
     const session = await stripe<{ url: string }>("POST", "billing_portal/sessions", { customer: ws.stripe_customer_id, return_url: `${originOf(request)}/billing` });
     return Response.json({ url: session.url });
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    return routeError(e, "billing-portal", "We couldn't open billing. Try again.");
   }
 }

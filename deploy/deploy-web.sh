@@ -14,6 +14,8 @@ set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 if [ -f docker-compose.yml ]; then FILE=docker-compose.yml; else FILE=web-compose.yml; fi
 COMPOSE=(docker compose -f "$FILE")
+# The app's service in the compose file: the first one that uses the morningtelos-web image.
+SERVICE=$(awk '/^  [A-Za-z0-9_.-]+:[[:space:]]*$/{svc=$1; sub(":","",svc)} /^    image:.*morningtelos-web/{print svc; exit}' "$FILE")
 
 # The app reads its keys from .env. Without them the restarted app would come up with every key empty, so stop here.
 if [ ! -f .env ]; then
@@ -31,6 +33,19 @@ fi
 
 echo "deploy: pulling images"
 "${COMPOSE[@]}" pull
+
+# New tables first, then the code that reads them. The new image runs scripts/migrate.mjs, which runs only the SQL
+# files this database hasn't had yet. If one fails, stop here: the old app keeps running on the old tables.
+if [ -n "${MIGRATE_DATABASE_URL:-}" ]; then
+  if [ -z "$SERVICE" ]; then
+    echo "deploy: no service in $FILE uses the morningtelos-web image. Not restarting the app." >&2
+    exit 1
+  fi
+  echo "deploy: updating the database"
+  "${COMPOSE[@]}" run --rm --no-deps -e MIGRATE_DATABASE_URL "$SERVICE" node scripts/migrate.mjs
+else
+  echo "deploy: MIGRATE_DATABASE_URL is empty in .env. Skipping database updates." >&2
+fi
 echo "deploy: restarting what changed"
 "${COMPOSE[@]}" up -d
 # Old images pile up with every build. Remove the ones nothing uses.

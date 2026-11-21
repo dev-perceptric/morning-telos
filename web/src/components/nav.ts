@@ -4,6 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useSyncExternalStore } from "react";
 import { parseRoute, type Route } from "@/lib/routes";
+import { plainError } from "@/lib/plainError";
 
 const EVENT = "mt:navigate";
 
@@ -58,7 +59,7 @@ export async function callApi<T = Record<string, unknown>>(sb: SupabaseClient, p
   }).catch(() => null);
   if (!res) throw new Error("Couldn't reach the server. Check your connection and try again.");
   const out = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(out.error || "Something went wrong. Try again.");
+  if (!res.ok) throw new Error(plainError(out.error));
   return out;
 }
 
@@ -68,6 +69,6 @@ export async function getApi<T = Record<string, unknown>>(sb: SupabaseClient, pa
   const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store" }).catch(() => null);
   if (!res) throw new Error("Couldn't reach the server. Check your connection and try again.");
   const out = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(out.error || "Something went wrong. Try again.");
+  if (!res.ok) throw new Error(plainError(out.error));
   return out;
 }

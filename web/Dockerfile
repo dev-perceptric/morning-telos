@@ -1,6 +1,7 @@
 # The Morning Telos web app (chat.morningtelos.com): build Next.js, then serve it.
 # Copied from Arrowsterr's Dockerfile. The build context is web/.
-# At runtime it only needs the build (.next), public/, next.config.ts and the packages. Nothing reads files from src/, tests/ or supabase/.
+# At runtime it needs the build (.next), public/, next.config.ts and the packages, plus supabase/ and scripts/migrate.mjs,
+# which deploy/deploy-web.sh runs in this image before the app restarts. Nothing reads files from src/ or tests/.
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -31,6 +32,8 @@ RUN npm ci --omit=dev --ignore-scripts && rm -rf /root/.npm
 COPY --from=build --chown=web /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/next.config.ts ./
+COPY --from=build /app/supabase ./supabase
+COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
 USER web
 EXPOSE 3000
 CMD ["npx", "next", "start", "-p", "3000"]

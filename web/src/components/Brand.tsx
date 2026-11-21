@@ -12,6 +12,7 @@ import { Markdown, ThemeFont } from "./Chat";
 import { callApi, message } from "./nav";
 import type { Workspace } from "./Settings";
 import { ErrorText, input, label, Notice, Switch } from "./ui";
+import { plainError } from "@/lib/plainError";
 
 type Fields = { primary_color: string; accent_color: string; heading_font: string; body_font: string; logo_url: string; tone: string };
 const FIELDS: (keyof Fields)[] = ["primary_color", "accent_color", "heading_font", "body_font", "logo_url", "tone"];
@@ -60,7 +61,7 @@ export function BrandSettings({ sb, ws }: { sb: SupabaseClient; ws: Workspace })
       .maybeSingle()
       .then(({ data, error }) => {
         if (!live) return;
-        if (error) setError(message(error));
+        if (error) setError(plainError(error, "We couldn't load your brand. Try again."));
         setRow((data as BrandRow | null) ?? null);
         setF(toFields((data as BrandRow | null) ?? null));
         setLoaded(true);

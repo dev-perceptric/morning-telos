@@ -12,7 +12,8 @@
     "stripe:setup": "node scripts/stripe-setup.mjs",
     "backup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/backup.ts",
     "restore": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/restore.ts",
-    "skills": "node scripts/skills.mjs"
+    "skills": "node scripts/skills.mjs",
+    "migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.10.0",
@@ -20,6 +21,7 @@
     "@supabase/supabase-js": "^2.119.0",
     "cheerio": "^1.2.0",
     "next": "16.4.6",
+    "pg": "^8.23.1",
     "posthog-js": "^1.438.13",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -35,7 +37,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
-    "pg": "^8.23.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

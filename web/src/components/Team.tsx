@@ -52,10 +52,10 @@ function useTeam(sb: SupabaseClient, ws: Workspace) {
       .eq("workspace_id", ws.id)
       .then(({ data, error }) => {
         if (!live) return;
-        if (error)
-          return setError(
-            /agent_prefs/.test(error.message) ? "" : error.message,
-          );
+        if (error) {
+          console.warn(error.message);
+          return setError("We couldn't load your team's settings. Try again.");
+        }
         const rows = (
           (data ?? []) as { agent: string; enabled: boolean; trust: number }[]
         ).filter((r) => isAgentKey(r.agent));

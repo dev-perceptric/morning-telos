@@ -2,6 +2,7 @@ import { closeWorkspace } from "@/lib/closeoutDb";
 import { adminClient, resendSettings, roleGate } from "@/lib/serverAuth";
 import { sendMail } from "@/lib/workspaceMail";
 import { deleteWorkspace } from "@/lib/workspaceRoutes";
+import { routeError } from "@/lib/routeError";
 
 // Delete a whole workspace (owner only). The person types the business name to confirm. Members, invites
 // and everything else with this workspace_id go with it (on delete cascade). Sends a goodbye email when Resend is set.
@@ -28,6 +29,6 @@ export async function POST(request: Request) {
     });
     return Response.json(out.body, { status: out.status, headers: { "Cache-Control": "no-store" } });
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : "Something went wrong. Try again." }, { status: 500 });
+    return routeError(e, "workspace-delete", "We couldn't delete the workspace. Try again.");
   }
 }

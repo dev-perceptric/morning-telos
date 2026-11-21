@@ -2,6 +2,7 @@ import { syncSubscription } from "@/lib/billing";
 import { isPaidPlan, lookupKey } from "@/lib/plans";
 import { adminClient, requireRole } from "@/lib/serverAuth";
 import { getSubscription, originOf, priceFor, PAYMENTS_OFF, stripe, stripeReady, type Subscription } from "@/lib/stripe";
+import { routeError } from "@/lib/routeError";
 
 // Pick or change a plan. Owner only. Copied from Arrowsterr's checkout route.
 // With no subscription yet, this opens Stripe Checkout. With one, it switches the plan at once and charges or credits the difference.
@@ -16,7 +17,8 @@ export async function POST(request: Request) {
   if (!isPaidPlan(plan)) return Response.json({ error: "Pick Starter or Pro." }, { status: 400 });
 
   const { data: ws, error } = await db.from("workspaces").select("id, name, stripe_customer_id, stripe_subscription_id").eq("id", body.workspaceId).maybeSingle();
-  if (error || !ws) return Response.json({ error: error?.message ?? "Workspace not found." }, { status: error ? 500 : 404 });
+  if (error) return routeError(error, "billing-checkout", "We couldn't open checkout. Try again.");
+  if (!ws) return Response.json({ error: "Workspace not found." }, { status: 404 });
 
   try {
     const price = await priceFor(lookupKey(plan));
@@ -63,6 +65,6 @@ export async function POST(request: Request) {
     });
     return Response.json({ url: session.url });
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    return routeError(e, "billing-checkout", "We couldn't open checkout. Try again.");
   }
 }
