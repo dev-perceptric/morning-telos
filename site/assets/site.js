@@ -218,6 +218,88 @@
     if (reduce) { demo.classList.add('s1', 's5', 's6'); lis.forEach(l => l.classList.add('done')); reply.textContent = msg; secsEl.textContent = '44'; clock.textContent = fmt(44); }
   }
 
+  /* team wheel (AI employee pages): the statues sit on a ring. Scrolling the page spins it one teammate at a time,
+     with a short pause on each, and the name under the wheel follows the one in front. Buttons, dots and a tap on a
+     side statue spin to that teammate. */
+  const roul = $('.roul');
+  if (roul) {
+    const items = $$('.roul-item', roul), dots = $$('.roul-dot', roul), n = items.length;
+    const stage = $('.roul-stage', roul), info = $('.roul-name', roul), hint = $('.roul-hint', roul);
+    const still = reduce;
+    roul.classList.add('live'); if (still) roul.classList.add('still');
+    const mod = (v, m) => ((v % m) + m) % m;
+    // Linger on each teammate: the wheel moves slowly near a stop and quickly between stops.
+    const detent = x => x - Math.sin(2 * Math.PI * x) / (2 * Math.PI) * .82;
+    let cur = 0, target = 0, shown = -1, raf = 0, moved = false;
+
+    function show(i) {
+      if (i === shown) return;
+      const first = shown < 0; shown = i;
+      const it = items[i];
+      dots.forEach((d, k) => d.classList.toggle('on', k === i));
+      items.forEach((el, k) => { el.tabIndex = k === i ? 0 : -1; el.setAttribute('aria-hidden', k === i ? 'false' : 'true'); });
+      const fill = () => {
+        info.querySelector('small').textContent = it.dataset.role;
+        info.querySelector('b').textContent = it.dataset.name;
+        const a = info.querySelector('a'); a.href = it.getAttribute('href'); a.textContent = `Meet ${it.dataset.first} →`;
+      };
+      if (first || still) { fill(); return; }
+      info.classList.add('swap');
+      setTimeout(() => { fill(); info.classList.remove('swap'); }, 180);
+    }
+
+    function draw() {
+      const w = stage.clientWidth, R = Math.min(w * (w < 700 ? .38 : .36), 520);
+      items.forEach((el, i) => {
+        const off = mod(i - cur + n / 2, n) - n / 2;            // -n/2 .. n/2, 0 is the front
+        const a = off * 2 * Math.PI / n, depth = (Math.cos(a) + 1) / 2;
+        const s = .32 + .68 * Math.pow(depth, 3.2);
+        el.style.transform = `translateX(-50%) translateX(${(Math.sin(a) * R).toFixed(1)}px) scale(${s.toFixed(3)})`;
+        el.style.opacity = (.06 + .94 * Math.pow(depth, 4)).toFixed(3);
+        el.style.zIndex = Math.round(depth * 100);
+        el.style.filter = `grayscale(${((1 - depth) * .9).toFixed(2)})`;
+      });
+      show(mod(Math.round(cur), n));
+    }
+
+    function tick() {
+      const d = target - cur;
+      cur = Math.abs(d) < .0005 ? target : cur + d * (still ? 1 : .14);
+      draw();
+      raf = cur !== target ? requestAnimationFrame(tick) : 0;
+    }
+    const go = () => { if (!raf) raf = requestAnimationFrame(tick); };
+
+    // Page scroll -> wheel position. The section is tall, and the wheel stays pinned while you scroll through it.
+    const span = () => roul.offsetHeight - innerHeight;
+    function fromScroll() {
+      if (still) return;
+      const p = clamp(-roul.getBoundingClientRect().top / Math.max(1, span()));
+      target = detent(p * (n - 1));
+      if (!moved && p > .02) { moved = true; if (hint) hint.style.opacity = 0; }
+      go();
+    }
+    addEventListener('scroll', fromScroll, { passive: true });
+    addEventListener('resize', () => { draw(); fromScroll(); });
+
+    // Spin to teammate k: scroll to its stop, or turn the wheel directly when motion is reduced.
+    function to(k) {
+      if (still) { target = Math.round(cur) + (mod(k - Math.round(cur) + n / 2, n) - n / 2); go(); return; }
+      k = mod(k, n);
+      const top = roul.getBoundingClientRect().top + scrollY;
+      scrollTo({ top: top + span() * k / (n - 1) + 1, behavior: 'smooth' });
+    }
+    $$('.roul-btn', roul).forEach(b => b.addEventListener('click', () => to(mod(Math.round(cur), n) + +b.dataset.step)));
+    dots.forEach((d, k) => d.addEventListener('click', () => to(k)));
+    items.forEach((el, k) => el.addEventListener('click', e => { if (k !== mod(Math.round(cur), n)) { e.preventDefault(); to(k); } }));
+    roul.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); to(mod(Math.round(cur), n) + (e.key === 'ArrowRight' ? 1 : -1)); }
+    });
+
+    $$('img', roul).forEach(img => { img.loading = 'eager'; });
+    draw(); fromScroll(); cur = target; draw();
+  }
+
   /* count-up stats: <b class="countup" data-to="40" data-suffix="%">0%</b> */
   const cio = new IntersectionObserver(es => es.forEach(e => {
     if (!e.isIntersecting) return; cio.unobserve(e.target);
