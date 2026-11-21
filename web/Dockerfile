@@ -18,6 +18,10 @@ ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ARG GIT_COMMIT=""
 ENV GIT_COMMIT=$GIT_COMMIT
 RUN npm run build && mkdir -p public
+# The workflow copies deploy/deploy-web.sh into the build, so the server can take the newest one from this image:
+#   docker run --rm --entrypoint cat ghcr.io/dev-perceptric/morningtelos-web:latest deploy-web.sh > deploy-web.sh
+# A local build has none; it gets a stub that refuses to run.
+RUN [ -f deploy-web.sh ] || printf '#!/usr/bin/env bash\necho "This image was built without deploy-web.sh." >&2\nexit 1\n' > deploy-web.sh
 
 FROM node:22-bookworm-slim
 ARG GIT_COMMIT=""
@@ -34,6 +38,7 @@ COPY --from=build /app/public ./public
 COPY --from=build /app/next.config.ts ./
 COPY --from=build /app/supabase ./supabase
 COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=build /app/deploy-web.sh ./deploy-web.sh
 USER web
 EXPOSE 3000
 CMD ["npx", "next", "start", "-p", "3000"]
