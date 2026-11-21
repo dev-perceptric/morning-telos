@@ -179,3 +179,17 @@ test("deploy-web.sh updates the database with the new image before it restarts t
   assert.match(docker, /COPY --from=build \/app\/supabase \.\/supabase/);
   assert.match(docker, /COPY --from=build \/app\/scripts\/migrate\.mjs/);
 });
+
+test("the deploy finds the database itself and never prints its password", () => {
+  const sh = readFileSync(new URL("../../deploy/deploy-web.sh", import.meta.url), "utf8");
+  assert.match(sh, /supabase\/postgres\*/);
+  assert.match(sh, /sed -n 's\/\^POSTGRES_PASSWORD=\/\/p'/);
+  assert.equal(/echo[^\n]*PGPASSWORD|set -x/.test(sh), false);
+});
+
+test("the app image carries the newest deploy script", () => {
+  const wf = readFileSync(new URL("../../.github/workflows/build-images.yml", import.meta.url), "utf8");
+  assert.match(wf, /cp deploy\/deploy-web\.sh web\/deploy-web\.sh/);
+  const docker = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
+  assert.match(docker, /COPY --from=build \/app\/deploy-web\.sh \.\/deploy-web\.sh/);
+});

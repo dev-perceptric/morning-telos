@@ -36,15 +36,44 @@ echo "deploy: pulling images"
 
 # New tables first, then the code that reads them. The new image runs scripts/migrate.mjs, which runs only the SQL
 # files this database hasn't had yet. If one fails, stop here: the old app keeps running on the old tables.
+# The database is found here, with no setup: the Supabase Postgres container (image supabase/postgres) on the same
+# Docker network as the running app, with the password that container was started with. MIGRATE_DATABASE_URL in
+# .env overrides it. The password goes to the migrate container only, and is never printed.
+find_db() {
+  local app net c found=""
+  app=$("${COMPOSE[@]}" ps -q "$SERVICE" 2>/dev/null | head -n 1)
+  [ -n "$app" ] || return 0
+  for net in $(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$app"); do
+    for c in $(docker network inspect -f '{{range .Containers}}{{.Name}} {{end}}' "$net"); do
+      case "$(docker inspect -f '{{.Config.Image}}' "$c")" in
+        supabase/postgres*) [ "$found" = "$c" ] || found="$found${found:+ }$c" ;;
+      esac
+    done
+  done
+  echo "$found"
+}
+
+if [ -z "$SERVICE" ]; then
+  echo "deploy: no service in $FILE uses the morningtelos-web image. Not restarting the app." >&2
+  exit 1
+fi
+MIGRATE_ENV=()
 if [ -n "${MIGRATE_DATABASE_URL:-}" ]; then
-  if [ -z "$SERVICE" ]; then
-    echo "deploy: no service in $FILE uses the morningtelos-web image. Not restarting the app." >&2
-    exit 1
-  fi
-  echo "deploy: updating the database"
-  "${COMPOSE[@]}" run --rm --no-deps -e MIGRATE_DATABASE_URL "$SERVICE" node scripts/migrate.mjs
+  MIGRATE_ENV=(-e MIGRATE_DATABASE_URL)
 else
-  echo "deploy: MIGRATE_DATABASE_URL is empty in .env. Skipping database updates." >&2
+  DB=$(find_db)
+  if [ -n "$DB" ] && [ "${DB// /}" = "$DB" ]; then
+    PGHOST=$DB PGPORT=5432 PGUSER=postgres PGDATABASE=postgres
+    PGPASSWORD=$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$DB" | sed -n 's/^POSTGRES_PASSWORD=//p' | head -n 1)
+    export PGHOST PGPORT PGUSER PGDATABASE PGPASSWORD
+    [ -n "$PGPASSWORD" ] && MIGRATE_ENV=(-e PGHOST -e PGPORT -e PGUSER -e PGDATABASE -e PGPASSWORD)
+  fi
+fi
+if [ ${#MIGRATE_ENV[@]} -gt 0 ]; then
+  echo "deploy: updating the database"
+  "${COMPOSE[@]}" run --rm --no-deps "${MIGRATE_ENV[@]}" "$SERVICE" node scripts/migrate.mjs
+else
+  echo "deploy: couldn't find the app's database (no single supabase/postgres container on its network). Skipping database updates. Set MIGRATE_DATABASE_URL in .env to point at it." >&2
 fi
 echo "deploy: restarting what changed"
 "${COMPOSE[@]}" up -d

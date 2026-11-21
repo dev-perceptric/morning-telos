@@ -5,6 +5,8 @@
 //
 //   MIGRATE_DATABASE_URL=postgres://... node scripts/migrate.mjs            run what is missing
 //   MIGRATE_DATABASE_URL=postgres://... node scripts/migrate.mjs --dry-run  only list it
+// Without MIGRATE_DATABASE_URL it uses Postgres's own PGHOST, PGUSER, PGPASSWORD... (deploy-web.sh sets those after it
+// finds the Supabase database on the server).
 //
 // A database made before this script has no record yet. If it already has the schema (public.workspaces exists),
 // schema.sql counts as done and every numbered migration runs again. That is safe: each one only adds what is
@@ -73,12 +75,12 @@ export async function migrate(client, { dryRun = false, log = console.log } = {}
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const url = (process.env.MIGRATE_DATABASE_URL ?? "").trim();
-  if (!url) {
-    console.error("migrate: set MIGRATE_DATABASE_URL first.");
+  if (!url && !process.env.PGHOST) {
+    console.error("migrate: set MIGRATE_DATABASE_URL (or PGHOST, PGUSER and PGPASSWORD) first.");
     process.exit(1);
   }
   const dryRun = process.argv.includes("--dry-run");
-  const client = new pg.Client({ connectionString: url, connectionTimeoutMillis: 10000 });
+  const client = new pg.Client(url ? { connectionString: url, connectionTimeoutMillis: 10000 } : { connectionTimeoutMillis: 10000 });
   try {
     await client.connect();
     const ran = await migrate(client, { dryRun });
