@@ -1038,3 +1038,11 @@ test("replies never name the services behind the team", async () => {
   assert.equal(r.said.at(-1)!.content, "your SEO tools shows you in 23% of answers, and your social tools has 3 drafts.");
   for (const n of INTERNAL_NAMES) assert.ok(!JSON.stringify(r.events).includes(n), n);
 });
+
+test("systemPrompt gives Hora the owner's booking rules, and nobody else", () => {
+  const booking = { days: [1, 2, 3, 4, 5], start: "09:00", end: "17:00", length: 30, gap: 15 };
+  const hora = systemPrompt({ name: "B", website: null, timezone: "America/Chicago" }, "forms", { tools: true, missing: [], teammates: [], booking });
+  assert.match(hora, /Booking rules from the owner: book meetings Monday to Friday, 9:00 AM to 5:00 PM \(America\/Chicago time\)\. Meetings are 30 minutes, with 15 minutes between them\./);
+  assert.doesNotMatch(systemPrompt({ name: "B", website: null }, "sales", { tools: true, missing: [], teammates: [], booking }), /Booking rules/);
+  assert.doesNotMatch(systemPrompt({ name: "B", website: null }, "forms", { tools: true, missing: [], teammates: [] }), /Booking rules/);
+});

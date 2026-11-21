@@ -2,6 +2,7 @@
 // since agent replies and ai_usage are server only. Every read and write names the workspace, so a thread id from
 // another workspace finds nothing (CLAUDE.md: server code checks the workspace too).
 
+import { cleanBooking } from "./booking.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NewMessage, Pref, StoredMessage, TeamStore, TeamWorkspace, UsageRow } from "./agentLoop.ts";
 import { HISTORY } from "./agentLoop.ts";
@@ -23,7 +24,7 @@ const must = <T>(r: { data: T; error: { message: string } | null }): T => {
  * A brand that can't be read (021_brand.sql not run yet, a hiccup) only leaves the tone out.
  */
 export async function loadWorkspace(db: SupabaseClient, id: string): Promise<TeamWorkspace | null> {
-  const row = must(await db.from("workspaces").select("id, name, website, plan, status, trial_ends_at, period_start").eq("id", id).maybeSingle()) as TeamWorkspace | null;
+  const row = must(await db.from("workspaces").select("id, name, website, timezone, plan, status, trial_ends_at, period_start").eq("id", id).maybeSingle()) as TeamWorkspace | null;
   if (!row) return null;
   const brand = await db.from("brand_kits").select("tone, use_brand").eq("workspace_id", id).maybeSingle();
   return { ...row, tone: brand.error ? null : brandTone(brand.data as Pick<BrandRow, "tone" | "use_brand"> | null) };
@@ -68,7 +69,7 @@ export function teamStore(db: SupabaseClient, workspaceId: string): TeamStore {
       must(await db.from("messages").insert(m));
     },
     async prefs() {
-      const rows = must(await db.from("agent_prefs").select("agent, enabled, trust, model").eq("workspace_id", workspaceId)) as { agent: string; enabled: boolean; trust: number; model: string }[];
+      const rows = must(await db.from("agent_prefs").select("agent, enabled, trust, model, settings").eq("workspace_id", workspaceId)) as { agent: string; enabled: boolean; trust: number; model: string; settings: Record<string, unknown> | null }[];
       const out: Partial<Record<AgentKey, Partial<Pref>>> = {};
       for (const r of rows ?? []) {
         if (!isAgentKey(r.agent)) continue;
@@ -76,6 +77,7 @@ export function teamStore(db: SupabaseClient, workspaceId: string): TeamStore {
           enabled: r.enabled !== false,
           trust: r.trust === 1 || r.trust === 2 ? r.trust : 0,
           model: isModelChoice(r.model) ? r.model : "auto",
+          booking: r.settings?.booking ? cleanBooking(r.settings.booking) : null,
         };
       }
       return out;

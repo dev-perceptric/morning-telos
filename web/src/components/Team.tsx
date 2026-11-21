@@ -29,6 +29,7 @@ import { Icon } from "./icons";
 import { navigate } from "./nav";
 import { SocialPosts } from "./Posts";
 import { SeoVisibility } from "./Visibility";
+import { BookingRules, HoraMeetings } from "./Meetings";
 import type { Workspace } from "./Settings";
 import { SocialSettings, useSocialReconnect } from "./Social";
 import { Empty, ErrorText, PageHead, Section, Switch, to } from "./ui";
@@ -356,7 +357,7 @@ function TrustChips({
 
 type Tab = "ov" | "chat" | "set";
 /** Each teammate's work tab. The others keep their overview until their own tab is built. */
-const WORK_TAB: Partial<Record<AgentKey, string>> = { social: "Posts", seo: "Visibility" };
+const WORK_TAB: Partial<Record<AgentKey, string>> = { social: "Posts", seo: "Visibility", forms: "Calendar" };
 const WEEK = () => new Date(Date.now() - 7 * 864e5).toISOString();
 type ApRow = { id: number; title: string; tool: string; created_at: string };
 type ActRow = {
@@ -616,6 +617,10 @@ export function AgentPage({
         <div className="tp on">
           <SeoVisibility sb={sb} ws={ws} editor={editor} onAsk={() => onAsk(k)} onAskWeb={(text) => onAsk("web", text)} />
         </div>
+      ) : tab === "ov" && k === "forms" ? (
+        <div className="tp on">
+          <HoraMeetings sb={sb} ws={ws} editor={editor} onAsk={(text) => onAsk(k, text)} />
+        </div>
       ) : tab === "ov" ? (
         <div className="tp on">
           <div className="card kpis">
@@ -828,6 +833,7 @@ export function AgentPage({
               </Section>
             </div>
           </div>
+          {k === "forms" ? <BookingRules sb={sb} ws={ws} admin={admin} /> : null}
           {k === "social" ? (
             <section className="sec">
               <SocialSettings sb={sb} ws={ws} title="Accounts" inTeam />
