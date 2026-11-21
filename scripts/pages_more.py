@@ -4,7 +4,7 @@ Imported by build_service.py, which adds these to PAGES."""
 
 def make(ns):
     viz_resp, viz_chat, viz_data, viz_week = ns["viz_resp"], ns["viz_chat"], ns["viz_data"], ns["viz_week"]
-    VIZ_YOU, VIZ_TOOLS, CHECK, cut = ns["VIZ_YOU"], ns["VIZ_TOOLS"], ns["CHECK"], ns["cut"]
+    VIZ_YOU, VIZ_TOOLS, CHECK, cut, part = ns["VIZ_YOU"], ns["VIZ_TOOLS"], ns["CHECK"], ns["cut"], ns["part"]
     SIG_CSS = ns["SIG_CSS"]
 
     # ---------- signature: outbound pipeline board ----------
@@ -54,7 +54,7 @@ def make(ns):
   </section>
 
 '''
-    CRM_SIG = cut("  <!-- 6. DEMO -->", "  <!-- 7. ANCIENT -->").replace(
+    CRM_SIG = part("  <!-- 6. DEMO -->", "  <!-- 7. ANCIENT -->").replace(
         'Systems that run <span class="clay">while you sleep.</span>', 'Follow-up that <span class="clay">never forgets.</span>')
     import re
     CRM_SIG = re.sub(r'<p class="lead rv" style="--d:.16s">.*?</p>', '<p class="lead rv" style="--d:.16s">An example of CRM automation. A lead comes in at 2 AM, gets a reply, and lands in your pipeline with the next step booked.</p>', CRM_SIG, count=1, flags=re.S)
