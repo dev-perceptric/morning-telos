@@ -27,7 +27,9 @@ import { can } from "@/lib/workspace";
 import { Face, useSkillRows } from "./Chat";
 import { Icon } from "./icons";
 import { navigate } from "./nav";
+import { SocialPosts } from "./Posts";
 import type { Workspace } from "./Settings";
+import { SocialSettings, useSocialReconnect } from "./Social";
 import { Empty, ErrorText, PageHead, Section, Switch, to } from "./ui";
 
 export { Face } from "./Chat";
@@ -352,6 +354,8 @@ function TrustChips({
 // ─────────────── one teammate ───────────────
 
 type Tab = "ov" | "chat" | "set";
+/** Each teammate's work tab. The others keep their overview until their own tab is built. */
+const WORK_TAB: Partial<Record<AgentKey, string>> = { social: "Posts" };
 const WEEK = () => new Date(Date.now() - 7 * 864e5).toISOString();
 type ApRow = { id: number; title: string; tool: string; created_at: string };
 type ActRow = {
@@ -403,6 +407,37 @@ export function AgentPage({
   const [docs, setDocs] = useState<DocRow[] | null>(null);
   const st = team.status(k);
   const off = team.paused.has(k);
+  const [menu, setMenu] = useState(false);
+  const [waitingBy, setWaitingBy] = useState<Partial<Record<AgentKey, number>>>({});
+  const social = useSocialReconnect(sb, ws, { to: "settings" });
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: MouseEvent) => !(e.target as HTMLElement).closest(".ag-dd") && setMenu(false);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", key);
+    };
+  }, [menu]);
+  useEffect(() => {
+    let live = true;
+    sb.from("approvals")
+      .select("agent")
+      .eq("workspace_id", ws.id)
+      .eq("status", "pending")
+      .limit(500)
+      .then(({ data }) => {
+        if (!live) return;
+        const n: Partial<Record<AgentKey, number>> = {};
+        for (const r of (data ?? []) as { agent: string }[]) if (isAgentKey(r.agent)) n[r.agent] = (n[r.agent] ?? 0) + 1;
+        setWaitingBy(n);
+      });
+    return () => {
+      live = false;
+    };
+  }, [sb, ws.id, k]);
 
   const load = useCallback(() => {
     let live = true;
@@ -495,41 +530,43 @@ export function AgentPage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={agentPicture(k)} alt={`Marble statue of ${a.god}`} />
         <div className="tx">
-          <span className="eyebrow">{a.god}</span>
-          <h1>{a.name}</h1>
-          <p>{a.job}</p>
-          <div className="tools">
-            {a.soon ? <span className="toolc">Coming soon</span> : null}
-            {products.map((p) => (
-              <span key={p} className="toolc">
-                <i
-                  style={{
-                    background:
-                      team.services[p] === "ready"
-                        ? "var(--green)"
-                        : "var(--ink-4)",
+          <span className="eyebrow">{a.name}</span>
+          <div className="dd ag-dd">
+            <h1>
+              <button type="button" className="ag-switch" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>
+                {a.god}
+                <Icon name="down" />
+              </button>
+            </h1>
+            <div className={`dd-menu ag-menu${menu ? " on" : ""}`} role="menu" aria-label="Teammates">
+              {ORDER.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={t === k}
+                  onClick={() => {
+                    setMenu(false);
+                    setTab("ov");
+                    navigate(`/team/${t}`);
                   }}
-                />
-                {PRODUCT_BADGE[p].name}
-                {team.services[p] === "ready" ? "" : ", setting up"}
-              </span>
-            ))}
-            {toolkits.map((t) => (
-              <span key={t} className="toolc">
-                <i
-                  style={{
-                    background: team.connected.includes(t)
-                      ? "var(--green)"
-                      : "var(--ink-4)",
-                  }}
-                />
-                {appName(t)}
-              </span>
-            ))}
-            {a.apps.includes("*") ? (
-              <span className="toolc">Every connected service, read only</span>
-            ) : null}
+                >
+                  <Face agent={t} size={30} />
+                  <span>
+                    <b>{AGENTS[t].god}</b>
+                    <small>{AGENTS[t].name}</small>
+                  </span>
+                  {waitingBy[t] ? <span className="n">{waitingBy[t]} waiting</span> : null}
+                </button>
+              ))}
+            </div>
           </div>
+          <p>{a.job}</p>
+          {a.soon ? (
+            <div className="tools">
+              <span className="toolc">Coming soon</span>
+            </div>
+          ) : null}
         </div>
         <div className="ag-side">
           <div className="onoff">
@@ -553,7 +590,7 @@ export function AgentPage({
       <div className="tabs" role="tablist">
         {(
           [
-            ["ov", "Overview"],
+            ["ov", WORK_TAB[k] ?? "Overview"],
             ["chat", "Chats"],
             ["set", "Settings"],
           ] as const
@@ -570,7 +607,11 @@ export function AgentPage({
         ))}
       </div>
 
-      {tab === "ov" ? (
+      {tab === "ov" && k === "social" ? (
+        <div className="tp on">
+          <SocialPosts sb={sb} ws={ws} editor={editor} onAsk={() => onAsk(k)} onReconnect={(n) => (social.admin ? void social.reconnect(n) : setTab("set"))} />
+        </div>
+      ) : tab === "ov" ? (
         <div className="tp on">
           <div className="card kpis">
             <Kpi label="Replies" value={stats?.replies} note="Last 7 days" />
@@ -782,6 +823,48 @@ export function AgentPage({
               </Section>
             </div>
           </div>
+          {k === "social" ? (
+            <section className="sec">
+              <SocialSettings sb={sb} ws={ws} title="Accounts" inTeam />
+            </section>
+          ) : products.length || toolkits.length ? (
+            <Section
+              title="Apps"
+              more={
+                <a
+                  href={to("/settings/apps")}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/settings/apps");
+                  }}
+                >
+                  Manage apps
+                </a>
+              }
+            >
+              <div className="card list">
+                {products.map((p) => (
+                  <div key={p} className="row">
+                    <span className="main">
+                      <b>{PRODUCT_BADGE[p].name}</b>
+                      <small>Set up for you</small>
+                    </span>
+                    {team.services[p] === "ready" ? <span className="pillst ok">Working</span> : <span className="pillst off">Setting up</span>}
+                  </div>
+                ))}
+                {toolkits.map((t) => (
+                  <div key={t} className="row">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={appLogo(t)} alt="" width={32} height={32} className="lg-img" />
+                    <span className="main">
+                      <b>{appName(t)}</b>
+                    </span>
+                    {team.connected.includes(t) ? <span className="pillst ok">Connected</span> : <span className="pillst off">Not connected</span>}
+                  </div>
+                ))}
+              </div>
+            </Section>
+          ) : null}
           <Section
             title="Skills"
             num={skills.length || undefined}

@@ -1,7 +1,7 @@
 // The partner API client (src/lib/partner.ts) against a fake fetch. Nothing reaches Arrowsterr or Capybaroar.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { integrationConnectFor, isRetryable, partnerClient, partnerFor, socialConnectClient, socialConnectFor } from "../src/lib/partner.ts";
+import { channelGone, integrationConnectFor, isRetryable, partnerClient, partnerFor, socialConnectClient, socialConnectFor } from "../src/lib/partner.ts";
 
 type Call = { url: string; method: string; headers: Headers; body: unknown };
 
@@ -140,6 +140,25 @@ test("removeBrand deletes the brand, and a 404 comes back typed", async () => {
   assert.deepEqual(await api.removeBrand("b1"), { ok: true, status: 204, data: null });
   assert.deepEqual([calls[0].method, calls[0].url], ["DELETE", "https://aw.test/api/partner/brands/b1"]);
   assert.deepEqual(await api.removeBrand("gone"), { ok: false, status: 404, code: "not_found", message: "No such brand.", retryable: false });
+});
+
+test("disconnectChannel deletes one channel from the brand; only Capybaroar's own 'channel not found' counts as gone", async () => {
+  const { f, calls } = fakeFetch((c) => {
+    if (c.url.endsWith("/brands/b1/channels/c%201")) return new Response(null, { status: 204 });
+    if (c.url.endsWith("/brands/b1/channels/old")) return json(404, { error: { code: "not_found", message: "Channel not found" } });
+    if (c.url.includes("/brands/gone/")) return json(404, { error: { code: "not_found", message: "Brand not found" } });
+    return new Response("<html>404</html>", { status: 404 });
+  });
+  const api = partnerClient({ product: "capybaroar", url: "https://cb.test", key: "k", fetch: f });
+  assert.deepEqual(await api.disconnectChannel("b1", "c 1"), { ok: true, status: 204, data: null });
+  assert.deepEqual([calls[0].method, calls[0].url], ["DELETE", "https://cb.test/api/partner/brands/b1/channels/c%201"]);
+  const old = await api.disconnectChannel("b1", "old");
+  assert.equal(!old.ok && channelGone(old), true);
+  const brand = await api.disconnectChannel("gone", "c");
+  assert.equal(!brand.ok && channelGone(brand), false);
+  const noRoute = await api.disconnectChannel("b1", "x");
+  assert.equal(!noRoute.ok && noRoute.code, "http_404");
+  assert.equal(!noRoute.ok && channelGone(noRoute), false);
 });
 
 // ─────────────── connecting on our own page ───────────────

@@ -728,6 +728,22 @@ test("social_channels: members read their own workspace's channels, never anothe
   assert.equal((await db.query("select count(*)::int n from social_channels where workspace_id = $1", [xws])).rows[0].n, 0);
 });
 
+test("save_social_channel: a lost event for an account we removed doesn't bring it back", async (t) => {
+  if (!db) return t.skip("no test database");
+  const o = await signUp("soc4@example.com", { business: "Soc4 Co" });
+  const ws = await wsOf(o);
+  const save = async (ch: string, status: string, at: string) => (await db!.query("select save_social_channel($1, $2, 'linkedin', 'Soc4', $3, $4::timestamptz) ok", [ws, ch, status, at])).rows[0].ok as boolean;
+  const rows = async () => (await db!.query("select channel_id, status from social_channels where workspace_id = $1 order by channel_id", [ws])).rows;
+  // Disconnected from Settings: the row is gone, and Capybaroar's channel.lost that follows is skipped.
+  assert.equal(await save("gone", "lost", "2027-02-01T08:00:00Z"), false);
+  assert.deepEqual(await rows(), []);
+  // A known channel still turns lost, and a new one still connects.
+  assert.equal(await save("ch1", "connected", "2027-02-01T08:00:00Z"), true);
+  assert.equal(await save("ch1", "lost", "2027-02-02T08:00:00Z"), true);
+  assert.equal(await save("gone", "connected", "2027-02-03T08:00:00Z"), true);
+  assert.deepEqual(await rows(), [{ channel_id: "ch1", status: "lost" }, { channel_id: "gone", status: "connected" }]);
+});
+
 test("save_social_channel: an older event never replaces a newer one, and only known values are saved", async (t) => {
   if (!db) return t.skip("no test database");
   const o = await signUp("soc3@example.com", { business: "Soc3 Co" });

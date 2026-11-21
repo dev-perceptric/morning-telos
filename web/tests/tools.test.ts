@@ -10,7 +10,7 @@ import type { NewApproval } from "../src/lib/approvals.ts";
 import { knowledgeTool, knowledgeToolSource } from "../src/lib/knowledgeTools.ts";
 import { mcpClient } from "../src/lib/mcpClient.ts";
 import type { Product } from "../src/lib/partner.ts";
-import { MCP_DEFAULTS, mcpUrls, missingReason, productsFor, productToolSource, runApproval, toolName, type ActivityRow, type ProductToolDeps, type ServiceRow } from "../src/lib/productTools.ts";
+import { MCP_DEFAULTS, mcpUrls, missingReason, productsFor, productToolSource, productWrite, runApproval, toolName, type ActivityRow, type ProductToolDeps, type ServiceRow } from "../src/lib/productTools.ts";
 import { openWith, sealWith, type Keyring } from "../src/lib/sealing.ts";
 import { clipResult, composeTools, MAX_TOOL_RESULT, staticSource } from "../src/lib/toolRegistry.ts";
 import { AGENTS, type AgentKey } from "../src/lib/team.ts";
@@ -286,6 +286,25 @@ test("runApproval: a product error is a failed result; a call that can't be made
   assert.deepEqual(await runApproval(approved(), errDeps), { ok: false, text: "Channel c9 isn't in this workspace." });
   const throwing = { ...s.deps, mcp: { ...s.deps.mcp, callTool: async () => Promise.reject(new Error("timeout")) } };
   assert.deepEqual(await runApproval(approved(), throwing), { ok: false, text: "We couldn't reach this service right now. Try again in a few minutes." });
+});
+
+// ─────────────── changes a person makes on a screen ───────────────
+
+test("productWrite runs a person's calendar change with the brand key, and only the calendar's tools", async () => {
+  const s = setup();
+  assert.deepEqual(await productWrite(WS.id, "capybaroar", "create_posts", { posts: [{ text: "Hi" }] }, s.deps), { ok: true, text: 'create_posts ran with {"posts":[{"text":"Hi"}]}' });
+  const call = s.srv.calls.find((c) => c.method === "tools/call")!;
+  assert.equal(call.key, CB_KEY);
+  // Not a calendar change, or a hidden tool: refused before anything is called.
+  for (const tool of ["create_webhook", "generate_media", "get_credits"]) assert.deepEqual(await productWrite(WS.id, "capybaroar", tool, {}, s.deps), { ok: false, text: "This change isn't allowed." });
+  assert.deepEqual(await productWrite(WS.id, "arrowsterr", "create_posts", {}, s.deps), { ok: false, text: "This change isn't allowed." });
+  // Allowed, but this Capybaroar doesn't have it.
+  assert.deepEqual(await productWrite(WS.id, "capybaroar", "delete_post", { id: "p1" }, s.deps), { ok: false, text: "This action isn't available any more." });
+  const none = setup({ services: { capybaroar: null } });
+  assert.deepEqual(await productWrite(WS.id, "capybaroar", "create_posts", {}, none.deps), { ok: false, text: "This service isn't set up for your business yet." });
+  const throwing = { ...s.deps, mcp: { ...s.deps.mcp, callTool: async () => Promise.reject(new Error("timeout")) } };
+  assert.deepEqual(await productWrite(WS.id, "capybaroar", "create_posts", {}, throwing), { ok: false, text: "We couldn't reach this service right now. Try again in a few minutes." });
+  assert.equal(s.srv.calls.filter((c) => c.method === "tools/call").length, 1, "only the first one ran");
 });
 
 // ─────────────── search_knowledge and settings ───────────────
