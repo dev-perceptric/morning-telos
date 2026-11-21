@@ -20,10 +20,19 @@ def cut(a, b):
 
 
 HEAD = H[:H.index("<main")]
-LOGOS = cut("  <!-- LOGOS -->", "  <!-- 2. TELOS -->")
-HOW = cut("  <!-- 5. HOW -->", "  <!-- 6. DEMO -->")
-RIBBONS = cut("  <!-- RIBBONS -->", "  <!-- 8. FAQ -->")
-FINAL = cut("  <!-- 9. FINAL -->", "</main>")
+# Tool logos, steps, lead demo, ribbons and final call to action come from scripts/shared_parts.html, so homepage copy changes don't change these pages.
+P = (pathlib.Path(__file__).resolve().parent / "shared_parts.html").read_text()
+
+
+def part(a, b):
+    i = P.index(a)
+    return P[i:P.index(b, i)] if b else P[i:]
+
+
+LOGOS = part("  <!-- LOGOS -->", "  <!-- 5. HOW -->")
+HOW = part("  <!-- 5. HOW -->", "  <!-- 6. DEMO -->")
+RIBBONS = part("  <!-- RIBBONS -->", "  <!-- 9. FINAL -->")
+FINAL = part("  <!-- 9. FINAL -->", None)
 FOOTER = H[H.index("</main>"):]
 AVS = re.search(r'<div class="avs".*?</div>', H, re.S).group(0)
 VIZ_YOU = re.search(r'<div class="viz viz-you".*?</svg>\s*</div>', H, re.S).group(0)
