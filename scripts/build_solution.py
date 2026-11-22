@@ -86,7 +86,7 @@ def G(icon):
 SOL_CSS = B.SIG_CSS + '''
   .ba-sec { padding: 40px 0 120px; }
   .ba-sec .head { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: end; margin-bottom: 36px; }
-  .ba { border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 40px 80px -50px rgba(20,20,19,.5); padding: 22px 26px 26px; background: var(--ivory-3); transition: background .6s; }
+  .ba { border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 40px 80px -50px rgba(46,41,38,.5); padding: 22px 26px 26px; background: var(--ivory-3); transition: background .6s; }
   .ba[data-s="after"] { background: var(--white); }
   .ba-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
   .ba-tog { position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; padding: 4px; border-radius: 99px; background: var(--white); border: 1px solid var(--line-2); }
@@ -109,12 +109,12 @@ SOL_CSS = B.SIG_CSS + '''
   .ba[data-s="after"] .ba-l.before li { opacity: 0; transform: translateY(-10px); pointer-events: none; }
   .ba time { font-family: var(--mono); font-size: 12px; color: var(--ink-4); }
   .ba em { font-style: normal; font-family: var(--mono); font-size: 11px; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
-  .ba em.m { background: rgba(20,20,19,.07); color: var(--ink-3); }
+  .ba em.m { background: rgba(46,41,38,.07); color: var(--ink-3); }
   .ba em.a { background: rgba(95,163,106,.14); color: #3f7d4a; }
   .ba em.f { background: var(--clay); color: #fff; }
   .flow-body { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 0; min-height: 380px; }
   .flow-msg { padding: 24px; border-right: 1px solid var(--line); background: var(--ivory); }
-  .flow-msg small, .flow-steps::before { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 12px; }
+  .flow-msg small, .flow-steps::before { display: block; font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 12px; }
   .bubble { background: var(--white); border: 1px solid var(--line); border-radius: 16px 16px 16px 4px; padding: 14px 16px; opacity: 0; transform: translateY(12px) scale(.96); transition: opacity .5s .2s, transform .6s cubic-bezier(.3,1.5,.5,1) .2s; }
   .flow.in .bubble { opacity: 1; transform: none; }
   .bubble b { display: block; font-size: 14px; } .bubble p { font-size: 15px; margin: 6px 0 8px; color: var(--ink-2); } .bubble time { font-family: var(--mono); font-size: 11px; color: var(--ink-4); }
@@ -129,7 +129,7 @@ SOL_CSS = B.SIG_CSS + '''
   .flow.in .flow-out { opacity: 1; transform: none; }
   .flow-out .ck { width: 48px; height: 48px; border-radius: 14px; background: var(--clay); display: grid; place-items: center; box-shadow: 0 14px 30px -12px rgba(217,119,87,.9); }
   .flow-out .ck svg { width: 22px; height: 22px; stroke: #fff; fill: none; stroke-width: 2.5; }
-  .flow-out b { font-family: var(--serif); font-weight: 400; font-size: 30px; line-height: 1.1; } .flow-out small { font-size: 14px; color: var(--ink-3); }
+  .flow-out b { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.1; } .flow-out small { font-size: 14px; color: var(--ink-3); }
   @media (max-width: 1000px) { .ba-sec .head { grid-template-columns: 1fr; gap: 18px; } .flow-body { grid-template-columns: 1fr; } .flow-msg, .flow-steps { border-right: 0; border-bottom: 1px solid var(--line); } }
   @media (max-width: 640px) { .ba { padding: 16px 12px 18px; } .ba-l li { grid-template-columns: 50px 1fr; font-size: 14px; padding: 10px 12px; } .ba em { display: none; } .ba-note { display: none; } .ba-sec { padding-bottom: 80px; } }
 '''

@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 20'%3E%3Cg fill='%23D97757'%3E%3Crect x='8' y='0' width='12' height='4'/%3E%3Crect x='4' y='4' width='20' height='4'/%3E%3Crect x='0' y='8' width='28' height='4'/%3E%3Crect x='0' y='16' width='28' height='4'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
 <link rel="canonical" href="https://morningtelos.com/ai-employees/ai-sales-rep/">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is an AI sales rep?", "acceptedAnswer": {"@type": "Answer", "text": "An AI teammate that answers new leads, books calls, follows up on quotes and keeps your CRM up to date. Midas does all of that for small businesses."}}, {"@type": "Question", "name": "Will Midas send emails without asking me?", "acceptedAnswer": {"@type": "Answer", "text": "No. Every email waits for your OK. Later, if you want, you can move him to autopilot so he sends on his own."}}, {"@type": "Question", "name": "What does he connect to?", "acceptedAnswer": {"@type": "Answer", "text": "Gmail or Outlook for email, Google Calendar or Calendly for calls, and HubSpot, Pipedrive or Salesforce for your CRM."}}, {"@type": "Question", "name": "I don't have a CRM. Is that OK?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Midas keeps a Leads tab with every lead, the next step and the date. For many small businesses, that is all the CRM they need."}}, {"@type": "Question", "name": "Will he make up prices or promises?", "acceptedAnswer": {"@type": "Answer", "text": "No. He quotes only prices you gave him or that are in the deal. He never invents a discount, a date or a promise."}}, {"@type": "Question", "name": "Will it sound like a robot?", "acceptedAnswer": {"@type": "Answer", "text": "He writes in your voice, using your past emails and the notes you give him. You can edit any draft before it goes out."}}]}</script>
@@ -22,12 +22,12 @@
   .pcard { border: 1px solid var(--line); border-radius: 16px; background: var(--white); padding: 24px; }
   .pcard .top { display: flex; gap: 14px; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
   .pcard img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); flex: none; }
-  .pcard h3 { font-family: var(--serif); font-weight: 400; font-size: 25px; line-height: 1.15; }
-  .pcard .role { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--clay); }
+  .pcard h3 { font-family: var(--serif); font-weight: 500; font-size: 25px; line-height: 1.15; }
+  .pcard .role { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); }
   .pcard dl { display: grid; gap: 16px; }
-  .pcard dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
+  .pcard dt { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
   .pcard dd { font-size: 15px; line-height: 1.5; color: var(--ink-2); }
-  .pcard .quote { font-family: var(--serif); font-size: 21px; font-style: italic; color: var(--ink); }
+  .pcard .quote { font-family: var(--serif); font-weight: 500; font-size: 21px; font-style: italic; color: var(--ink); }
   .pcard .tools { display: flex; flex-wrap: wrap; gap: 6px; }
   .pcard .tools span { font-size: 12.5px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; background: var(--ivory); }
   .chat-body { padding: 24px; display: grid; gap: 16px; min-height: 400px; align-content: start; background: var(--ivory); }
@@ -38,9 +38,9 @@
   .msg small { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--ink-2); }
   .msg .b { display: inline-block; max-width: 540px; padding: 11px 15px; border-radius: 14px; font-size: 14.5px; line-height: 1.5; background: var(--white); border: 1px solid var(--line); }
   .msg.you .b { background: var(--ink); color: var(--ivory); border-color: var(--ink); }
-  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(20,20,19,.4); }
+  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(46,41,38,.4); }
   .aphead { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
-  .aphead .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
+  .aphead .tag { font-family: var(--sans); font-weight: 600; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
   .apbody { padding: 12px 14px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
   .apbtns { display: flex; gap: 8px; padding: 0 14px 14px; flex-wrap: wrap; }
   .apbtns span { font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); }
@@ -82,12 +82,12 @@
           <span class="w"><span style="--d:0.05s">Midas</span></span> <span class="w"><span style="--d:0.13s">turns</span></span> <span class="w"><span style="--d:0.21s">leads</span></span> <br>
           <span class="w"><span style="--d:0.29s" class="clay">into</span></span> <span class="w"><span style="--d:0.37s" class="clay">gold.</span></span>
         </h1>
-        <p class="lead rv" style="--d:.55s">Midas is your AI sales rep. He replies to new leads fast, books the call, follows up every quote and keeps your CRM current. Nothing goes out until you approve it.</p>
+        <p class="lead rv" style="--d:.55s">Midas is your AI sales rep. He answers new leads in minutes, books the call and follows up on every quote, so no deal dies in your inbox. Nothing goes out until you approve it.</p>
         <div class="hero-ctas rv" style="--d:.7s">
           <a class="btn btn-dark btn-lg mag" href="https://chat.morningtelos.com/#signup">Start free trial <span class="arr">→</span></a>
           <a class="btn btn-ghost btn-lg" href="#demo">See Midas work</a>
         </div>
-        <div class="hero-proof rv" style="--d:.85s"><div class="avs" aria-hidden="true"><img src="/img/av1.webp" alt="" width="40" height="40" style="--i:0"><img src="/img/av4.webp" alt="" width="40" height="40" style="--i:1"><img src="/img/av3.webp" alt="" width="40" height="40" style="--i:2"><img src="/img/av6.webp" alt="" width="40" height="40" style="--i:3"><img src="/img/av2.webp" alt="" width="40" height="40" style="--i:4"><img src="/img/av5.webp" alt="" width="40" height="40" style="--i:5"></div><p><b>For founders, operators and decision makers.</b><br>Start free. Approve everything before it goes out.</p></div>
+        <div class="hero-proof rv" style="--d:.85s"><div class="avs" aria-hidden="true"><img src="/img/av1.webp" alt="" width="40" height="40" style="--i:0"><img src="/img/av4.webp" alt="" width="40" height="40" style="--i:1"><img src="/img/av3.webp" alt="" width="40" height="40" style="--i:2"><img src="/img/av6.webp" alt="" width="40" height="40" style="--i:3"><img src="/img/av2.webp" alt="" width="40" height="40" style="--i:4"><img src="/img/av5.webp" alt="" width="40" height="40" style="--i:5"></div><p><b>Built for owners who wear every hat.</b><br>14 days free. You approve everything before it goes out.</p></div>
       </div>
       <div class="stage" id="stage">
         <div class="sun"></div>
@@ -109,7 +109,7 @@
     <div class="wrap stall-grid">
       <div class="stall-side">
         <h2 class="big rv">Leads go cold <span class="clay">while you work.</span></h2>
-        <p class="lead rv" style="--d:.1s">You're on a job or with a client. By the time you reply, the lead has already called someone else.</p>
+        <p class="lead rv" style="--d:.1s">You're on a job, with a client or finally at dinner. By the time you reply, the lead has already hired someone else.</p>
         <div class="strain rv" style="--d:.2s" data-levels="22,46,70,92" aria-hidden="true">
           <div class="strain-top"><span>Leads going cold</span><b id="strainNum">0%</b></div>
           <div class="strain-bar"><i id="strainBar"></i></div>
@@ -120,22 +120,22 @@
         <span class="stall-fill" aria-hidden="true"></span>
         <li class="sitem">
           <div class="s-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-          <div class="s-body"><span class="s-n">01</span><h3>Slow replies lose the job</h3><p>Most people hire whoever answers first. A reply tomorrow is often too late.</p>
+          <div class="s-body"><span class="s-n">01</span><h3>The first to reply wins</h3><p>Most people hire whoever gets back to them first. A reply tomorrow is often a reply to nobody.</p>
             <div class="viz viz-resp" aria-hidden="true"><div class="row slow"><span>Reply tomorrow</span><span class="rtrack"><i></i></span><b>18 h</b></div><div class="row fast"><span>Midas drafts</span><span class="rtrack"><i></i></span><b>minutes</b></div><div class="lost">Fast replies win more jobs.</div></div></div>
         </li>
         <li class="sitem">
           <div class="s-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9h-4a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4H9M12 6v2M12 16v2"/></svg></div>
-          <div class="s-body"><span class="s-n">02</span><h3>Quotes sent, then silence</h3><p>You send a price and never hear back. Nobody follows up, so the deal fades.</p>
+          <div class="s-body"><span class="s-n">02</span><h3>Quotes vanish into silence</h3><p>You send a price and hear nothing back. Nobody follows up, so the deal fades away.</p>
             <div class="viz viz-chat" aria-hidden="true"><span class="bub">Quote sent: $4,200</span><span class="bub">No reply</span><span class="bub">Still no reply</span><span class="bub">They went with someone else</span><span class="cnt">0 follow-ups sent</span></div></div>
         </li>
         <li class="sitem">
           <div class="s-icon"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div>
-          <div class="s-body"><span class="s-n">03</span><h3>The CRM is out of date</h3><p>Notes live in your head and your inbox. The pipeline never matches reality.</p>
+          <div class="s-body"><span class="s-n">03</span><h3>Your CRM is a guess</h3><p>Notes live in your head and your inbox. The pipeline never matches what's really going on.</p>
             <div class="viz viz-data" aria-hidden="true"><div class="dts"><div class="dt"><span class="tile">Gmail</span><span class="lane"><i style="--dl:0s;--du:3.2s"></i></span></div><div class="dt"><span class="tile">Calls</span><span class="lane"><i style="--dl:0.8s;--du:4.1s"></i></span></div><div class="dt"><span class="tile">Calendar</span><span class="lane"><i style="--dl:1.6s;--du:3.6s"></i></span></div><div class="dt"><span class="tile">Notes</span><span class="lane"><i style="--dl:0.4s;--du:4.6s"></i></span></div><div class="dt"><span class="tile">Forms</span><span class="lane"><i style="--dl:1.2s;--du:3.9s"></i></span></div></div><div class="decide"><svg viewBox="0 0 40 40"><rect x="7" y="9" width="26" height="22" rx="3"/><path d="M7 16h26M14 16v15"/></svg><span>Your CRM</span></div></div></div>
         </li>
         <li class="sitem">
           <div class="s-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
-          <div class="s-body"><span class="s-n">04</span><h3>You are the whole sales team</h3><p>Every reply, quote and follow-up waits for you to find time.</p>
+          <div class="s-body"><span class="s-n">04</span><h3>You are the whole sales team</h3><p>Every reply and follow-up waits until you find a spare minute. Spare minutes are rare.</p>
             <div class="viz viz-you" aria-hidden="true">
               <svg viewBox="0 0 280 120">
                 <g class="spokes"><path id="sp1" d="M30 20 L140 60"/><path id="sp2" d="M30 100 L140 60"/><path id="sp3" d="M250 20 L140 60"/><path id="sp4" d="M250 100 L140 60"/><path id="sp5" d="M140 6 L140 60"/><path id="sp6" d="M140 114 L140 60"/></g>
@@ -153,7 +153,7 @@
     <div class="wrap">
       <div class="head">
         <h2 class="big rv">What Midas <span class="clay">does.</span></h2>
-        <p class="lead rv" style="--d:.1s">He works every lead from first message to signed deal, in your voice.</p>
+        <p class="lead rv" style="--d:.1s">He works every lead from the first hello to the signed deal, in your voice.</p>
       </div>
       <div class="sgrid"><div class="acard rv tilt" style="--d:0.00s"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div><h3>Replies to new leads</h3><p>He drafts a reply to every new lead within minutes, with your prices and your tone.</p><ul><li>Email</li><li>Web forms</li></ul></div><div class="acard rv tilt" style="--d:0.08s"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div><h3>Books the call</h3><p>He finds open times in your calendar and sends the invite once you approve.</p><ul><li>Google Calendar</li><li>Calendly</li></ul></div><div class="acard rv tilt" style="--d:0.16s"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></div><h3>Follows up every quote</h3><p>Day 3, day 7, day 14. No quote gets forgotten.</p><ul><li>Follow-ups</li><li>Reminders</li></ul></div><div class="acard rv tilt" style="--d:0.24s"><div class="ic"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div><h3>Keeps your CRM current</h3><p>He adds new leads and logs every email and next step.</p><ul><li>HubSpot</li><li>Pipedrive</li><li>Salesforce</li></ul></div><div class="acard rv tilt" style="--d:0.32s"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><h3>Tracks every lead</h3><p>His Leads tab shows each lead, the next step and the date. No CRM needed.</p><ul><li>Leads tab</li><li>Next steps</li></ul></div><div class="acard rv tilt" style="--d:0.40s"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Never makes things up</h3><p>He quotes only your real prices and never promises a discount you didn't approve.</p><ul><li>Your prices</li><li>Your rules</li></ul></div></div>
     </div>
@@ -197,10 +197,10 @@
     </div>
     <div class="steps" id="steps">
       <div class="track" aria-hidden="true"><i></i></div>
-      <div class="step rv" style="--d:0s"><div class="n">01</div>Hire<div class="free">Free trial</div><p>Start a free trial and meet Midas in chat.</p></div>
-      <div class="step rv" style="--d:.12s"><div class="n">02</div>Connect<p>Connect your email, your calendar and your CRM if you have one.</p></div>
-      <div class="step rv" style="--d:.24s"><div class="n">03</div>Approve<p>Approve his first replies and follow-ups with one tap.</p></div>
-      <div class="step rv" style="--d:.36s"><div class="n">04</div>Autopilot<p>Once you trust him, let him run on autopilot.</p></div>
+      <div class="step rv" style="--d:0s"><div class="n">01</div><h3>Hire</h3><div class="free">Free trial</div><p>Start a free trial and meet Midas in chat.</p></div>
+      <div class="step rv" style="--d:.12s"><div class="n">02</div><h3>Connect</h3><p>Connect your email, your calendar and your CRM if you have one.</p></div>
+      <div class="step rv" style="--d:.24s"><div class="n">03</div><h3>Approve</h3><p>Approve his first replies and follow-ups with one tap.</p></div>
+      <div class="step rv" style="--d:.36s"><div class="n">04</div><h3>Autopilot</h3><p>Once you trust him, let him run on autopilot.</p></div>
     </div>
     <div class="how-count" aria-hidden="true">STEP <b id="stepNow">01</b> / 04</div>
   </div></div></section>
@@ -211,7 +211,7 @@
         <h2 class="big rv">Meet the rest of <span class="clay">the team.</span></h2>
         <p class="roul-hint">Scroll to spin</p>
       </div>
-      <div class="roul-stage"><a class="roul-item" href="/ai-employees/ai-customer-support/" data-name="Irene the Peacemaker" data-role="The AI Customer Support" data-line="Keeps the peace in your inbox. She answers every customer kindly, in your voice, day or night." data-first="Irene"><img src="/img/team/irene.webp" alt="Irene the Peacemaker, AI Customer Support" width="900" height="926" loading="lazy" draggable="false"><span class="roul-cap"><b>Irene the Peacemaker</b><small>The AI Customer Support</small></span></a><a class="roul-item" href="/ai-employees/ai-scheduling-assistant/" data-name="Cleo the Timekeeper" data-role="The AI Scheduling Assistant" data-line="Master of the hours. She finds a time that works for everyone and books it for you." data-first="Cleo"><img src="/img/team/cleo.webp" alt="Cleo the Timekeeper, AI Scheduling Assistant" width="900" height="924" loading="lazy" draggable="false"><span class="roul-cap"><b>Cleo the Timekeeper</b><small>The AI Scheduling Assistant</small></span></a><a class="roul-item" href="/ai-employees/ai-email-marketing/" data-name="Cyrus the Messenger" data-role="The AI Email Marketer" data-line="Carries your news to every inbox. He writes your emails and sends them at the right moment." data-first="Cyrus"><img src="/img/team/cyrus.webp" alt="Cyrus the Messenger, AI Email Marketer" width="900" height="910" loading="lazy" draggable="false"><span class="roul-cap"><b>Cyrus the Messenger</b><small>The AI Email Marketer</small></span></a><a class="roul-item" href="/ai-employees/ai-social-media-manager/" data-name="Leo the Storyteller" data-role="The AI Social Media Manager" data-line="Tells your story every day. He plans your posts and writes captions people stop for." data-first="Leo"><img src="/img/team/leo.webp" alt="Leo the Storyteller, AI Social Media Manager" width="900" height="890" loading="lazy" draggable="false"><span class="roul-cap"><b>Leo the Storyteller</b><small>The AI Social Media Manager</small></span></a><a class="roul-item" href="/ai-employees/ai-seo-specialist/" data-name="Theseus the Librarian" data-role="The AI SEO Specialist" data-line="The diligent librarian. He writes and publishes articles on your site, so you show up on Google and in AI answers." data-first="Theseus"><img src="/img/team/theseus.webp" alt="Theseus the Librarian, AI SEO Specialist" width="900" height="912" loading="lazy" draggable="false"><span class="roul-cap"><b>Theseus the Librarian</b><small>The AI SEO Specialist</small></span></a><a class="roul-item" href="/ai-employees/ai-website-builder/" data-name="Archon the Builder" data-role="The AI Website Builder" data-line="Builds pages that sell. Name the page you need and he puts it live." data-first="Archon"><img src="/img/team/archon.webp" alt="Archon the Builder, AI Website Builder" width="900" height="900" loading="lazy" draggable="false"><span class="roul-cap"><b>Archon the Builder</b><small>The AI Website Builder</small></span></a><a class="roul-item" href="/ai-employees/ai-chief-of-staff/" data-name="Alexander the Emperor" data-role="The AI Chief of Staff" data-line="Sees the whole business at once. He plans your week and hands each job to the right teammate." data-first="Alexander"><img src="/img/team/alexander.webp" alt="Alexander the Emperor, AI Chief of Staff" width="900" height="974" loading="lazy" draggable="false"><span class="roul-cap"><b>Alexander the Emperor</b><small>The AI Chief of Staff</small></span></a><i class="roul-floor" aria-hidden="true"></i></div>
+      <div class="roul-stage"><a class="roul-item" href="/ai-employees/ai-customer-support/" data-name="Irene the Peacemaker" data-role="The AI Customer Support" data-line="Keeps the peace in your inbox. She answers every customer kindly, in your voice, day or night." data-first="Irene"><img src="/img/team/irene.webp" alt="Irene the Peacemaker, AI Customer Support" width="900" height="926" loading="lazy" draggable="false"><span class="roul-cap"><b>Irene the Peacemaker</b><small>The AI Customer Support</small></span></a><a class="roul-item" href="/ai-employees/ai-scheduling-assistant/" data-name="Cleo the Timekeeper" data-role="The AI Scheduling Assistant" data-line="Master of the hours. She finds a time that works for everyone and books it for you." data-first="Cleo"><img src="/img/team/cleo.webp" alt="Cleo the Timekeeper, AI Scheduling Assistant" width="900" height="924" loading="lazy" draggable="false"><span class="roul-cap"><b>Cleo the Timekeeper</b><small>The AI Scheduling Assistant</small></span></a><a class="roul-item" href="/ai-employees/ai-email-marketing/" data-name="Cyrus the Messenger" data-role="The AI Email Marketer" data-line="Carries your news to every inbox. He writes your emails and sends them at the right moment." data-first="Cyrus"><img src="/img/team/cyrus.webp" alt="Cyrus the Messenger, AI Email Marketer" width="900" height="910" loading="lazy" draggable="false"><span class="roul-cap"><b>Cyrus the Messenger</b><small>The AI Email Marketer</small></span></a><a class="roul-item" href="/ai-employees/ai-social-media-manager/" data-name="Leo the Storyteller" data-role="The AI Social Media Manager" data-line="Tells your story every day. He plans your posts and writes captions people stop for." data-first="Leo"><img src="/img/team/leo.webp" alt="Leo the Storyteller, AI Social Media Manager" width="900" height="890" loading="lazy" draggable="false"><span class="roul-cap"><b>Leo the Storyteller</b><small>The AI Social Media Manager</small></span></a><a class="roul-item" href="/ai-employees/ai-seo-specialist/" data-name="Theseus the Librarian" data-role="The AI SEO Specialist" data-line="The diligent librarian. He learns what your customers search for and maps the way to the top of Google and AI answers." data-first="Theseus"><img src="/img/team/theseus.webp" alt="Theseus the Librarian, AI SEO Specialist" width="900" height="912" loading="lazy" draggable="false"><span class="roul-cap"><b>Theseus the Librarian</b><small>The AI SEO Specialist</small></span></a><a class="roul-item" href="/ai-employees/ai-website-builder/" data-name="Archon the Builder" data-role="The AI Website Builder" data-line="Builds pages that sell. Name the page you need and he builds it on your site, ready for your OK." data-first="Archon"><img src="/img/team/archon.webp" alt="Archon the Builder, AI Website Builder" width="900" height="900" loading="lazy" draggable="false"><span class="roul-cap"><b>Archon the Builder</b><small>The AI Website Builder</small></span></a><a class="roul-item" href="/ai-employees/ai-chief-of-staff/" data-name="Alexander the Emperor" data-role="The AI Chief of Staff" data-line="Sees the whole business at once. He plans your week and hands each job to the right teammate." data-first="Alexander"><img src="/img/team/alexander.webp" alt="Alexander the Emperor, AI Chief of Staff" width="900" height="974" loading="lazy" draggable="false"><span class="roul-cap"><b>Alexander the Emperor</b><small>The AI Chief of Staff</small></span></a><i class="roul-floor" aria-hidden="true"></i></div>
       <div class="wrap roul-info">
         <button class="roul-btn" type="button" data-step="-1" aria-label="Previous teammate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
         <div class="roul-name" aria-live="polite"><b>Irene the Peacemaker</b><small>The AI Customer Support</small><p>Keeps the peace in your inbox. She answers every customer kindly, in your voice, day or night.</p><a href="/ai-employees/ai-customer-support/">Meet Irene &rarr;</a></div>
@@ -254,7 +254,7 @@
       <div class="final-glow"></div>
       <div class="final-copy">
         <h2 class="big">Set your telos <span class="clay">free.</span></h2>
-        <p>Forward Midas your last unanswered lead. See the reply he writes.</p>
+        <p>Forward Midas the last lead you didn't get to. See the reply he writes.</p>
         <div class="hero-ctas"><a class="btn btn-dark btn-lg mag" href="https://chat.morningtelos.com/#signup">Start free trial <span class="arr">→</span></a><a class="btn btn-ghost btn-lg" href="/#team">Meet the team</a></div>
       </div>
     </div>

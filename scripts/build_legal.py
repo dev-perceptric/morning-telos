@@ -17,9 +17,9 @@ FOOT = HOME[HOME.index("</main>"):]
 STYLE = """<style>
   .legal-page { padding: 56px 0 110px; }
   .legal-page .wrap { max-width: 760px; }
-  .legal-page h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 5vw, 60px); line-height: 1.05; letter-spacing: -.02em; margin: 12px 0 8px; }
+  .legal-page h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(40px, 5vw, 60px); line-height: 1.05; letter-spacing: -.02em; margin: 12px 0 8px; }
   .legal-page .upd { color: var(--ink-4); font-size: 14px; margin-bottom: 32px; }
-  .legal-page h2 { font-family: var(--serif); font-weight: 400; font-size: 28px; margin: 36px 0 10px; }
+  .legal-page h2 { font-family: var(--serif); font-weight: 500; font-size: 28px; margin: 36px 0 10px; }
   .legal-page p, .legal-page li { color: var(--ink-2); font-size: 17px; line-height: 1.65; }
   .legal-page p { margin: 0 0 14px; }
   .legal-page ul { margin: 0 0 14px 22px; display: grid; gap: 6px; }

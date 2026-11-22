@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 20'%3E%3Cg fill='%23D97757'%3E%3Crect x='8' y='0' width='12' height='4'/%3E%3Crect x='4' y='4' width='20' height='4'/%3E%3Crect x='0' y='8' width='28' height='4'/%3E%3Crect x='0' y='16' width='28' height='4'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
 <link rel="canonical" href="https://morningtelos.com/ai-employees/ai-customer-support/">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is an AI customer support agent?", "acceptedAnswer": {"@type": "Answer", "text": "An AI teammate that reads customer messages and writes answers from your own information. Irene does that and sends hard cases to you."}}, {"@type": "Question", "name": "Where does Irene get her answers?", "acceptedAnswer": {"@type": "Answer", "text": "From the Knowledge and Memory you give her, plus what the customer wrote. If the answer isn't there, she asks you."}}, {"@type": "Question", "name": "What does she connect to?", "acceptedAnswer": {"@type": "Answer", "text": "Gmail or Outlook for email, Zendesk or Help Scout for tickets, and Slack for your team."}}, {"@type": "Question", "name": "What happens with angry customers or refunds?", "acceptedAnswer": {"@type": "Answer", "text": "Irene hands refunds, legal questions and upset customers straight to you, with a summary so you can reply fast."}}, {"@type": "Question", "name": "Will she reply without my OK?", "acceptedAnswer": {"@type": "Answer", "text": "No. Every reply waits for your approval until you choose to put her on autopilot."}}, {"@type": "Question", "name": "Can she learn our policies?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Add your policies, prices and FAQs to Knowledge. She uses them for every answer and gets better as you correct her."}}]}</script>
@@ -22,12 +22,12 @@
   .pcard { border: 1px solid var(--line); border-radius: 16px; background: var(--white); padding: 24px; }
   .pcard .top { display: flex; gap: 14px; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
   .pcard img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); flex: none; }
-  .pcard h3 { font-family: var(--serif); font-weight: 400; font-size: 25px; line-height: 1.15; }
-  .pcard .role { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--clay); }
+  .pcard h3 { font-family: var(--serif); font-weight: 500; font-size: 25px; line-height: 1.15; }
+  .pcard .role { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); }
   .pcard dl { display: grid; gap: 16px; }
-  .pcard dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
+  .pcard dt { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
   .pcard dd { font-size: 15px; line-height: 1.5; color: var(--ink-2); }
-  .pcard .quote { font-family: var(--serif); font-size: 21px; font-style: italic; color: var(--ink); }
+  .pcard .quote { font-family: var(--serif); font-weight: 500; font-size: 21px; font-style: italic; color: var(--ink); }
   .pcard .tools { display: flex; flex-wrap: wrap; gap: 6px; }
   .pcard .tools span { font-size: 12.5px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; background: var(--ivory); }
   .chat-body { padding: 24px; display: grid; gap: 16px; min-height: 400px; align-content: start; background: var(--ivory); }
@@ -38,9 +38,9 @@
   .msg small { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--ink-2); }
   .msg .b { display: inline-block; max-width: 540px; padding: 11px 15px; border-radius: 14px; font-size: 14.5px; line-height: 1.5; background: var(--white); border: 1px solid var(--line); }
   .msg.you .b { background: var(--ink); color: var(--ivory); border-color: var(--ink); }
-  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(20,20,19,.4); }
+  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(46,41,38,.4); }
   .aphead { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
-  .aphead .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
+  .aphead .tag { font-family: var(--sans); font-weight: 600; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
   .apbody { padding: 12px 14px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
   .apbtns { display: flex; gap: 8px; padding: 0 14px 14px; flex-wrap: wrap; }
   .apbtns span { font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); }
@@ -80,12 +80,12 @@
           <span class="w"><span style="--d:0.05s">Irene</span></span> <span class="w"><span style="--d:0.13s">keeps</span></span> <span class="w"><span style="--d:0.21s">your</span></span> <br>
           <span class="w"><span style="--d:0.29s" class="clay">customers</span></span> <span class="w"><span style="--d:0.37s" class="clay">happy.</span></span>
         </h1>
-        <p class="lead rv" style="--d:.55s">Irene is your AI customer support agent. She answers customer emails from your own knowledge, turns repeat questions into an FAQ and hands refunds and upset customers to you.</p>
+        <p class="lead rv" style="--d:.55s">Irene is your AI customer support agent. She answers customer emails from your own policies, kindly and fast, and brings you only the ones that really need you.</p>
         <div class="hero-ctas rv" style="--d:.7s">
           <a class="btn btn-dark btn-lg mag" href="https://chat.morningtelos.com/#signup">Start free trial <span class="arr">→</span></a>
           <a class="btn btn-ghost btn-lg" href="#demo">See Irene work</a>
         </div>
-        <div class="hero-proof rv" style="--d:.85s"><div class="avs" aria-hidden="true"><img src="/img/av1.webp" alt="" width="40" height="40" style="--i:0"><img src="/img/av4.webp" alt="" width="40" height="40" style="--i:1"><img src="/img/av3.webp" alt="" width="40" height="40" style="--i:2"><img src="/img/av6.webp" alt="" width="40" height="40" style="--i:3"><img src="/img/av2.webp" alt="" width="40" height="40" style="--i:4"><img src="/img/av5.webp" alt="" width="40" height="40" style="--i:5"></div><p><b>For founders, operators and decision makers.</b><br>Start free. Approve everything before it goes out.</p></div>
+        <div class="hero-proof rv" style="--d:.85s"><div class="avs" aria-hidden="true"><img src="/img/av1.webp" alt="" width="40" height="40" style="--i:0"><img src="/img/av4.webp" alt="" width="40" height="40" style="--i:1"><img src="/img/av3.webp" alt="" width="40" height="40" style="--i:2"><img src="/img/av6.webp" alt="" width="40" height="40" style="--i:3"><img src="/img/av2.webp" alt="" width="40" height="40" style="--i:4"><img src="/img/av5.webp" alt="" width="40" height="40" style="--i:5"></div><p><b>Built for owners who wear every hat.</b><br>14 days free. You approve everything before it goes out.</p></div>
       </div>
       <div class="stage" id="stage">
         <div class="sun"></div>
@@ -107,7 +107,7 @@
     <div class="wrap stall-grid">
       <div class="stall-side">
         <h2 class="big rv">Support eats <span class="clay">your whole day.</span></h2>
-        <p class="lead rv" style="--d:.1s">The same questions arrive every day. Every answer pulls you away from the work that pays.</p>
+        <p class="lead rv" style="--d:.1s">The same questions show up every morning. Each answer is small. Together they eat the hours you meant for real work.</p>
         <div class="strain rv" style="--d:.2s" data-levels="28,50,72,93" aria-hidden="true">
           <div class="strain-top"><span>Inbox pressure</span><b id="strainNum">0%</b></div>
           <div class="strain-bar"><i id="strainBar"></i></div>
@@ -118,22 +118,22 @@
         <span class="stall-fill" aria-hidden="true"></span>
         <li class="sitem">
           <div class="s-icon"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4z"/><path d="M9 9h6M9 12h3"/></svg></div>
-          <div class="s-body"><span class="s-n">01</span><h3>Same questions, every day</h3><p>Hours, prices, where's my order. You type the same answers over and over.</p>
+          <div class="s-body"><span class="s-n">01</span><h3>The same five questions</h3><p>Hours, prices, where's my order. You type the same answers again and again.</p>
             <div class="viz viz-chat" aria-hidden="true"><span class="bub">What are your hours?</span><span class="bub">Do you take insurance?</span><span class="bub">Where is my order?</span><span class="bub">What are your hours?</span><span class="cnt">12 repeats this week</span></div></div>
         </li>
         <li class="sitem">
           <div class="s-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-          <div class="s-body"><span class="s-n">02</span><h3>Customers wait for replies</h3><p>A slow answer turns a simple question into a bad review.</p>
+          <div class="s-body"><span class="s-n">02</span><h3>Customers wait, then vent</h3><p>A slow reply turns a simple question into a one-star review.</p>
             <div class="viz viz-resp" aria-hidden="true"><div class="row slow"><span>Reply when free</span><span class="rtrack"><i></i></span><b>9 h</b></div><div class="row fast"><span>Irene drafts</span><span class="rtrack"><i></i></span><b>minutes</b></div><div class="lost">Waiting customers leave.</div></div></div>
         </li>
         <li class="sitem">
           <div class="s-icon"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg></div>
-          <div class="s-body"><span class="s-n">03</span><h3>Hard cases get lost</h3><p>An upset customer hides between twenty easy emails, and you find it too late.</p>
+          <div class="s-body"><span class="s-n">03</span><h3>The angry email gets buried</h3><p>An upset customer hides between twenty easy ones, and you find it a day too late.</p>
             <div class="viz viz-week" aria-hidden="true"><div><div class="col"><i style="--h:30%;--dl:0.00s"></i></div><div class="d">Mon</div></div><div><div class="col"><i style="--h:55%;--dl:0.12s"></i></div><div class="d">Tue</div></div><div><div class="col"><i style="--h:40%;--dl:0.24s"></i></div><div class="d">Wed</div></div><div><div class="col"><i style="--h:70%;--dl:0.36s"></i></div><div class="d">Thu</div></div><div><div class="col"><i style="--h:85%;--dl:0.48s"></i></div><div class="d">Fri</div></div><div class="tot">Example: unread emails by day.</div></div></div>
         </li>
         <li class="sitem">
           <div class="s-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
-          <div class="s-body"><span class="s-n">04</span><h3>Only you know the answers</h3><p>Your policies live in your head, so nobody else can help.</p>
+          <div class="s-body"><span class="s-n">04</span><h3>Only you know the answers</h3><p>Your policies live in your head, so nobody can step in when you're busy.</p>
             <div class="viz viz-you" aria-hidden="true">
               <svg viewBox="0 0 280 120">
                 <g class="spokes"><path id="sp1" d="M30 20 L140 60"/><path id="sp2" d="M30 100 L140 60"/><path id="sp3" d="M250 20 L140 60"/><path id="sp4" d="M250 100 L140 60"/><path id="sp5" d="M140 6 L140 60"/><path id="sp6" d="M140 114 L140 60"/></g>
@@ -195,10 +195,10 @@
     </div>
     <div class="steps" id="steps">
       <div class="track" aria-hidden="true"><i></i></div>
-      <div class="step rv" style="--d:0s"><div class="n">01</div>Hire<div class="free">Free trial</div><p>Start a free trial and meet Irene in chat.</p></div>
-      <div class="step rv" style="--d:.12s"><div class="n">02</div>Connect<p>Connect your inbox or help desk and add your policies.</p></div>
-      <div class="step rv" style="--d:.24s"><div class="n">03</div>Approve<p>Approve her first replies and correct anything she gets wrong.</p></div>
-      <div class="step rv" style="--d:.36s"><div class="n">04</div>Autopilot<p>Let her handle the easy ones on autopilot.</p></div>
+      <div class="step rv" style="--d:0s"><div class="n">01</div><h3>Hire</h3><div class="free">Free trial</div><p>Start a free trial and meet Irene in chat.</p></div>
+      <div class="step rv" style="--d:.12s"><div class="n">02</div><h3>Connect</h3><p>Connect your inbox or help desk and add your policies.</p></div>
+      <div class="step rv" style="--d:.24s"><div class="n">03</div><h3>Approve</h3><p>Approve her first replies and correct anything she gets wrong.</p></div>
+      <div class="step rv" style="--d:.36s"><div class="n">04</div><h3>Autopilot</h3><p>Let her handle the easy ones on autopilot.</p></div>
     </div>
     <div class="how-count" aria-hidden="true">STEP <b id="stepNow">01</b> / 04</div>
   </div></div></section>
@@ -209,7 +209,7 @@
         <h2 class="big rv">Meet the rest of <span class="clay">the team.</span></h2>
         <p class="roul-hint">Scroll to spin</p>
       </div>
-      <div class="roul-stage"><a class="roul-item" href="/ai-employees/ai-scheduling-assistant/" data-name="Cleo the Timekeeper" data-role="The AI Scheduling Assistant" data-line="Master of the hours. She finds a time that works for everyone and books it for you." data-first="Cleo"><img src="/img/team/cleo.webp" alt="Cleo the Timekeeper, AI Scheduling Assistant" width="900" height="924" loading="lazy" draggable="false"><span class="roul-cap"><b>Cleo the Timekeeper</b><small>The AI Scheduling Assistant</small></span></a><a class="roul-item" href="/ai-employees/ai-email-marketing/" data-name="Cyrus the Messenger" data-role="The AI Email Marketer" data-line="Carries your news to every inbox. He writes your emails and sends them at the right moment." data-first="Cyrus"><img src="/img/team/cyrus.webp" alt="Cyrus the Messenger, AI Email Marketer" width="900" height="910" loading="lazy" draggable="false"><span class="roul-cap"><b>Cyrus the Messenger</b><small>The AI Email Marketer</small></span></a><a class="roul-item" href="/ai-employees/ai-social-media-manager/" data-name="Leo the Storyteller" data-role="The AI Social Media Manager" data-line="Tells your story every day. He plans your posts and writes captions people stop for." data-first="Leo"><img src="/img/team/leo.webp" alt="Leo the Storyteller, AI Social Media Manager" width="900" height="890" loading="lazy" draggable="false"><span class="roul-cap"><b>Leo the Storyteller</b><small>The AI Social Media Manager</small></span></a><a class="roul-item" href="/ai-employees/ai-seo-specialist/" data-name="Theseus the Librarian" data-role="The AI SEO Specialist" data-line="The diligent librarian. He writes and publishes articles on your site, so you show up on Google and in AI answers." data-first="Theseus"><img src="/img/team/theseus.webp" alt="Theseus the Librarian, AI SEO Specialist" width="900" height="912" loading="lazy" draggable="false"><span class="roul-cap"><b>Theseus the Librarian</b><small>The AI SEO Specialist</small></span></a><a class="roul-item" href="/ai-employees/ai-website-builder/" data-name="Archon the Builder" data-role="The AI Website Builder" data-line="Builds pages that sell. Name the page you need and he puts it live." data-first="Archon"><img src="/img/team/archon.webp" alt="Archon the Builder, AI Website Builder" width="900" height="900" loading="lazy" draggable="false"><span class="roul-cap"><b>Archon the Builder</b><small>The AI Website Builder</small></span></a><a class="roul-item" href="/ai-employees/ai-chief-of-staff/" data-name="Alexander the Emperor" data-role="The AI Chief of Staff" data-line="Sees the whole business at once. He plans your week and hands each job to the right teammate." data-first="Alexander"><img src="/img/team/alexander.webp" alt="Alexander the Emperor, AI Chief of Staff" width="900" height="974" loading="lazy" draggable="false"><span class="roul-cap"><b>Alexander the Emperor</b><small>The AI Chief of Staff</small></span></a><a class="roul-item" href="/ai-employees/ai-sales-rep/" data-name="Midas the Merchant" data-role="The AI Sales Rep" data-line="Turns leads into gold. He replies in minutes and follows up until the call is booked." data-first="Midas"><img src="/img/team/midas.webp" alt="Midas the Merchant, AI Sales Rep" width="900" height="955" loading="lazy" draggable="false"><span class="roul-cap"><b>Midas the Merchant</b><small>The AI Sales Rep</small></span></a><i class="roul-floor" aria-hidden="true"></i></div>
+      <div class="roul-stage"><a class="roul-item" href="/ai-employees/ai-scheduling-assistant/" data-name="Cleo the Timekeeper" data-role="The AI Scheduling Assistant" data-line="Master of the hours. She finds a time that works for everyone and books it for you." data-first="Cleo"><img src="/img/team/cleo.webp" alt="Cleo the Timekeeper, AI Scheduling Assistant" width="900" height="924" loading="lazy" draggable="false"><span class="roul-cap"><b>Cleo the Timekeeper</b><small>The AI Scheduling Assistant</small></span></a><a class="roul-item" href="/ai-employees/ai-email-marketing/" data-name="Cyrus the Messenger" data-role="The AI Email Marketer" data-line="Carries your news to every inbox. He writes your emails and sends them at the right moment." data-first="Cyrus"><img src="/img/team/cyrus.webp" alt="Cyrus the Messenger, AI Email Marketer" width="900" height="910" loading="lazy" draggable="false"><span class="roul-cap"><b>Cyrus the Messenger</b><small>The AI Email Marketer</small></span></a><a class="roul-item" href="/ai-employees/ai-social-media-manager/" data-name="Leo the Storyteller" data-role="The AI Social Media Manager" data-line="Tells your story every day. He plans your posts and writes captions people stop for." data-first="Leo"><img src="/img/team/leo.webp" alt="Leo the Storyteller, AI Social Media Manager" width="900" height="890" loading="lazy" draggable="false"><span class="roul-cap"><b>Leo the Storyteller</b><small>The AI Social Media Manager</small></span></a><a class="roul-item" href="/ai-employees/ai-seo-specialist/" data-name="Theseus the Librarian" data-role="The AI SEO Specialist" data-line="The diligent librarian. He learns what your customers search for and maps the way to the top of Google and AI answers." data-first="Theseus"><img src="/img/team/theseus.webp" alt="Theseus the Librarian, AI SEO Specialist" width="900" height="912" loading="lazy" draggable="false"><span class="roul-cap"><b>Theseus the Librarian</b><small>The AI SEO Specialist</small></span></a><a class="roul-item" href="/ai-employees/ai-website-builder/" data-name="Archon the Builder" data-role="The AI Website Builder" data-line="Builds pages that sell. Name the page you need and he builds it on your site, ready for your OK." data-first="Archon"><img src="/img/team/archon.webp" alt="Archon the Builder, AI Website Builder" width="900" height="900" loading="lazy" draggable="false"><span class="roul-cap"><b>Archon the Builder</b><small>The AI Website Builder</small></span></a><a class="roul-item" href="/ai-employees/ai-chief-of-staff/" data-name="Alexander the Emperor" data-role="The AI Chief of Staff" data-line="Sees the whole business at once. He plans your week and hands each job to the right teammate." data-first="Alexander"><img src="/img/team/alexander.webp" alt="Alexander the Emperor, AI Chief of Staff" width="900" height="974" loading="lazy" draggable="false"><span class="roul-cap"><b>Alexander the Emperor</b><small>The AI Chief of Staff</small></span></a><a class="roul-item" href="/ai-employees/ai-sales-rep/" data-name="Midas the Merchant" data-role="The AI Sales Rep" data-line="Turns leads into gold. He replies in minutes and follows up until the call is on your calendar." data-first="Midas"><img src="/img/team/midas.webp" alt="Midas the Merchant, AI Sales Rep" width="900" height="955" loading="lazy" draggable="false"><span class="roul-cap"><b>Midas the Merchant</b><small>The AI Sales Rep</small></span></a><i class="roul-floor" aria-hidden="true"></i></div>
       <div class="wrap roul-info">
         <button class="roul-btn" type="button" data-step="-1" aria-label="Previous teammate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
         <div class="roul-name" aria-live="polite"><b>Cleo the Timekeeper</b><small>The AI Scheduling Assistant</small><p>Master of the hours. She finds a time that works for everyone and books it for you.</p><a href="/ai-employees/ai-scheduling-assistant/">Meet Cleo &rarr;</a></div>
@@ -252,7 +252,7 @@
       <div class="final-glow"></div>
       <div class="final-copy">
         <h2 class="big">Set your telos <span class="clay">free.</span></h2>
-        <p>Show Irene the question you answer most. See how she would reply.</p>
+        <p>Show Irene the question you answer most. See how she handles it.</p>
         <div class="hero-ctas"><a class="btn btn-dark btn-lg mag" href="https://chat.morningtelos.com/#signup">Start free trial <span class="arr">→</span></a><a class="btn btn-ghost btn-lg" href="/#team">Meet the team</a></div>
       </div>
     </div>

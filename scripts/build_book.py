@@ -28,7 +28,7 @@ extra = f'''<link rel="canonical" href="{BASE}/book/">
   .book {{ padding: 48px 0 110px; }}
   .book-grid {{ display: grid; grid-template-columns: 1fr 1.15fr; gap: 64px; align-items: start; }}
   .book-copy {{ position: sticky; top: 110px; }}
-  .book-copy h1 {{ font-family: var(--serif); font-weight: 400; font-size: clamp(42px, 5vw, 68px); line-height: 1.04; letter-spacing: -.02em; margin: 14px 0 18px; text-wrap: balance; }}
+  .book-copy h1 {{ font-family: var(--serif); font-weight: 500; font-size: clamp(42px, 5vw, 68px); line-height: 1.04; letter-spacing: -.02em; margin: 14px 0 18px; text-wrap: balance; }}
   .book-copy .lead {{ margin-bottom: 30px; }}
   .bk-steps {{ list-style: none; display: grid; gap: 14px; margin-bottom: 30px; }}
   .bk-steps li {{ display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: start; }}

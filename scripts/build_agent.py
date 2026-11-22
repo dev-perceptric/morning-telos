@@ -63,13 +63,13 @@ TEAM = [
 # One short line per teammate, shown under their name in the team wheel.
 LINES = dict(
     alexander="Sees the whole business at once. He plans your week and hands each job to the right teammate.",
-    midas="Turns leads into gold. He replies in minutes and follows up until the call is booked.",
+    midas="Turns leads into gold. He replies in minutes and follows up until the call is on your calendar.",
     irene="Keeps the peace in your inbox. She answers every customer kindly, in your voice, day or night.",
     cleo="Master of the hours. She finds a time that works for everyone and books it for you.",
     cyrus="Carries your news to every inbox. He writes your emails and sends them at the right moment.",
     leo="Tells your story every day. He plans your posts and writes captions people stop for.",
-    theseus="The diligent librarian. He writes and publishes articles on your site, so you show up on Google and in AI answers.",
-    archon="Builds pages that sell. Name the page you need and he puts it live.",
+    theseus="The diligent librarian. He learns what your customers search for and maps the way to the top of Google and AI answers.",
+    archon="Builds pages that sell. Name the page you need and he builds it on your site, ready for your OK.",
 )
 IMG_H = dict(alexander=974, midas=955, irene=926, cleo=924, cyrus=910, leo=890, theseus=912, archon=900)
 
@@ -161,12 +161,12 @@ CSS = '''
   .pcard { border: 1px solid var(--line); border-radius: 16px; background: var(--white); padding: 24px; }
   .pcard .top { display: flex; gap: 14px; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
   .pcard img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); flex: none; }
-  .pcard h3 { font-family: var(--serif); font-weight: 400; font-size: 25px; line-height: 1.15; }
-  .pcard .role { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--clay); }
+  .pcard h3 { font-family: var(--serif); font-weight: 500; font-size: 25px; line-height: 1.15; }
+  .pcard .role { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); }
   .pcard dl { display: grid; gap: 16px; }
-  .pcard dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
+  .pcard dt { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
   .pcard dd { font-size: 15px; line-height: 1.5; color: var(--ink-2); }
-  .pcard .quote { font-family: var(--serif); font-size: 21px; font-style: italic; color: var(--ink); }
+  .pcard .quote { font-family: var(--serif); font-weight: 500; font-size: 21px; font-style: italic; color: var(--ink); }
   .pcard .tools { display: flex; flex-wrap: wrap; gap: 6px; }
   .pcard .tools span { font-size: 12.5px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; background: var(--ivory); }
   .chat-body { padding: 24px; display: grid; gap: 16px; min-height: 400px; align-content: start; background: var(--ivory); }
@@ -177,9 +177,9 @@ CSS = '''
   .msg small { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--ink-2); }
   .msg .b { display: inline-block; max-width: 540px; padding: 11px 15px; border-radius: 14px; font-size: 14.5px; line-height: 1.5; background: var(--white); border: 1px solid var(--line); }
   .msg.you .b { background: var(--ink); color: var(--ivory); border-color: var(--ink); }
-  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(20,20,19,.4); }
+  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(46,41,38,.4); }
   .aphead { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
-  .aphead .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
+  .aphead .tag { font-family: var(--sans); font-weight: 600; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
   .apbody { padding: 12px 14px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
   .apbtns { display: flex; gap: 8px; padding: 0 14px 14px; flex-wrap: wrap; }
   .apbtns span { font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); }
@@ -196,23 +196,23 @@ AGENTS = [
         title="AI Chief of Staff for Small Business | Alexander | Morning Telos",
         desc="Meet Alexander, your AI chief of staff. He reads every tool you connect, answers questions with real numbers, plans your week and hands work to the right AI teammate.",
         h1=("Alexander runs", "your empire."), h1_label="Alexander, the AI chief of staff who runs your empire",
-        lead="Alexander is your AI chief of staff. He watches every tool you connect, answers questions with real numbers, plans your week with you and hands each task to the right teammate.",
+        lead="Alexander is your AI chief of staff. Ask him anything about the business and get a straight answer with real numbers. He plans your week and makes sure every job lands with the right teammate.",
         img_alt="Marble statue of Alexander the Emperor in a gold laurel wreath and sunglasses, holding a glowing orb of circuits",
         chips=[("Monday briefing", "sent"), ("Task handed to Midas", "follow up with Dana"), ("Revenue question", "answered"), ("Your week", "5 priorities set")],
-        stall_head='When everything runs <span class="clay">through you.</span>',
-        stall_lead="You are the only one who sees the whole business. So every question, every task and every decision waits on you.",
+        stall_head='Everything runs <span class="clay">through you.</span>',
+        stall_lead="You're the only one who sees the whole picture. So every question and every decision ends up on your desk at 9 PM.",
         meter=("Owner load", "30,52,74,94", ["Fine", "Stretched", "Burned out"]),
         problems=[
-            (I["user"], "Every question lands on you", "Where is that deal? Did the client pay? Your team asks you because nobody else can see it all.", VIZ_YOU),
-            (I["grid"], "Your numbers live in ten tools", "Sales in the CRM, money in Stripe, meetings in the calendar. One answer means opening five tabs.",
+            (I["user"], "Every question lands on you", "Did that client pay? Where are we on the Reyes job? Your phone buzzes all day because nobody else can see it all.", VIZ_YOU),
+            (I["grid"], "Answers hide in ten tabs", "Sales in the CRM, money in Stripe, meetings in the calendar. One simple answer takes twenty minutes of digging.",
              viz_data(["CRM", "Stripe", "Gmail", "Calendar", "Sheets"], "One answer", BIG["chart"])),
-            (I["cal"], "Weeks start without a plan", "Monday fills up with whatever is loudest, and the work that grows the business slides again.",
+            (I["cal"], "Mondays start on fire", "The week fills up with whatever is loudest, and the work that grows the business slips again.",
              viz_week([("Mon", 90), ("Tue", 75), ("Wed", 85), ("Thu", 70), ("Fri", 95)], "Example: hours spent on urgent work.")),
-            (I["chat"], "Tasks fall between people", "You ask for a follow-up in passing. A week later, nobody sent it.",
+            (I["chat"], "Tasks fall through the cracks", "You ask for a follow-up in passing. A week later, nobody sent it and the lead went cold.",
              viz_chat(["Can someone follow up with Dana?", "Did the quote go out?", "Who is posting this week?", "Did we answer that review?"], "4 tasks, no owner")),
         ],
         cards_head='What Alexander <span class="clay">does.</span>',
-        cards_lead="He sees across every tool and every teammate, so you get answers and a plan without the digging.",
+        cards_lead="One teammate who sees every tool and every teammate. You get answers and a plan without the digging.",
         cards=[
             ("Answers with real numbers", "Ask anything about the business. He checks your connected tools and replies with the facts.", ["Revenue", "Pipeline", "Bookings"], I["chart"]),
             ("Hands off tasks", "Tell him what you need. He picks the right teammate and tracks it until it is done.", ["Midas", "Irene", "Cleo"], I["send"]),
@@ -222,7 +222,7 @@ AGENTS = [
             ("Read-only by design", "Alexander looks but never touches. He can't send, change or delete anything.", ["Safe", "No sends"], I["shield"]),
         ],
         sig_head='Ask him <span class="clay">anything.</span>',
-        sig_lead="Alexander answers from your own tools, then gets the right teammate moving.",
+        sig_lead="Talk to him like your sharpest manager. He answers from your own tools, then gets the right teammate moving.",
         profile=dict(good="Seeing the whole business at once and keeping the team on track.", tools=["Every tool you connect"],
                      says="The empire is in order.", fact="Reads every report before breakfast. Has never touched a send button."),
         chat=[
@@ -248,30 +248,30 @@ AGENTS = [
             ("Is my data safe?", "Your workspace is private to your business. Other customers can never see your data, and you can disconnect a tool at any time."),
             ("Do I need the other AI employees?", "No, but Alexander gets more done with them. He hands sales to Midas, support to Irene and scheduling to Cleo."),
         ],
-        final_line="Ask Alexander one question about your business. See what he finds.",
+        final_line="Ask Alexander one question about your business. You'll wonder how you ran it without him.",
     ),
     dict(
         key="midas", role_long="Sales Rep", service_type="AI sales representative",
         title="AI Sales Rep for Small Business | Midas | Morning Telos",
         desc="Meet Midas, your AI sales rep. He replies to new leads, books the call, follows up every quote and keeps your CRM up to date. Nothing goes out until you approve it.",
         h1=("Midas turns leads", "into gold."), h1_label="Midas, the AI sales rep who turns leads into gold",
-        lead="Midas is your AI sales rep. He replies to new leads fast, books the call, follows up every quote and keeps your CRM current. Nothing goes out until you approve it.",
+        lead="Midas is your AI sales rep. He answers new leads in minutes, books the call and follows up on every quote, so no deal dies in your inbox. Nothing goes out until you approve it.",
         img_alt="Marble statue of Midas the Merchant with an earbud, flipping a glowing gold coin above brass scales",
         chips=[("New lead", "reply drafted"), ("Quote follow-up", "day 3, needs you"), ("Call booked", "Thu 10:00 AM"), ("CRM", "updated")],
         stall_head='Leads go cold <span class="clay">while you work.</span>',
-        stall_lead="You're on a job or with a client. By the time you reply, the lead has already called someone else.",
+        stall_lead="You're on a job, with a client or finally at dinner. By the time you reply, the lead has already hired someone else.",
         meter=("Leads going cold", "22,46,70,92", ["Warm", "Cooling", "Lost"]),
         problems=[
-            (I["clock"], "Slow replies lose the job", "Most people hire whoever answers first. A reply tomorrow is often too late.",
+            (I["clock"], "The first to reply wins", "Most people hire whoever gets back to them first. A reply tomorrow is often a reply to nobody.",
              viz_resp("Reply tomorrow", "18 h", "Midas drafts", "minutes", "Fast replies win more jobs.")),
-            (I["money"], "Quotes sent, then silence", "You send a price and never hear back. Nobody follows up, so the deal fades.",
+            (I["money"], "Quotes vanish into silence", "You send a price and hear nothing back. Nobody follows up, so the deal fades away.",
              viz_chat(["Quote sent: $4,200", "No reply", "Still no reply", "They went with someone else"], "0 follow-ups sent")),
-            (I["list"], "The CRM is out of date", "Notes live in your head and your inbox. The pipeline never matches reality.",
+            (I["list"], "Your CRM is a guess", "Notes live in your head and your inbox. The pipeline never matches what's really going on.",
              viz_data(["Gmail", "Calls", "Calendar", "Notes", "Forms"], "Your CRM", BIG["crm"])),
-            (I["user"], "You are the whole sales team", "Every reply, quote and follow-up waits for you to find time.", VIZ_YOU),
+            (I["user"], "You are the whole sales team", "Every reply and follow-up waits until you find a spare minute. Spare minutes are rare.", VIZ_YOU),
         ],
         cards_head='What Midas <span class="clay">does.</span>',
-        cards_lead="He works every lead from first message to signed deal, in your voice.",
+        cards_lead="He works every lead from the first hello to the signed deal, in your voice.",
         cards=[
             ("Replies to new leads", "He drafts a reply to every new lead within minutes, with your prices and your tone.", ["Email", "Web forms"], I["mail"]),
             ("Books the call", "He finds open times in your calendar and sends the invite once you approve.", ["Google Calendar", "Calendly"], I["cal"]),
@@ -306,27 +306,27 @@ AGENTS = [
             ("Will he make up prices or promises?", "No. He quotes only prices you gave him or that are in the deal. He never invents a discount, a date or a promise."),
             ("Will it sound like a robot?", "He writes in your voice, using your past emails and the notes you give him. You can edit any draft before it goes out."),
         ],
-        final_line="Forward Midas your last unanswered lead. See the reply he writes.",
+        final_line="Forward Midas the last lead you didn't get to. See the reply he writes.",
     ),
     dict(
         key="irene", role_long="Customer Support", service_type="AI customer support agent",
         title="AI Customer Support Agent for Small Business | Irene | Morning Telos",
         desc="Meet Irene, your AI customer support agent. She answers customers from your own knowledge in Gmail, Outlook, Zendesk or Help Scout, and hands hard cases to you.",
         h1=("Irene keeps your", "customers happy."), h1_label="Irene, the AI customer support agent who keeps your customers happy",
-        lead="Irene is your AI customer support agent. She answers customer emails from your own knowledge, turns repeat questions into an FAQ and hands refunds and upset customers to you.",
+        lead="Irene is your AI customer support agent. She answers customer emails from your own policies, kindly and fast, and brings you only the ones that really need you.",
         img_alt="Smiling marble statue of Irene the Peacemaker wearing a headset, with her hand on her heart",
         chips=[("Customer email", "answered"), ("Refund request", "sent to you"), ("FAQ", "3 new answers"), ("Inbox", "sorted")],
         stall_head='Support eats <span class="clay">your whole day.</span>',
-        stall_lead="The same questions arrive every day. Every answer pulls you away from the work that pays.",
+        stall_lead="The same questions show up every morning. Each answer is small. Together they eat the hours you meant for real work.",
         meter=("Inbox pressure", "28,50,72,93", ["Calm", "Busy", "Drowning"]),
         problems=[
-            (I["chat"], "Same questions, every day", "Hours, prices, where's my order. You type the same answers over and over.",
+            (I["chat"], "The same five questions", "Hours, prices, where's my order. You type the same answers again and again.",
              viz_chat(["What are your hours?", "Do you take insurance?", "Where is my order?", "What are your hours?"], "12 repeats this week")),
-            (I["clock"], "Customers wait for replies", "A slow answer turns a simple question into a bad review.",
+            (I["clock"], "Customers wait, then vent", "A slow reply turns a simple question into a one-star review.",
              viz_resp("Reply when free", "9 h", "Irene drafts", "minutes", "Waiting customers leave.")),
-            (I["warn"], "Hard cases get lost", "An upset customer hides between twenty easy emails, and you find it too late.",
+            (I["warn"], "The angry email gets buried", "An upset customer hides between twenty easy ones, and you find it a day too late.",
              viz_week([("Mon", 30), ("Tue", 55), ("Wed", 40), ("Thu", 70), ("Fri", 85)], "Example: unread emails by day.")),
-            (I["user"], "Only you know the answers", "Your policies live in your head, so nobody else can help.", VIZ_YOU),
+            (I["user"], "Only you know the answers", "Your policies live in your head, so nobody can step in when you're busy.", VIZ_YOU),
         ],
         cards_head='What Irene <span class="clay">does.</span>',
         cards_lead="She answers from what you know, kindly and fast, and knows when to call you.",
@@ -364,27 +364,27 @@ AGENTS = [
             ("Will she reply without my OK?", "No. Every reply waits for your approval until you choose to put her on autopilot."),
             ("Can she learn our policies?", "Yes. Add your policies, prices and FAQs to Knowledge. She uses them for every answer and gets better as you correct her."),
         ],
-        final_line="Show Irene the question you answer most. See how she would reply.",
+        final_line="Show Irene the question you answer most. See how she handles it.",
     ),
     dict(
         key="cleo", role_long="Scheduling Assistant", service_type="AI scheduling assistant",
         title="AI Scheduling Assistant for Small Business | Cleo | Morning Telos",
         desc="Meet Cleo, your AI scheduling assistant. She finds open times in Google Calendar or Calendly, books meetings and sends invites and reminders after you approve.",
         h1=("Cleo keeps every", "hour in order."), h1_label="Cleo, the AI scheduling assistant who keeps every hour in order",
-        lead="Cleo is your AI scheduling assistant. She finds open times, books meetings and sends invites and reminders, so you stop playing email tag.",
+        lead="Cleo is your AI scheduling assistant. She finds open times, books the meeting and sends the reminder, so you can quit the email back-and-forth for good.",
         img_alt="Marble statue of Cleo the Timekeeper holding a gold pocket watch and a desk calendar",
         chips=[("Meeting booked", "Fri 3:00 PM"), ("Reminder", "sent"), ("Double booking", "avoided"), ("Your week", "at a glance")],
         stall_head='Scheduling steals <span class="clay">hours every week.</span>',
-        stall_lead="Back-and-forth emails, no-shows and double bookings. Small things that add up fast.",
+        stall_lead="Five emails to book one call, then a no-show on Tuesday. Small things that add up fast.",
         meter=("Calendar chaos", "24,48,70,90", ["Calm", "Messy", "Chaos"]),
         problems=[
-            (I["chat"], "Email tag to find a time", "Five emails to book one call. Then someone asks to move it.",
+            (I["chat"], "Email tag to find a time", "Does Tuesday work? How about Wednesday? Five emails later, still no meeting.",
              viz_chat(["Does Tuesday work?", "Tuesday is full. Wednesday?", "Morning or afternoon?", "Can we do next week?"], "5 emails, 0 meetings")),
-            (I["bell"], "No-shows waste your day", "People forget. Without a reminder, the slot sits empty.",
+            (I["bell"], "No-shows waste your day", "People forget. Without a reminder, the slot sits empty and the hour is gone.",
              viz_week([("Mon", 40), ("Tue", 65), ("Wed", 35), ("Thu", 80), ("Fri", 55)], "Example: empty slots from no-shows.")),
-            (I["warn"], "Double bookings", "Two calendars, one of you. Something always overlaps.",
+            (I["warn"], "Two calendars, one of you", "Work and personal calendars never agree. Something always overlaps.",
              viz_resp("Booking by hand", "15 min", "Cleo checks", "1 step", "Every offer checked against your calendar.")),
-            (I["user"], "Your week is a mystery", "You don't know what's coming until it's already here.", VIZ_YOU),
+            (I["user"], "Your week sneaks up on you", "You don't know what's coming until it's already here.", VIZ_YOU),
         ],
         cards_head='What Cleo <span class="clay">does.</span>',
         cards_lead="She runs your calendar like clockwork and never books over another meeting.",
@@ -422,27 +422,27 @@ AGENTS = [
             ("Will she send invites without asking?", "No. Every invite and reminder waits for your OK until you put her on autopilot."),
             ("Can she cut down on no-shows?", "She sends reminder emails before meetings, which helps people remember to show up."),
         ],
-        final_line="Tell Cleo who you need to meet this week. She'll find the time.",
+        final_line="Tell Cleo who you need to meet this week. She'll handle the rest.",
     ),
     dict(
         key="cyrus", role_long="Email Marketer", service_type="AI email marketing",
         title="AI Email Marketing for Small Business | Cyrus | Morning Telos",
         desc="Meet Cyrus, your AI email marketer. He writes campaigns, welcome emails and win-back emails in your voice and sends them from your own Gmail or Outlook after you approve.",
         h1=("Cyrus delivers", "every message."), h1_label="Cyrus, the AI email marketer who delivers every message",
-        lead="Cyrus is your AI email marketer. He writes campaigns, welcome emails and win-back emails in your voice, then sends them from your own inbox after you approve.",
+        lead="Cyrus is your AI email marketer. He writes the campaigns you never have time for, in your voice, and sends them from your own inbox after you approve.",
         img_alt="Marble statue of Cyrus the Messenger in a wide hat, with a bronze raven carrying a sealed letter",
         chips=[("Campaign", "written"), ("Test email", "sent to you"), ("Welcome series", "ready"), ("Win-back email", "drafted")],
-        stall_head='Your list is <span class="clay">sitting idle.</span>',
-        stall_lead="You have past customers who liked you. Without regular emails, they forget you exist.",
+        stall_head='Your list is <span class="clay">gathering dust.</span>',
+        stall_lead="You have hundreds of past customers who liked you. Without a note now and then, they forget you and call someone else.",
         meter=("List going cold", "25,48,72,92", ["Warm", "Fading", "Forgotten"]),
         problems=[
-            (I["mail"], "No time to write emails", "A good campaign takes hours. So it never gets written.",
+            (I["mail"], "No time to write", "A good campaign takes a whole evening. So it never gets written.",
              viz_resp("Writing it yourself", "3 h", "Cyrus drafts", "minutes", "The campaign you never send earns nothing.")),
-            (I["user"], "Past customers forget you", "They would buy again. Nobody reminds them.",
+            (I["user"], "Happy customers drift away", "They would gladly buy again. Nobody reminds them you exist.",
              viz_week([("Jan", 90), ("Mar", 70), ("May", 50), ("Jul", 35), ("Sep", 20)], "Example: repeat customers when nobody emails them.")),
-            (I["chat"], "New signups hear nothing", "Someone joins your list and hears nothing for months.",
+            (I["chat"], "New signups hear crickets", "Someone joins your list, then hears nothing for months.",
              viz_chat(["New signup: Ana", "New signup: Priya", "New signup: Tom", "New signup: Jordan"], "0 welcome emails sent")),
-            (I["grid"], "Email tools are a chore", "Templates, lists and settings. Another app to learn.", VIZ_TOOLS),
+            (I["grid"], "Email tools feel like homework", "Templates, lists and settings. One more app to learn.", VIZ_TOOLS),
         ],
         cards_head='What Cyrus <span class="clay">does.</span>',
         cards_lead="He writes the emails your customers want to open and sends them the right way.",
@@ -480,25 +480,25 @@ AGENTS = [
             ("Why does he send a few at a time?", "Sending slowly from your own inbox helps keep your emails out of spam folders."),
             ("Can he write welcome and win-back emails?", "Yes. He writes welcome emails for new subscribers and win-back emails for past customers."),
         ],
-        final_line="Tell Cyrus what you want to announce. He'll write the email.",
+        final_line="Tell Cyrus what's new. He'll write the email your customers actually open.",
     ),
     dict(
         key="leo", role_long="Social Media Manager", service_type="AI social media manager",
         title="AI Social Media Manager for Small Business | Leo | Morning Telos",
         desc="Meet Leo, your AI social media manager. He plans, writes and schedules your posts for Instagram, Facebook, TikTok and more, and reports what works.",
         h1=("Leo tells your", "story every day."), h1_label="Leo, the AI social media manager who tells your story every day",
-        lead="Leo is your AI social media manager. He plans a full week of posts, writes them in your voice, schedules them at the best times and tells you what works.",
+        lead="Leo is your AI social media manager. He plans a full week of posts, writes them in your voice and schedules them for the best times. You just tap approve.",
         img_alt="Smiling marble statue of Leo the Storyteller juggling Instagram, Facebook and TikTok icons",
         chips=[("This week", "7 posts planned"), ("Instagram post", "needs you"), ("Best time", "Tue 6:00 PM"), ("Monday report", "sent")],
         stall_head='Social media <span class="clay">falls off first.</span>',
-        stall_lead="You know you should post. But something is always more urgent, so the feed goes silent.",
+        stall_lead="You know you should post. But a customer always comes first, so the feed goes silent for weeks.",
         meter=("Feed going stale", "22,46,70,92", ["Fresh", "Stale", "Silent"]),
         problems=[
-            (I["cal"], "Posting when you remember", "A burst of posts, then nothing for a month.",
+            (I["cal"], "Posting when you remember", "A burst of posts, then nothing for a month. Your followers notice.",
              viz_week([("Wk 1", 90), ("Wk 2", 15), ("Wk 3", 4), ("Wk 4", 60), ("Wk 5", 6)], "Example: posts per week without a plan.")),
-            (I["chat"], "Staring at a blank caption", "What do I even post? So you skip it.",
+            (I["chat"], "The blank caption stare", "What do I even post? So you skip it again.",
              viz_chat(["What should I post today?", "Is this photo good?", "What hashtags?", "Maybe tomorrow..."], "0 posts this week")),
-            (I["grid"], "Too many apps", "Every network has its own app, its own sizes and its own rules.",
+            (I["grid"], "Every app wants something else", "Different sizes, different rules, different apps. It adds up to a part-time job.",
              viz_data(["Instagram", "Facebook", "TikTok", "LinkedIn", "YouTube"], "One calendar", BIG["cal"])),
             (I["chart"], "No idea what works", "You post and hope. Nobody tells you which posts brought customers.",
              viz_resp("Guessing", "never", "Leo's report", "weekly", "Know what to post more of.")),
@@ -539,27 +539,27 @@ AGENTS = [
             ("How often will he post?", "You choose. He suggests a schedule that fits your goal, like three times a week."),
             ("Does he tell me what's working?", "Yes. Every Monday he sends a short report on your results and what to post next."),
         ],
-        final_line="Tell Leo your goal for social media. He'll plan your first week.",
+        final_line="Tell Leo your goal for social media. He'll plan your first week of posts.",
     ),
     dict(
         key="theseus", role_long="SEO Specialist", service_type="AI SEO specialist",
         title="AI SEO Specialist for Small Business | Theseus | Morning Telos",
         desc="Meet Theseus, your AI SEO specialist. He finds the keywords people search, plans your content, tracks rankings and checks how you show up in AI answers like ChatGPT.",
         h1=("Theseus gets you", "found."), h1_label="Theseus, the AI SEO specialist who gets you found",
-        lead="Theseus is your AI SEO specialist. He finds what your customers search for, plans what to write and tracks how you show up on Google and in AI answers.",
+        lead="Theseus is your AI SEO specialist. He learns what your customers type into Google and ChatGPT, then hands you a clear plan to show up when they do.",
         img_alt="Smiling marble statue of Theseus the Librarian in round glasses, with his hand on an open atlas",
         chips=[("Keywords", "42 found"), ("Content plan", "8 pages"), ("ChatGPT", "now names you"), ("Rankings", "tracked weekly")],
-        stall_head='Customers search. <span class="clay">They don&rsquo;t find you.</span>',
-        stall_lead="Every day, people ask Google and ChatGPT for a business like yours. If you don't show up, a competitor does.",
+        stall_head='Customers search. <span class="clay">They find someone else.</span>',
+        stall_lead="Every day, people ask Google and ChatGPT for a business like yours. If you're missing from the answer, a competitor gets the call.",
         meter=("Visibility gap", "26,50,72,92", ["Found", "Hidden", "Invisible"]),
         problems=[
-            (I["search"], "You don't know what people search", "You guess at keywords and write pages nobody looks for.",
+            (I["search"], "Guessing at keywords", "You write pages on a hunch, and nobody searches for them.",
              viz_chat(["plumber near me", "emergency plumber open now", "water heater repair cost", "best plumber in town"], "which ones matter?")),
-            (I["spark"], "AI answers skip you", "More people ask ChatGPT for a recommendation. It names other businesses.",
+            (I["spark"], "AI answers name your rivals", "More people ask ChatGPT for a recommendation. Right now it names someone else.",
              viz_resp("Your business", "not named", "Competitor", "named 3x", "AI answers are the new first page.")),
-            (I["doc"], "No plan for content", "Blog posts happen once a year, with no link to what people want.",
+            (I["doc"], "Content happens once a year", "A blog post here and there, with no plan behind it.",
              viz_week([("Q1", 10), ("Q2", 4), ("Q3", 25), ("Q4", 4), ("Q1", 6)], "Example: pages published without a plan.")),
-            (I["user"], "SEO feels like a dark art", "Agencies send reports you can't read. You're not sure what you pay for.", VIZ_YOU),
+            (I["user"], "SEO reports read like a foreign language", "Agencies send charts you can't read. You're never sure what you're paying for.", VIZ_YOU),
         ],
         cards_head='What Theseus <span class="clay">does.</span>',
         cards_lead="He maps how customers search and tells you exactly what to do next.",
@@ -597,27 +597,27 @@ AGENTS = [
             ("How long until I see results?", "SEO takes time, often a few months. Theseus tracks your progress every week so you can see it move."),
             ("Can he replace an SEO agency?", "For many small businesses, yes. Theseus does the research and planning an agency would, at any hour."),
         ],
-        final_line="Tell Theseus your top service and your town. He'll show you what people search.",
+        final_line="Tell Theseus your top service and your town. He'll show you exactly what people search.",
     ),
     dict(
         key="archon", role_long="Website Builder", service_type="AI website builder",
         title="AI Website Builder for Small Business | Archon | Morning Telos",
         desc="Meet Archon, your AI website builder. He plans and writes pages people search for and builds them on your own Framer, Webflow, WordPress or Shopify site. Nothing goes live until you approve it.",
         h1=("Archon builds", "your website."), h1_label="Archon, the AI website builder who builds your website",
-        lead="Archon is your AI website builder. He writes pages people search for, with clear calls to book, and builds them on your own site. Nothing goes live until you approve it.",
+        lead="Archon is your AI website builder. Tell him the page you need. He writes it, designs it in your brand and builds it on your own site. Nothing goes live until you approve it.",
         img_alt="Smiling marble statue of Archon the Builder in a leather apron, holding a hammer and a glowing website",
         chips=[("New page", "ready to review"), ("Brand", "matched"), ("WordPress", "connected"), ("Published", "after your OK")],
-        stall_head='Your website <span class="clay">stopped working for you.</span>',
-        stall_lead="It looked great at launch. Now it's out of date, and every change means waiting on a developer.",
+        stall_head='Your website <span class="clay">fell behind.</span>',
+        stall_lead="It looked great at launch. Now it's out of date, and every small change means waiting on a developer.",
         meter=("Site going stale", "24,48,72,92", ["Fresh", "Dated", "Broken"]),
         problems=[
-            (I["hammer"], "Every change needs a developer", "A new page takes weeks and a quote.",
+            (I["hammer"], "Every change needs a developer", "One new page takes three weeks and a quote.",
              viz_resp("Developer", "3 weeks", "Archon", "one chat", "Pages that wait don't sell.")),
             (I["search"], "Pages nobody searches for", "Your site says what you want to say, but not what customers type into Google.",
              viz_chat(["Home", "About us", "Our story", "Welcome!"], "0 pages people search for")),
-            (I["page"], "No clear way to book", "Visitors read, then leave, because the next step isn't clear.",
+            (I["page"], "Visitors read, then leave", "The next step isn't clear, so they close the tab and call someone else.",
              viz_week([("Home", 80), ("About", 50), ("Services", 65), ("Blog", 30), ("Contact", 10)], "Example: visitors who reach each page.")),
-            (I["grid"], "Stuck in a builder you don't know", "Framer, WordPress, Shopify. Each one has its own learning curve.", VIZ_TOOLS),
+            (I["grid"], "Stuck in a builder you never learned", "Framer, WordPress, Shopify. Each one has its own learning curve.", VIZ_TOOLS),
         ],
         cards_head='What Archon <span class="clay">does.</span>',
         cards_lead="He builds on the site you already have, in your brand, and asks before anything goes live.",
@@ -655,7 +655,7 @@ AGENTS = [
             ("Can he touch my Shopify products or orders?", "No. On Shopify he works only on pages and blog posts. He never touches products, orders, customers or discounts."),
             ("Where do the page ideas come from?", "From Theseus, the SEO specialist. Every page targets what people really search for."),
         ],
-        final_line="Tell Archon which page your site is missing. He'll build a preview.",
+        final_line="Tell Archon which page your site is missing. He'll have a preview ready for you.",
     ),
 ]
 
@@ -670,12 +670,13 @@ def make(a):
     p.update(
         slug=slug, section=SECTION, name=f"{n} {t}", title_word=t,
         crumb='<b>AI employees</b>',
-        second_cta=(f"See {n} work", "demo"), proof="Start free. Approve everything before it goes out.",
+        second_cta=(f"See {n} work", "demo"), proof="14 days free. You approve everything before it goes out.",
         img=f"team/{k}.webp", img_h=IMG_H[k], name_full=f"{n}, AI {a['role_long']}",
         audience="Small business owners", signature=signature(dict(a, name=n, title_word=t)), css=CSS + CHIPS.get(k, ""),
         before_faq=team_strip(k),
     )
     p["name"] = f"{n} {t}"
+    p["step_names"] = [f"<h3>{x}</h3>" for x in a["step_names"]]
     return p
 
 
@@ -694,6 +695,7 @@ if __name__ == "__main__":
         bs.build(p)
         out = ROOT / SECTION / p["slug"] / "index.html"
         html = out.read_text().replace('<div class="free">Free · 30 min</div>', '<div class="free">Free trial</div>')
+        html = html.replace("<b>For founders, operators and decision makers.</b>", "<b>Built for owners who wear every hat.</b>")
         out.write_text(html)
         urls.append(f"https://morningtelos.com/{SECTION}/{p['slug']}/")
     sitemap(urls)
