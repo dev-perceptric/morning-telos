@@ -6,7 +6,7 @@ This file is guidance for writers. It is NOT a post (the builder only reads file
 Morning Telos (morningtelos.com) builds software and AI automation for founders, business owners and operators. Sign-up link: `https://chat.morningtelos.com/#signup` (free 14-day trial, no card). Email: meet@morningtelos.com.
 
 Industry pages you may link: `/solutions/clinics/`, `/solutions/home-services/`, `/solutions/real-estate/`, `/solutions/law-firms/`, `/solutions/ecommerce/`, `/solutions/accounting/`, `/solutions/fitness/`, `/solutions/logistics/`, `/solutions/agencies/`, `/solutions/saas/`, `/solutions/insurance/`, `/solutions/recruiting/`.
-Service pages: `/services/ai-agents/`, `/services/ai-automation/`, `/services/crm-sales-automation/`, `/services/partnership/`.
+AI team pages: `/ai-employees/ai-chief-of-staff/`, `/ai-employees/ai-sales-rep/`, `/ai-employees/ai-customer-support/`, `/ai-employees/ai-scheduling-assistant/`, `/ai-employees/ai-email-marketing/`, `/ai-employees/ai-social-media-manager/`, `/ai-employees/ai-seo-specialist/`, `/ai-employees/ai-website-builder/`. Only promise what the team does: email, calendar, CRM, help desk, social posts, search and website pages, with the owner's OK. No phone answering or texting.
 Existing posts you may link: `/blog/ai-receptionist-cost/`, `/blog/how-to-automate-customer-service/`, `/blog/best-ai-automation-agencies/`, and the other Cluster 1 posts by slug (list below).
 
 ## Writing rules (strict)
@@ -36,7 +36,7 @@ category: templates
 date: 2026-11-16
 image: /img/blog/<image-file>.webp
 image_alt: "Short description of the statue image"
-services: [ai-agents, ai-automation]
+team: [irene, cleo]   # alexander, midas, irene, cleo, cyrus, leo, theseus, archon
 manual:
   title: "Sending these by hand?"
   text: "One or two sentences on the time it takes by hand, and that it can run automatically."
@@ -54,7 +54,7 @@ offer:
   cta: "Book a free Telos Session"
   side_title: "Want reminders that send themselves?"
   side_text: "We set it up for you, usually in about a week."
-promo: "One sentence mentioning Morning Telos naturally, with a Markdown link, e.g. [AI receptionist](/services/ai-agents/)."
+promo: "One sentence mentioning Morning Telos naturally, with a Markdown link, e.g. [Cleo](/ai-employees/ai-scheduling-assistant/) sends reminder emails from your calendar."
 stats:
   - n: "78%"
     text: "of consumers have given up on a business after an unanswered call."

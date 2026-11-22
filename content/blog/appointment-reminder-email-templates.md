@@ -5,25 +5,25 @@ category: templates
 date: 2026-11-16
 image: /img/blog/appointment-reminder-email-templates.webp
 image_alt: "Marble statue of a young Greek woman holding a sealed letter"
-services: [ai-agents, ai-automation]
+team: [cleo, cyrus]
 manual:
   title: "Sending these by hand?"
-  text: "Writing and sending reminder emails for every booking adds up fast, especially when each one needs the right date, time and prep notes. Your booking calendar can send them for you."
-  link_text: "See how automatic reminders work"
+  text: "Writing a reminder email for every booking adds up fast, especially when each one needs the right date, time and prep notes. Cleo can send them from your calendar for you."
+  link_text: "See how it works for clinics"
   link: "/solutions/clinics/"
 offer:
-  kicker: "Done for you by Morning Telos"
-  title: "Automatic appointment reminders"
-  text: "We connect your calendar to email and text reminders that go out at the right time, with the right prep notes for each type of appointment. Clients can confirm or reschedule with one click."
+  kicker: "Your AI team at Morning Telos"
+  title: "Reminder emails, handled"
+  text: "Cleo checks your calendar and drafts reminder emails with the right date, time and prep notes. You approve them, or let her send them on her own."
   points:
-    - "Emails 1 week and 1 day before"
-    - "Prep notes matched to each service"
-    - "One-click confirm and reschedule"
-    - "Follow-up after a no-show"
+    - "Reminders before every visit"
+    - "Prep notes for each service"
+    - "Time zones always included"
+    - "A friendly note after a no-show"
   cta: "Start your free trial"
   side_title: "Want reminders that send themselves?"
-  side_text: "We set it up for you, usually in about a week."
-promo: "Email works well for details, but many clients reply by phone. If those calls go unanswered, an [AI receptionist](/services/ai-agents/) from Morning Telos can answer, look up the booking and reschedule it on the spot."
+  side_text: "Cleo sends them from your own calendar and inbox."
+promo: "Want these sent for you? [Cleo](/ai-employees/ai-scheduling-assistant/), the Morning Telos scheduling assistant, sends reminder emails from your own calendar and inbox after you approve."
 stats:
   - n: "$38,010"
     text: "Median yearly pay for a US receptionist ($18.27 an hour)."

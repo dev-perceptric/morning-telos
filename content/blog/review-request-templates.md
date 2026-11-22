@@ -5,25 +5,25 @@ category: templates
 date: 2026-11-16
 image: /img/blog/review-request-templates.webp
 image_alt: "Marble statue of a young Greek man holding up five golden stars"
-services: [ai-agents, ai-automation]
+team: [cyrus, irene]
 manual:
   title: "Sending these by hand?"
-  text: "Remembering to text every customer after every job is easy to forget on a busy day. Review requests can go out automatically the moment a job is marked done."
-  link_text: "See how automatic review requests work"
+  text: "Remembering to ask every customer for a review is easy to forget on a busy day. Your AI team can draft the review request email after every job."
+  link_text: "See how it works for home services"
   link: "/solutions/home-services/"
 offer:
-  kicker: "Done for you by Morning Telos"
-  title: "Automatic review requests after every job"
-  text: "We connect your booking or job software to a simple system that texts each customer your review link after the visit, with one polite reminder if they don't respond."
+  kicker: "Your AI team at Morning Telos"
+  title: "Review requests, handled"
+  text: "Cyrus drafts a friendly review request email after each job, with your direct Google review link and one polite reminder."
   points:
-    - "Sends after every completed job"
-    - "Uses your direct Google review link"
+    - "A request after every job"
+    - "Your direct Google review link"
     - "One reminder, then it stops"
-    - "Alerts you to new reviews so you can reply"
+    - "Sent from your own inbox"
   cta: "Start your free trial"
-  side_title: "Want review requests that send themselves?"
-  side_text: "We set it up for you, usually in about a week."
-promo: "Most businesses forget to ask on busy days. At Morning Telos we [automate review requests](/services/ai-automation/) so every customer gets the same friendly text after their visit."
+  side_title: "Want more Google reviews?"
+  side_text: "Cyrus asks every customer, in your voice."
+promo: "Most businesses forget to ask on busy days. With Morning Telos, [Cyrus](/ai-employees/ai-email-marketing/) sends every customer a friendly review request from your own inbox."
 templates:
   after_job:
     - title: "Simple thank you and ask"

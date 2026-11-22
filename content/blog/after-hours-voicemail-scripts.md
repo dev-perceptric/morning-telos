@@ -5,25 +5,25 @@ category: templates
 date: 2026-11-16
 image: /img/blog/after-hours-voicemail-scripts.webp
 image_alt: "Marble statue of a Greek woman holding a small lit oil lamp"
-services: [ai-agents, ai-automation]
+team: [irene, midas, cleo]
 manual:
   title: "Calling everyone back by hand?"
-  text: "Listening to voicemails every morning and texting each caller back takes time, and callers wait all night for an answer. An AI receptionist can pick up after-hours calls and send these texts for you."
-  link_text: "See how after-hours answering works for clinics"
+  text: "Listening to voicemails every morning and writing back to each caller takes time, and callers wait all night. Your AI team can draft the replies to after-hours emails and forms, so people hear back first thing."
+  link_text: "See how it works for clinics"
   link: "/solutions/clinics/"
 offer:
-  kicker: "Done for you by Morning Telos"
-  title: "24/7 AI answering"
-  text: "We set up an AI receptionist that answers your calls at night, on weekends and on holidays. It takes messages, books appointments and sends urgent calls to your on-call person."
+  kicker: "Your AI team at Morning Telos"
+  title: "After-hours follow-up, handled"
+  text: "Irene and Midas answer the emails and web forms that come in after hours, and Cleo offers open times from your calendar. Every reply waits for your OK in the morning."
   points:
-    - "Answers every call, day or night"
-    - "Books into your calendar"
-    - "Sends urgent calls to your on-call line"
-    - "Texts you a summary of each call"
+    - "Replies drafted overnight"
+    - "Open times from your calendar"
+    - "Urgent messages flagged for you"
+    - "Nothing sent without your OK"
   cta: "Start your free trial"
-  side_title: "Want every after-hours call answered?"
-  side_text: "We set it up for you, usually in about a week."
-promo: "If you'd rather callers talk to someone at 9 p.m., Morning Telos can set up an [AI receptionist](/services/ai-agents/) that answers after-hours calls, takes details and books appointments."
+  side_title: "Want every message answered by morning?"
+  side_text: "Your AI team drafts the replies overnight. You approve them with your coffee."
+promo: "Voicemail can't book a visit. With Morning Telos, [Irene](/ai-employees/ai-customer-support/) and [Midas](/ai-employees/ai-sales-rep/) answer the emails and forms that arrive after hours, so every caller hears back first thing."
 stats:
   - n: "78%"
     text: "of consumers have given up on a business after an unanswered call."

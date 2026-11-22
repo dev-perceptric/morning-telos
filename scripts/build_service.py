@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Builds service landing pages from shared parts of site/index.html.
+"""The shared page builder behind the industry pages (build_solution.py) and the AI team pages (build_agent.py).
 
-Usage: python3 scripts/build_service.py
-Writes site/services/<slug>/index.html for every page in PAGES.
-The homepage is the source for the nav, logo strip, steps, banners,
-final call to action and footer, so edits there flow into every page.
+It has no pages of its own: those scripts call build(). The homepage is the source for the head, nav and footer,
+and scripts/shared_parts.html holds the logo strip, steps, ribbons and final call to action.
 """
 import json
 import pathlib
@@ -74,16 +72,10 @@ def faq_block(title, faqs):
 '''
 
 
-INDUSTRIES = [("clinics", "Clinics", "Dental &amp; medical"), ("home-services", "Home services", "HVAC, plumbing, roofing"), ("real-estate", "Real estate", "Agents &amp; brokerages"), ("law-firms", "Law firms", "Intake to case updates"), ("ecommerce", "E-commerce", "Shopify &amp; DTC brands"), ("accounting", "Accounting", "CPA &amp; bookkeeping firms"), ("fitness", "Fitness", "Gyms &amp; studios"), ("logistics", "Logistics", "Freight &amp; distribution"), ("agencies", "Agencies", "Marketing &amp; creative"), ("saas", "SaaS", "Startups &amp; software"), ("insurance", "Insurance", "Agencies &amp; brokers"), ("recruiting", "Recruiting", "Staffing &amp; search")]
-INDUSTRY_STRIP = ('  <section class="istrip wrap">\n    <h2 class="big rv">Built for <span class="clay">your industry.</span></h2>\n    <div class="igrid">'
-                  + "".join(f'<a class="icard rv" style="--d:{k*0.06:.2f}s" href="/solutions/{s}/"><b>{n}</b><small>{d}</small><span>→</span></a>' for k, (s, n, d) in enumerate(INDUSTRIES))
-                  + '</div>\n  </section>\n\n')
-
-
 def build(p):
     head = re.sub(r"<title>.*?</title>", f"<title>{p['title']}</title>", HEAD)
     head = re.sub(r'<meta name="description" content="[^"]*">', f'<meta name="description" content="{p["desc"]}">', head)
-    section = p.get("section", "services")
+    section = p["section"]
     url = f"https://morningtelos.com/{section}/{p['slug']}/"
     schema = {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": a, "acceptedAnswer": {"@type": "Answer", "text": b}} for a, b in p["faqs"]]}
     svc = {"@context": "https://schema.org", "@type": "Service", "name": p["name"], "serviceType": p["service_type"], "provider": {"@type": "Organization", "name": "Morning Telos", "url": "https://morningtelos.com/"}, "url": url}
@@ -108,7 +100,7 @@ def build(p):
   <section class="hero svc" id="hero">
     <div class="wrap">
       <div>
-        <div class="crumb rv"><a href="/">Home</a> / {p.get("crumb", '<a href="/#services">Services</a>')} / {p["name"]}</div>
+        <div class="crumb rv"><a href="/">Home</a> / {p["crumb"]} / {p["name"]}</div>
         <h1 aria-label="{p["h1_label"]}">
           {h1.strip()}
         </h1>
@@ -188,68 +180,13 @@ def build(p):
         for old, new in zip(["<h3>Telos Session</h3>", "<h3>Telos Audit</h3>", "<h3>Build</h3>", "<h3>Compound</h3>"], p["step_names"]):
             how = how.replace(old, new)
     final = FINAL.replace("<p>Tell us where your business is headed and where it is stuck. We'll map your highest-leverage first move.</p>", f"<p>{p['final_line']}</p>")
-    page = head + hero + LOGOS + stall + p.get("after_stall", "") + auto + p["signature"] + outc + how + p.get("before_faq", INDUSTRY_STRIP if section == "services" else "") + RIBBONS + faq_block(p["faq_title"], p["faqs"]) + final + FOOTER
+    page = head + hero + LOGOS + stall + p.get("after_stall", "") + auto + p["signature"] + outc + how + p.get("before_faq", "") + RIBBONS + faq_block(p["faq_title"], p["faqs"]) + final + FOOTER
     out = ROOT / section / p["slug"] / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page)
     print("wrote", out.relative_to(ROOT.parent), len(page))
 
 
-# ---------- signature sections ----------
-SOFTWARE_SIG = '''  <section class="sig" id="demo">
-    <div class="wrap">
-      <div class="head">
-        <h2 class="big rv">One screen for <span class="clay">the whole business.</span></h2>
-        <p class="lead rv" style="--d:.1s">An example of what we build: an internal dashboard that pulls orders, customers and stock into one place your team actually uses.</p>
-      </div>
-      <div class="app dash draw rv rv-s">
-        <div class="app-bar"><i></i><i></i><i></i><span class="ttl">example · ops.yourcompany.com</span><span class="clock"><span class="dot-live"></span>live</span></div>
-        <div class="dash-body">
-          <nav class="dash-nav"><span class="on">Overview</span><span>Orders</span><span>Customers</span><span>Inventory</span><span>Reports</span><span>Team</span></nav>
-          <div class="dash-main">
-            <div class="kpis">
-              <div class="kpi"><small>Revenue this week</small><b>$<span class="countup" data-to="48">0</span>k</b><em>+12% vs last week</em></div>
-              <div class="kpi"><small>Open orders</small><b><span class="countup" data-to="312">0</span></b><em>27 ship today</em></div>
-              <div class="kpi"><small>On-time delivery</small><b><span class="countup" data-to="98" data-suffix="%">0%</span></b><em>Up from 91%</em></div>
-            </div>
-            <div class="dash-row">
-              <div class="chart"><small>Orders by day</small><div class="cbars">''' + ''.join(f'<i style="--h:{h}%;--dl:{k*0.07:.2f}s"></i>' for k, h in enumerate([40, 55, 48, 62, 70, 66, 82, 78, 90, 86, 95, 100])) + '''</div></div>
-              <div class="tbl"><small>Latest orders</small>''' + ''.join(f'<div class="tr" style="--dl:{.6+k*0.18:.2f}s"><span>{a}</span><span class="pill {c}">{b}</span></div>' for k, (a, b, c) in enumerate([("#2041 · Reyes Co.", "Shipped", "ok"), ("#2040 · Park Fitness", "Packing", ""), ("#2039 · Okafor Dental", "Shipped", "ok"), ("#2038 · Chen Studio", "Paid", "")])) + '''</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <p class="onote rv">Sample data. Every build is designed around your own workflows.</p>
-    </div>
-  </section>
-
-'''
-PARTNER_SIG = '''  <section class="sig" id="demo">
-    <div class="wrap">
-      <div class="head">
-        <h2 class="big rv">Every month, <span class="clay">something gets better.</span></h2>
-        <p class="lead rv" style="--d:.1s">An example of the monthly report you get on a partnership plan: what we fixed, what we shipped, and what comes next.</p>
-      </div>
-      <div class="app report draw rv rv-s">
-        <div class="app-bar"><i></i><i></i><i></i><span class="ttl">example · monthly report</span><span class="clock"><span class="dot-live"></span>all systems running</span></div>
-        <div class="rep-body">
-          <div class="rep-chart">
-            <small>Hours saved per month</small>
-            <b class="rep-big"><span class="countup" data-to="64">0</span><em>hrs this month</em></b>
-            <svg viewBox="0 0 320 140" preserveAspectRatio="none" aria-hidden="true"><path class="area" d="M0 128 L64 112 L128 96 L192 70 L256 46 L320 18 L320 140 L0 140 Z"/><path class="line" d="M0 128 L64 112 L128 96 L192 70 L256 46 L320 18"/></svg>
-            <div class="months"><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span></div>
-          </div>
-          <div class="rep-list">
-            <small>This month</small>
-            <ul>''' + ''.join(f'<li style="--dl:{.5+k*0.35:.2f}s"><span class="bx">{CHECK}</span><span><b>{a}</b><em>{b}</em></span></li>' for k, (a, b) in enumerate([("Fixed Stripe sync", "after an API change, same day"), ("Added WhatsApp to the lead agent", "new channel, live"), ("New weekly cash report", "in Slack every Monday"), ("Next: invoice reminders", "planned for December")])) + '''</ul>
-          </div>
-        </div>
-      </div>
-      <p class="onote rv">Sample report. Yours tracks the goals we set together.</p>
-    </div>
-  </section>
-
-'''
 SIG_CSS = '''
   .sig { padding: 40px 0 120px; }
   .sig .head { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: end; margin-bottom: 40px; }
@@ -301,109 +238,3 @@ SIG_CSS = '''
   @media (max-width: 640px) { .kpis { grid-template-columns: 1fr; } .sig { padding-bottom: 80px; } }
 '''
 
-PAGES = [
-    dict(
-        slug="custom-software", name="Custom software", service_type="Custom business software development",
-        title="Custom Business Software Development Agency | Morning Telos",
-        desc="Custom software development for small and growing businesses. We build CRMs, internal tools, client portals and dashboards around how your business actually runs.",
-        h1=("Software built around", "how you run."), h1_label="Custom business software built around how your business runs",
-        lead="A custom software development agency for founders and operators. We build CRMs, internal tools, client portals and dashboards that fit your workflows, so your team stops working around the tools.",
-        second_cta=("See an example", "demo"), proof="Free 30-minute call. We map what to build first.",
-        img="software.webp", img_h=787, img_alt="Marble statue of a young Greek man holding a glowing laptop", glow=("70%", "62%"),
-        chips=[("Orders dashboard", "one source of truth"), ("Client portal", "launched"), ("Spreadsheets", "retired"), ("Team access", "set by role")],
-        stall_head='When the tools <span class="clay">stop fitting.</span>',
-        stall_lead="Off-the-shelf apps get you started. As you grow, your team spends more time bending the tools than doing the work.",
-        meter=("Workaround load", "25,48,72,92", ["Fine", "Messy", "Blocking"]),
-        problems=[
-            ('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16"/>', "Spreadsheets run the business", "Orders, stock and clients tracked in files with names like final_v7, edited by five people.",
-             viz_chat(["Orders_final_v7.xlsx", "Orders_final_v7 (1).xlsx", "Orders_REAL_final.xlsx", "Copy of Orders_final.xlsx"], "which one is right?")),
-            ('<path d="M14 6l4 4-8 8H6v-4z"/><path d="M4 20h16"/>', "Tools that don't fit how you work", "Your process has steps the software doesn't, so people fill the gaps by hand.",
-             viz_resp("Workarounds", "6 h/wk", "Custom tool", "20 min", "Each workaround is a step someone can forget.")),
-            ('<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>', "Data spread across five apps", "Nobody can see the full picture without exporting and stitching files together.",
-             viz_data(["CRM", "Stripe", "Sheets", "Shopify", "Email"], "One view", '<rect x="7" y="9" width="26" height="22" rx="3"/><path d="M7 16h26M14 16v15"/>')),
-            ('<rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 10h8M8 14h5"/>', "Paying for seats nobody uses", "Subscriptions stack up for features you don't need and gaps you still fill by hand.",
-             viz_week([("CRM", 70), ("PM", 55), ("Forms", 40), ("BI", 85), ("Docs", 35)], "Example: shaded part of each bill goes unused.")),
-        ],
-        cards_head='What we <span class="clay">build.</span>', cards_lead="Software that fits your business today and grows with it, with AI built in where it helps.",
-        cards=[
-            ("Custom CRMs", "A CRM shaped around your sales process, with the fields and steps your team actually uses.", ["Pipelines", "Follow-ups", "AI notes"], '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/>'),
-            ("Internal tools", "Admin panels and back-office apps that replace spreadsheets and manual steps.", ["Approvals", "Inventory", "Scheduling"], '<path d="M14 6l4 4-8 8H6v-4z"/><path d="M4 20h16"/>'),
-            ("Client portals", "A branded place for clients to book, pay, upload files and check status.", ["Bookings", "Payments", "Files"], '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>'),
-            ("Dashboards", "Live numbers from every tool on one screen, so decisions stop waiting on data.", ["KPIs", "Forecasts", "Alerts"], '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
-            ("Web & mobile apps", "Customer-facing apps for products and services that need more than a website.", ["iOS", "Android", "Web"], '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'),
-            ("AI features", "Search, summaries, drafting and smart routing built right into your software.", ["Claude", "OpenAI", "Gemini"], '<rect x="5" y="7" width="14" height="12" rx="3"/><circle cx="10" cy="13" r="1.3"/><circle cx="14" cy="13" r="1.3"/><path d="M12 7V4"/>'),
-        ],
-        signature=SOFTWARE_SIG, css=SIG_CSS,
-        outc_head='What we <span class="clay">build toward.</span>',
-        outcomes=[(1, "place", "for your data, one source of truth"), (100, "%", "yours: the code and the data"), (2, "weeks", "per release, so you see progress early"), (0, "workarounds", "for the steps that matter most")],
-        outc_note="Targets we set with each client during the Telos Audit. Timelines depend on scope.",
-        how_head='From whiteboard to <span class="clay">working software.</span>',
-        how_steps=["Walk us through how the business runs and where the tools get in the way.", "Map the workflows, data and users. Scope a first release that pays off fast.", "Design, build and ship in short releases your team uses right away.", "Add features, connect new tools and keep everything fast and secure."],
-        faq_title="Custom software questions",
-        faqs=[
-            ("How do I know if my business needs custom software?", "If your team works around your tools, copies data between apps, or runs key processes in spreadsheets, custom software usually pays for itself. The Telos Session will tell you either way."),
-            ("Is custom software expensive?", "We start with the smallest release that solves the biggest problem, so you see value before spending more. After the audit you get a fixed price for each release."),
-            ("Who owns the code?", "You do. The code, the data and the accounts belong to your business."),
-            ("Can you connect it to the tools we already use?", "Yes. We connect to your CRM, payments, email, accounting and other tools, so data flows in one direction with no copy-paste."),
-            ("How long does it take?", "Most first releases ship within a few weeks, then we add features in short cycles. You get a clear timeline after the Telos Audit."),
-            ("Can you work with our in-house developers?", "Yes. We can lead the build, work alongside your team, or hand over a clean codebase with documentation."),
-        ],
-        final_line="Show us the spreadsheet or tool your team fights with. We'll scope the first release worth building.",
-    ),
-    dict(
-        slug="partnership", name="Ongoing partnership", service_type="Managed AI automation services",
-        title="Managed AI Automation Agency & Ongoing Support | Morning Telos",
-        desc="A managed AI automation agency on a simple monthly plan. We monitor, fix and improve your software and automations, and ship new systems every month.",
-        h1=("Systems that keep", "getting better."), h1_label="Managed AI automation and ongoing support on a monthly plan",
-        lead="Managed AI automation services for founders and operators. On one monthly plan we monitor everything we build, fix issues fast, and ship new automations every month, so your systems compound instead of decay.",
-        second_cta=("See a monthly report", "demo"), proof="Free 30-minute call. We review what you run today.",
-        img="atlas.webp", img_h=692, img_alt="Marble statue of a young Greek man carrying a globe of the Earth on his shoulder",
-        chips=[("Monitoring", "24/7"), ("Fix shipped", "same day"), ("New automation", "added this month"), ("Monthly report", "sent")],
-        stall_head='Systems decay <span class="clay">without an owner.</span>',
-        stall_lead="Tools change, APIs update and the business moves on. Without someone watching, good systems slowly stop working.",
-        meter=("System decay", "20,44,70,90", ["Healthy", "Slipping", "Broken"]),
-        problems=[
-            ('<path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/>', "Things break after the agency leaves", "An API changes, a field gets renamed, and an automation fails with nobody watching.",
-             viz_resp("No support", "9 days", "Partnership", "same day", "Every day broken is leads and orders lost.")),
-            ('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.6-7 8-7s8 2.5 8 7"/>', "Nobody owns improvements", "Every fix and idea lands back on the founder's desk.", VIZ_YOU),
-            ('<path d="M4 5h16v10H9l-5 4z"/><path d="M9 9h6M9 12h3"/>', "Good ideas wait months", "The next automation stays on a list because there is no one to build it.",
-             viz_chat(["Can we automate invoices?", "What about WhatsApp leads?", "We need a weekly cash report", "Can the CRM do follow-ups?"], "14 ideas in the backlog")),
-            ('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7" stroke-dasharray="2 2"/>', "New tools pile up", "Each new app adds another gap between systems.", VIZ_TOOLS),
-        ],
-        cards_head='What you <span class="clay">get.</span>', cards_lead="One simple monthly plan that covers everything we build for you, and keeps adding to it.",
-        cards=[
-            ("Monitoring", "We watch every system around the clock and catch failures before your team does.", ["Alerts", "Uptime", "Logs"], '<path d="M3 12h4l3-8 4 16 3-8h4"/>'),
-            ("Fast fixes", "When something breaks, we fix it, usually the same day.", ["Same-day target", "Root cause"], '<path d="M14 6l4 4-8 8H6v-4z"/><path d="M4 20h16"/>'),
-            ("Monthly improvements", "Every month we make what you have faster, smarter and more useful.", ["Tuning", "New fields", "Better prompts"], '<path d="M4 18l6-6 4 4 6-8"/><path d="M15 8h5v5"/>'),
-            ("New automations", "We keep building from your backlog, one high-leverage system at a time.", ["Agents", "Workflows", "Integrations"], '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="12" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8.5 6H12a3 3 0 0 1 3 3v1M8.5 18H12a3 3 0 0 0 3-3v-1"/>'),
-            ("Monthly report", "A clear report of what we fixed, shipped and measured, plus what comes next.", ["Hours saved", "Next steps"], '<path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M10 17v-3M13 17v-5M16 17v-2"/>'),
-            ("Strategy check-ins", "Regular calls to review your telos and pick the next moves.", ["Roadmap", "Priorities"], '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/>'),
-        ],
-        signature=PARTNER_SIG, css=SIG_CSS,
-        outc_head='What the plan <span class="clay">aims for.</span>',
-        outcomes=[(24, "/7", "monitoring of every system we run"), (1, "day", "target to fix anything that breaks"), (30, "days", "between new improvements"), (1, "report", "every month, in plain words")],
-        outc_note="Plan targets. Exact terms are set in your partnership agreement.",
-        how_head='How the partnership <span class="clay">works.</span>',
-        step_names=["<h3>Telos Session</h3>", "<h3>System review</h3>", "<h3>Monthly cycle</h3>", "<h3>Compound</h3>"],
-        how_steps=["Tell us what you run today and where the business is headed.", "We review every system, fix the weak spots and set up monitoring.", "Each month we fix, improve and ship the next item from your backlog.", "Your systems get better every month instead of slowly breaking."],
-        faq_title="Partnership questions",
-        faqs=[
-            ("What does the monthly plan include?", "Monitoring, fixes, monthly improvements, new automations from your backlog, a monthly report and regular strategy check-ins."),
-            ("Can you support systems another agency built?", "Yes. We start with a system review, fix what is fragile and document everything before taking it over."),
-            ("How fast do you fix problems?", "Our target is the same day for anything that breaks. Exact response times are written into your plan."),
-            ("Is there a long contract?", "Plans run month to month after an initial period, so you stay because it keeps paying off."),
-            ("What if we need a bigger project?", "Larger builds are scoped separately, and your plan covers support once they launch."),
-            ("Do we still own everything?", "Yes. Everything runs in your accounts and belongs to your business."),
-        ],
-        final_line="Tell us what you run today. We'll review it and show you what a month of improvements looks like.",
-    ),
-]
-
-import sys
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import pages_more  # noqa: E402
-PAGES += pages_more.make(globals())
-
-if __name__ == "__main__":
-    for p in PAGES:
-        build(p)

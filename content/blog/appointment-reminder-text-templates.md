@@ -5,25 +5,25 @@ category: templates
 date: 2026-11-16
 image: /img/blog/appointment-reminder-text-templates.webp
 image_alt: "Marble statue of a smiling Greek woman reading a text message on a phone"
-services: [ai-agents, ai-automation]
+team: [cleo, irene]
 manual:
   title: "Sending these by hand?"
-  text: "Texting every client two or three times per visit can take your front desk an hour or more a day. The same messages can go out on their own, straight from your booking calendar."
-  link_text: "See how automatic reminders work"
+  text: "Texting every client two or three times per visit can take your front desk an hour or more a day. Many booking tools can send texts on their own, and your AI team can cover the reminder emails and the replies."
+  link_text: "See how it works for clinics"
   link: "/solutions/clinics/"
 offer:
-  kicker: "Done for you by Morning Telos"
-  title: "Automatic appointment reminders"
-  text: "We connect your booking calendar to a texting system that sends each reminder at the right time and handles the replies. Clients can confirm, cancel or move their visit by text, and your calendar updates by itself."
+  kicker: "Your AI team at Morning Telos"
+  title: "Reminders and rescheduling, handled"
+  text: "Cleo sends reminder emails from your calendar and offers new times when clients ask to move. Irene answers their questions from your policies."
   points:
-    - "Reminders 2 days, 1 day and 2 hours before"
-    - "Reply YES to confirm, R to reschedule"
-    - "Open slots offered to your waitlist"
-    - "Works with the booking tool you already use"
+    - "Reminder emails before every visit"
+    - "New times offered from your calendar"
+    - "Questions answered from your policies"
+    - "Nothing sent without your OK"
   cta: "Start your free trial"
-  side_title: "Want reminders that send themselves?"
-  side_text: "We set it up for you, usually in about a week."
-promo: "Reminders cut down on no-shows, but clients still call to reschedule. If those calls go to voicemail, an [AI receptionist](/services/ai-agents/) from Morning Telos can pick up, answer questions and move the appointment for you."
+  side_title: "Tired of the reschedule shuffle?"
+  side_text: "Cleo finds a new time and drafts the reply. You tap approve."
+promo: "Clients still write in to reschedule. With Morning Telos, [Cleo](/ai-employees/ai-scheduling-assistant/) finds a new time in your calendar and drafts the reply, so you just tap approve."
 stats:
   - n: "74%"
     text: "of consumers now expect 24/7 customer service because of AI."
