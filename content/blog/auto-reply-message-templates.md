@@ -5,25 +5,25 @@ category: templates
 date: 2026-11-16
 image: /img/blog/auto-reply-message-templates.webp
 image_alt: "Marble statue of a young Greek man ringing a small brass bell"
-services: [ai-agents, ai-automation]
+team: [irene, midas]
 manual:
   title: "Writing every reply by hand?"
-  text: "Answering each text, DM and form one at a time can take hours a week, and leads go cold while they wait. An AI receptionist can answer all of them in seconds, day or night."
-  link_text: "See how an AI receptionist works"
-  link: "/services/ai-agents/"
+  text: "Answering each email and form one at a time can take hours a week, and leads go cold while they wait. Your AI team can draft a real answer to each one in minutes."
+  link_text: "Meet Irene, your AI support agent"
+  link: "/ai-employees/ai-customer-support/"
 offer:
-  kicker: "Done for you by Morning Telos"
-  title: "AI receptionist for calls, texts and chat"
-  text: "We set up an assistant that answers your phone, texts, DMs and website chat, answers common questions and books appointments into your calendar."
+  kicker: "Your AI team at Morning Telos"
+  title: "Real replies for email and web forms"
+  text: "Irene answers customer emails from your policies, and Midas answers new leads and offers times to talk. Every reply waits for your OK."
   points:
-    - "Replies in seconds, 24/7"
-    - "Books straight into your calendar"
-    - "Hands tricky questions to your team"
+    - "Replies drafted in minutes"
+    - "Open times from your calendar"
+    - "Hard questions handed to you"
     - "Uses your hours, prices and rules"
   cta: "Start your free trial"
-  side_title: "Want replies that actually answer?"
-  side_text: "We set up your AI receptionist for you, usually in about a week."
-promo: "Auto replies buy you time. If you want the reply to answer the question and book the job too, that's what our [AI receptionist](/services/ai-agents/) does at Morning Telos."
+  side_title: "Want replies that answer the question?"
+  side_text: "Irene and Midas write real answers, in your voice."
+promo: "Auto replies buy you time. If you want the reply to answer the question and book the call too, that's what [Irene](/ai-employees/ai-customer-support/) and [Midas](/ai-employees/ai-sales-rep/) do at Morning Telos."
 stats:
   - n: "74%"
     text: "of consumers now expect 24/7 customer service because of AI."

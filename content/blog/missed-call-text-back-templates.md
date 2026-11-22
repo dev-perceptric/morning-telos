@@ -5,25 +5,25 @@ category: templates
 date: 2026-11-16
 image: /img/blog/missed-call-text-back.webp
 image_alt: "Marble statue of a smiling young Greek man talking on a smartphone"
-services: [ai-agents, ai-automation, crm-sales-automation]
+team: [midas, cleo]
 manual:
   title: "Sending these by hand?"
-  text: "Watching the call log and texting each missed caller yourself is easy to forget on a busy day. A missed call text back system sends the right message within seconds, every time."
-  link_text: "See how missed call text back works for home services"
+  text: "Watching the call log and texting each missed caller yourself is easy to forget on a busy day. Your phone system or a texting app can send these automatically."
+  link_text: "See how it works for home services"
   link: "/solutions/home-services/"
 offer:
-  kicker: "Done for you by Morning Telos"
-  title: "Missed call text back in 30 seconds"
-  text: "We set up your phone line so every missed caller gets a friendly text within 30 seconds, with the right message for the time of day and a fast path back to your team."
+  kicker: "Your AI team at Morning Telos"
+  title: "Every lead followed up"
+  text: "When a lead emails or fills out your form, Midas drafts a reply in minutes and follows up until there's a call. Cleo offers open times from your calendar."
   points:
-    - "A text to every missed caller within 30 seconds"
-    - "Different messages for business hours, nights and weekends"
-    - "Urgent replies sent straight to your on-call phone"
-    - "Optional AI replies that answer questions and book jobs"
+    - "Replies drafted in minutes"
+    - "Follow-ups until the call is booked"
+    - "Open times from your calendar"
+    - "Every lead saved with a next step"
   cta: "Start your free trial"
-  side_title: "Still losing callers to voicemail?"
-  side_text: "We set up missed call text back for you, usually in about a week."
-promo: "Want every call answered instead of texted back? Morning Telos sets up [AI receptionists](/services/ai-agents/) that pick up and book jobs day or night. Here's [what an AI receptionist costs](/blog/ai-receptionist-cost/)."
+  side_title: "Still losing leads to slow replies?"
+  side_text: "Midas answers every email and form lead, with your OK."
+promo: "Texts catch the caller. The next step is a real reply: [Midas](/ai-employees/ai-sales-rep/) at Morning Telos answers every email and web form lead and follows up until the call is booked. Here's [what an AI receptionist costs](/blog/ai-receptionist-cost/)."
 stats:
   - n: "78%"
     text: "of consumers have given up on a business after an unanswered call."

@@ -5,7 +5,7 @@ category: costs
 date: 2026-11-16
 image: /img/blog/ai-receptionist-cost.webp
 image_alt: "Marble statue of a young Greek man holding a brass telephone and a stack of gold coins"
-services: [ai-agents, ai-automation, partnership]
+team: [irene, midas, cleo]
 stats:
   - n: "$38,010"
     text: "Median yearly pay for a US receptionist, before benefits and payroll taxes ($18.27 an hour)."
@@ -119,4 +119,4 @@ These are estimates from published plans as of November 2026. Your real cost dep
 
 For most small businesses, an AI receptionist app is the right start. A custom build makes sense when the receptionist has to book into your own software, follow rules no app supports, or handle enough calls that per-call fees add up.
 
-That's where we help at Morning Telos. If an app fits, we pick it, set it up and connect it to your calendar and CRM. If it doesn't, we build a custom AI receptionist around your systems. See our [AI agents service](/services/ai-agents/), our playbooks for [clinics](/solutions/clinics/) and [home services](/solutions/home-services/), or [start a free trial](https://chat.morningtelos.com/#signup).
+Morning Telos covers the other half of the front desk: the inbox and the calendar. Your AI team works inside your email, calendar and CRM. [Midas](/ai-employees/ai-sales-rep/) answers new leads, [Irene](/ai-employees/ai-customer-support/) answers customers and [Cleo](/ai-employees/ai-scheduling-assistant/) books the visits, all with your OK. See how it works for [clinics](/solutions/clinics/) and [home services](/solutions/home-services/), or [start a free trial](https://chat.morningtelos.com/#signup).

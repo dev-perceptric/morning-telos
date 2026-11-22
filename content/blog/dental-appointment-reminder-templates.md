@@ -5,25 +5,25 @@ category: templates
 date: 2026-11-16
 image: /img/blog/reduce-no-shows.webp
 image_alt: "Marble statue of a smiling Greek woman holding a small brass hourglass"
-services: [ai-agents, ai-automation]
+team: [cleo, irene, cyrus]
 manual:
   title: "Sending these by hand?"
-  text: "Texting and calling every patient before every visit can take your front desk hours each week. The same messages can go out on their own, right on time, straight from your schedule."
-  link_text: "See how automatic reminders work for clinics"
+  text: "Emailing every patient before every visit can take your front desk hours each week. Cleo can send reminder emails from your schedule, right on time."
+  link_text: "See how it works for clinics"
   link: "/solutions/clinics/"
 offer:
-  kicker: "Done for you by Morning Telos"
-  title: "No-show recovery for dental practices"
-  text: "We connect your practice schedule to automatic texts and emails, so every patient gets a reminder, a simple way to confirm, and a quick follow-up if they miss a visit."
+  kicker: "Your AI team at Morning Telos"
+  title: "Fewer empty chairs for dental practices"
+  text: "Cleo sends reminder emails and offers new times when patients need to move. Cyrus reminds patients when a checkup is due. You approve everything first."
   points:
-    - "Reminders 2 to 3 days and 1 day before each visit"
-    - "Reply C or R to confirm or reschedule"
-    - "Same-day text after a missed appointment"
-    - "Recall messages for patients who are overdue"
+    - "Reminder emails before each visit"
+    - "New times offered from your calendar"
+    - "A friendly note after a missed visit"
+    - "Recall emails for overdue patients"
   cta: "Start your free trial"
   side_title: "Want fewer empty chairs?"
-  side_text: "We set up reminders, confirmations and recall for you, usually in about a week."
-promo: "If your front desk can't keep up with calls and confirmations, Morning Telos can set up an [AI receptionist](/services/ai-agents/) that answers patient calls and books visits while your team is busy."
+  side_text: "Cleo and Cyrus handle reminders and recalls, with your OK."
+promo: "If your front desk can't keep up with confirmations, [Cleo](/ai-employees/ai-scheduling-assistant/) and [Irene](/ai-employees/ai-customer-support/) from Morning Telos handle the reminder emails and patient questions while your team is busy."
 templates:
   new-patient:
     - title: "New patient welcome (text)"

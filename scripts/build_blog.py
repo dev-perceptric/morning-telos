@@ -42,13 +42,16 @@ CATEGORIES = {
     "templates": ("Templates", "Copy-ready texts, emails and scripts for local businesses."),
     "local-business": ("Local business growth", "Practical playbooks for clinics, home services and other local businesses."),
 }
-SERVICES = {
-    "ai-automation": ("AI &amp; automation", "Workflows that run on their own"),
-    "ai-agents": ("AI agents", "Agents that do real jobs"),
-    "ai-lead-generation": ("AI lead generation", "A pipeline that fills itself"),
-    "crm-sales-automation": ("CRM &amp; sales automation", "Follow-up that never forgets"),
-    "custom-software": ("Custom software", "Tools built around how you run"),
-    "partnership": ("Ongoing partnership", "Systems that keep improving"),
+# Teammates a post can point to (frontmatter "team: [midas, cleo]"), linked to their pages.
+TEAM = {
+    "alexander": ("Alexander the Emperor", "AI Chief of Staff", "ai-chief-of-staff"),
+    "midas": ("Midas the Merchant", "AI Sales Rep", "ai-sales-rep"),
+    "irene": ("Irene the Peacemaker", "AI Customer Support", "ai-customer-support"),
+    "cleo": ("Cleo the Timekeeper", "AI Scheduling Assistant", "ai-scheduling-assistant"),
+    "cyrus": ("Cyrus the Messenger", "AI Email Marketer", "ai-email-marketing"),
+    "leo": ("Leo the Storyteller", "AI Social Media Manager", "ai-social-media-manager"),
+    "theseus": ("Theseus the Librarian", "AI SEO Specialist", "ai-seo-specialist"),
+    "archon": ("Archon the Builder", "AI Website Builder", "ai-website-builder"),
 }
 
 HOME = (SITE / "index.html").read_text()
@@ -238,7 +241,7 @@ def build_post(p, posts):
         toc_items += f'<li><a href="#{i}">{esc(text)}</a></li>'
         if has_list and p.get("list_heading") and slugify(p["list_heading"]) == i:
             toc_items += '<li class="sub"><ol>' + "".join(f'<li><a href="#{slugify(e["name"])}">{n}. {esc(e["name"])}</a></li>' for n, e in enumerate(p["entries"], 1)) + "</ol></li>"
-    related_svc = "".join(f'<a class="icard" href="/services/{s}/"><b>{SERVICES[s][0]}</b><small>{SERVICES[s][1]}</small><span>→</span></a>' for s in p.get("services", []))
+    related_team = "".join(f'<a class="icard" href="/ai-employees/{TEAM[k][2]}/"><b>{TEAM[k][0]}</b><small>{TEAM[k][1]}</small><span>→</span></a>' for k in p.get("team", []))
     others = [o for o in posts if o["slug"] != p["slug"]][:3]
     related_posts = "".join(card(o) for o in others)
 
@@ -286,7 +289,7 @@ def build_post(p, posts):
     </aside>
   </div>
   <section class="post-cta wrap"><div><h2>Want work that gets done <span class="clay">while you sleep?</span></h2><p>Morning Telos gives you a team of AI employees who handle the busywork.</p></div><span style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn btn-dark btn-lg" href="https://chat.morningtelos.com/#signup">Start free trial <span class="arr">→</span></a><a class="btn btn-ghost btn-lg" href="/#team">Meet the team</a></span></section>
-  {f'<section class="istrip wrap"><h2 class="big">Related <span class="clay">services.</span></h2><div class="igrid">{related_svc}</div></section>' if related_svc else ''}
+  {f'<section class="istrip wrap"><h2 class="big">Meet the teammates <span class="clay">for this.</span></h2><div class="igrid">{related_team}</div></section>' if related_team else ''}
   {f'<section class="more wrap"><h2 class="big">More from <span class="clay">the blog.</span></h2><div class="pgrid">{related_posts}</div></section>' if related_posts else ''}
 </main>
 ''' + FOOTER

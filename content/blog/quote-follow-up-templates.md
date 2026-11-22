@@ -5,25 +5,25 @@ category: templates
 date: 2026-11-16
 image: /img/blog/quote-follow-up-templates.webp
 image_alt: "Marble statue of a young Greek man holding a rolled scroll tied with a red ribbon"
-services: [crm-sales-automation, ai-automation]
+team: [midas, cyrus]
 manual:
   title: "Following up by hand?"
-  text: "Keeping track of every open quote and remembering who to text on which day can take hours each week, and a few always slip through. These follow-ups can send on their own and stop as soon as the customer replies."
+  text: "Keeping track of every open quote and remembering who to email on which day can take hours each week, and a few always slip through. Midas can draft every follow-up on time."
   link_text: "See how it works for home service businesses"
   link: "/solutions/home-services/"
 offer:
-  kicker: "Done for you by Morning Telos"
-  title: "Automatic quote follow-up"
-  text: "We connect your quoting tool or CRM to text and email follow-ups that go out on a set schedule. When a customer replies, the follow-ups stop and your team gets a heads-up to take it from there."
+  kicker: "Your AI team at Morning Telos"
+  title: "Quote follow-up, handled"
+  text: "Midas follows up on every open quote on day 3, 7 and 14 from your own inbox. When a customer replies, he stops and tells you."
   points:
-    - "Follow-ups start the moment a quote is sent"
+    - "Follow-ups on every open quote"
     - "Stops as soon as the customer replies"
-    - "Sends from your business number and email"
-    - "Works with the CRM or quoting tool you already use"
+    - "Sent from your own email"
+    - "Works with your CRM or his leads list"
   cta: "Start your free trial"
-  side_title: "Want quotes that follow up on their own?"
-  side_text: "We set it up for you, usually in about a week."
-promo: "At Morning Telos we set up [quote follow-ups that run from your CRM](/services/crm-sales-automation/), so every open quote gets a check-in on time and nobody has to keep a list."
+  side_title: "Want quotes that never go quiet?"
+  side_text: "Midas follows up on every one, with your OK."
+promo: "With Morning Telos, [Midas](/ai-employees/ai-sales-rep/) follows up on every open quote on time from your own inbox, so nobody has to keep a list."
 templates:
   same-day:
     - title: "Text right after you send the quote"

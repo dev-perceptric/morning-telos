@@ -5,7 +5,7 @@ category: how-to-automate
 date: 2026-11-16
 image: /img/blog/automate-customer-service.webp
 image_alt: "Marble statue of a young Greek woman wearing a modern headset"
-services: [ai-agents, ai-automation, partnership]
+team: [irene, alexander]
 faqs:
   - q: "Can you fully automate customer service?"
     a: "You can automate most routine questions, like order status, hours, pricing and simple changes. Complaints, refunds above a set amount and sensitive cases should still reach a person. Most businesses aim for AI to resolve the common questions and hand the rest to their team with a summary."
@@ -117,4 +117,4 @@ Off-the-shelf tools are a great place to start. Bring in help when:
 - You bought a tool but never finished setting it up.
 - Volume is high enough that per-resolution fees add up to more than a custom build.
 
-That's the work we do at Morning Telos. If an off-the-shelf tool fits, we set it up and connect it for you. If it doesn't, we build a custom support agent around your tools and rules. See our [AI agents service](/services/ai-agents/) or [start a free trial](https://chat.morningtelos.com/#signup).
+That's what [Irene](/ai-employees/ai-customer-support/), the Morning Telos support agent, does. She answers customer emails from your own policies, hands the hard cases to you and waits for your OK before anything goes out. [Start a free trial](https://chat.morningtelos.com/#signup) to try her on your inbox.

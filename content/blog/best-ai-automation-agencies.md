@@ -5,7 +5,7 @@ category: top-agencies
 date: 2026-11-16
 image: /img/blog/best-ai-automation-agencies.webp
 image_alt: "Marble statue of a young Greek man reading a ranked list on a scroll"
-services: [ai-automation, ai-agents, partnership]
+team: [alexander, midas]
 list_heading: "The 12 best AI automation agencies"
 entry_label: "Agency"
 entries:
