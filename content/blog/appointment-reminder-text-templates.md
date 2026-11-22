@@ -20,7 +20,7 @@ offer:
     - "Reply YES to confirm, R to reschedule"
     - "Open slots offered to your waitlist"
     - "Works with the booking tool you already use"
-  cta: "Book a free Telos Session"
+  cta: "Start your free trial"
   side_title: "Want reminders that send themselves?"
   side_text: "We set it up for you, usually in about a week."
 promo: "Reminders cut down on no-shows, but clients still call to reschedule. If those calls go to voicemail, an [AI receptionist](/services/ai-agents/) from Morning Telos can pick up, answer questions and move the appointment for you."
@@ -300,4 +300,4 @@ For visits booked weeks or months out, add one more reminder about a week before
 
 Copying and pasting works when you have a few clients a day. Once you're busy, reminders slip, and that's when no-shows creep back in.
 
-At Morning Telos we set up reminders that send themselves and handle the replies. See how it works for [clinics](/solutions/clinics/), or [book a free Telos Session](/book/) and we'll map it out for your business.
+At Morning Telos we set up reminders that send themselves and handle the replies. See how it works for [clinics](/solutions/clinics/), or [start a free trial](https://chat.morningtelos.com/#signup) and try it yourself.

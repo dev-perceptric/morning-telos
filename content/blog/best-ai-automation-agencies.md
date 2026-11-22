@@ -22,7 +22,7 @@ entries:
     services: ["AI strategy and Telos Audit", "AI agents and AI receptionists", "Workflow, CRM and sales automation", "AI lead generation", "Custom software", "Ongoing partnership"]
     best_for: "Small and mid-size businesses that want one partner to plan, build and run their software and AI systems."
     pricing: "Pricing on a call, after a free 30-minute Telos Session."
-    pricing_url: "https://morningtelos.com/book/"
+    pricing_url: "https://chat.morningtelos.com/#signup"
   - name: "LeftClick"
     url: "https://leftclick.ai"
     shot: /img/blog/shots/leftclick.webp
@@ -240,7 +240,7 @@ Use these questions on your first call with any agency:
 6. What happens when something breaks, and how fast do you fix it?
 7. When would you tell us to buy software instead of building something custom?
 
-If you want a partner that starts with your end goal, plans the work and builds it into the tools you already use, [book a free Telos Session](/book/).
+If you want a partner that starts with your end goal, plans the work and builds it into the tools you already use, [start a free Morning Telos trial](https://chat.morningtelos.com/#signup).
 
 ## How much does an AI automation agency cost?
 

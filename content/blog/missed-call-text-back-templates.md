@@ -20,7 +20,7 @@ offer:
     - "Different messages for business hours, nights and weekends"
     - "Urgent replies sent straight to your on-call phone"
     - "Optional AI replies that answer questions and book jobs"
-  cta: "Book a free Telos Session"
+  cta: "Start your free trial"
   side_title: "Still losing callers to voicemail?"
   side_text: "We set up missed call text back for you, usually in about a week."
 promo: "Want every call answered instead of texted back? Morning Telos sets up [AI receptionists](/services/ai-agents/) that pick up and book jobs day or night. Here's [what an AI receptionist costs](/blog/ai-receptionist-cost/)."
@@ -254,6 +254,6 @@ Trade-specific versions for [home services](/solutions/home-services/), [clinics
 
 ## Set up missed call text back
 
-You can copy these templates into your phone system today. If you'd rather have it done for you, with the right message for each time of day and urgent replies sent to your team, book a free [Telos Session](/book/).
+You can copy these templates into your phone system today. If you'd rather have it done for you, with the right message for each time of day and urgent replies sent to your team, [start a free Morning Telos trial](https://chat.morningtelos.com/#signup).
 
 We work with plumbers, HVAC companies and other [home service businesses](/solutions/home-services/). Running a dental office? See our [dental appointment reminder templates](/blog/dental-appointment-reminder-templates/) too.

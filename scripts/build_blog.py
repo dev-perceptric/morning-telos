@@ -153,7 +153,7 @@ def manual_html(p):
     m = p.get("manual")
     if not m:
         return ""
-    link = f'<a href="{esc(m.get("link", "/book/"))}">{esc(m.get("link_text", "See how it works"))} →</a>'
+    link = f'<a href="{esc(m.get("link", "https://chat.morningtelos.com/#signup"))}">{esc(m.get("link_text", "See how it works"))} →</a>'
     return (f'<aside class="manual"><span class="mi" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>'
             f'<div><b>{esc(m.get("title", "Sending these by hand?"))}</b><p>{esc(m["text"])}</p>{link}</div></aside>')
 
@@ -165,7 +165,7 @@ def offer_html(p):
     pts = "".join(f"<li>{esc(x)}</li>" for x in o.get("points", []))
     return (f'<aside class="offer"><span class="ok">{esc(o.get("kicker", "Done for you by Morning Telos"))}</span><h3>{esc(o["title"])}</h3>'
             f'<p>{esc(o["text"])}</p>{"<ul>" + pts + "</ul>" if pts else ""}'
-            f'<a class="btn btn-dark" href="/book/">{esc(o.get("cta", "Book a free Telos Session"))} <span class="arr">→</span></a></aside>')
+            f'<a class="btn btn-dark" href="https://chat.morningtelos.com/#signup">{esc(o.get("cta", "Start your free trial"))} <span class="arr">→</span></a></aside>')
 
 
 def promo_html(p):
@@ -194,8 +194,8 @@ def share_bar(url, title):
 def side_cta(p):
     o = p.get("offer")
     if o:
-        return f'<div class="side-cta"><b>{esc(o.get("side_title", o["title"]))}</b><p>{esc(o.get("side_text", "We set it up for you, usually in about a week. Start with a free 30-minute Telos Session."))}</p><a class="btn" href="https://chat.morningtelos.com/#signup">Start free trial →</a><a class="side-alt" href="/book/">or book a free Telos Session</a></div>'
-    return '<div class="side-cta"><b>Want systems that run while you sleep?</b><p>Book a free 30-minute Telos Session. We\'ll find your highest-leverage first move.</p><a class="btn" href="https://chat.morningtelos.com/#signup">Start free trial →</a><a class="side-alt" href="/book/">or book a free Telos Session</a></div>'
+        return f'<div class="side-cta"><b>{esc(o.get("side_title", o["title"]))}</b><p>{esc(o.get("side_text", "Your AI team can do this for you. Try it free for 14 days."))}</p><a class="btn" href="https://chat.morningtelos.com/#signup">Start free trial →</a></div>'
+    return '<div class="side-cta"><b>Want work that gets done while you sleep?</b><p>Hire your AI team. Free for 14 days, no card needed.</p><a class="btn" href="https://chat.morningtelos.com/#signup">Start free trial →</a></div>'
 
 
 def build_post(p, posts):
@@ -285,7 +285,7 @@ def build_post(p, posts):
       {side_cta(p)}
     </aside>
   </div>
-  <section class="post-cta wrap"><div><h2>Want systems that run <span class="clay">while you sleep?</span></h2><p>Morning Telos builds software and AI automation for founders, operators and decision makers.</p></div><span style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn btn-dark btn-lg" href="https://chat.morningtelos.com/#signup">Start free trial <span class="arr">→</span></a><a class="btn btn-ghost btn-lg" href="/book/">Book a Telos Session</a></span></section>
+  <section class="post-cta wrap"><div><h2>Want work that gets done <span class="clay">while you sleep?</span></h2><p>Morning Telos gives you a team of AI employees who handle the busywork.</p></div><span style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn btn-dark btn-lg" href="https://chat.morningtelos.com/#signup">Start free trial <span class="arr">→</span></a><a class="btn btn-ghost btn-lg" href="/#team">Meet the team</a></span></section>
   {f'<section class="istrip wrap"><h2 class="big">Related <span class="clay">services.</span></h2><div class="igrid">{related_svc}</div></section>' if related_svc else ''}
   {f'<section class="more wrap"><h2 class="big">More from <span class="clay">the blog.</span></h2><div class="pgrid">{related_posts}</div></section>' if related_posts else ''}
 </main>

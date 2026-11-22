@@ -20,7 +20,7 @@ offer:
     - "Stops as soon as the customer replies"
     - "Sends from your business number and email"
     - "Works with the CRM or quoting tool you already use"
-  cta: "Book a free Telos Session"
+  cta: "Start your free trial"
   side_title: "Want quotes that follow up on their own?"
   side_text: "We set it up for you, usually in about a week."
 promo: "At Morning Telos we set up [quote follow-ups that run from your CRM](/services/crm-sales-automation/), so every open quote gets a check-in on time and nobody has to keep a list."
@@ -349,4 +349,4 @@ For bigger jobs, like a new roof or a remodel, you can space these out a bit mor
 
 You've already done the hard part by visiting, measuring and pricing the job. Follow-up is how you get paid for that work.
 
-If you'd like your follow-ups to run on their own, book a free [Telos Session](/book/) and we'll map out a schedule for your business. Insurance agencies can see how we handle renewals and quotes on our [insurance page](/solutions/insurance/).
+If you'd like your follow-ups to run on their own, [start a free Morning Telos trial](https://chat.morningtelos.com/#signup) and let Midas follow up for you. Insurance agencies can see how we handle renewals and quotes on our [insurance page](/solutions/insurance/).

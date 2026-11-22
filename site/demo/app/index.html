@@ -553,7 +553,7 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
       </div>
     </nav>
     <div class="grp"><h6>Recent</h6><div id="recent"></div></div>
-    <div class="sb-demo"><b>Demo</b>A sample business with sample data. Want this for yours?<a href="/book/">Book a Telos Session →</a></div>
+    <div class="sb-demo"><b>Demo</b>A sample business with sample data. Want this for yours?<a href="https://chat.morningtelos.com/#signup">Start your free trial →</a></div>
     <div class="sb-foot">
       <button class="me-btn" data-toast="Profile and settings"><span class="avatar-me">A</span><span><b>Alex Rivera</b><small>Owner</small></span></button>
       <button class="icon-btn" data-toast="Invite link copied" aria-label="Invite team"><svg class="ico" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/></svg></button>
@@ -565,7 +565,7 @@ button.row:hover,a.row:hover,.row.sel{background:var(--sunk)}
       <span class="logo"><svg viewBox="0 0 28 20" aria-hidden="true"><g fill="#D97757"><rect x="8" y="0" width="12" height="4"/><rect x="4" y="4" width="20" height="4"/><rect x="0" y="8" width="28" height="4"/><rect x="0" y="16" width="28" height="4"/></g></svg></span>
       <b>Brightside Heating & Air</b>
       <button class="icon-btn" data-pal aria-label="Search"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
-      <a class="demo-tag" href="/book/">Demo</a>
+      <a class="demo-tag" href="https://chat.morningtelos.com/#signup">Demo</a>
       <span class="avatar-me">A</span>
     </header>
 
@@ -1056,7 +1056,7 @@ function renderTeam(){
   let html=CATS.map(([c,ks])=>{const l=ks.filter(k=>match(A[k].name,A[k].god,A[k].job,c));return l.length?`<section class="uc-sec"><h2>${c}</h2><div class="uc-grid">${l.map(card).join("")}</div></section>`:""}).join("");
   const soon=SOON.filter(s=>match(s[0],s[1]));
   if(soon.length)html+=`<section class="uc-sec"><h2>Coming soon</h2><div class="uc-grid">${soon.map(s=>`<article class="card uc soon"><div class="top"><span class="lock"><svg class="ico sm" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Coming soon</span>${ics(s[3])}</div><h3>${s[0]}</h3><p>${s[1]}</p><ul>${s[2].map(o=>`<li>${o}</li>`).join("")}</ul><div class="ft"><span></span><button class="btn sm" data-toast="You're on the list for ${s[0]}">Join waitlist</button></div></article>`).join("")}</div></section>`;
-  html+=`<section class="uc-sec"><h2>Custom work</h2><div class="uc-grid"><article class="card uc custom"><h3>Anything else</h3><p>Describe the job in your own words. If it happens in your tools, Morning Telos can build an employee for it.</p><ul><li>Your process, your rules</li><li>Works in the tools you use</li><li>Built for you in about a week</li></ul><div class="ft"><a href="/book/" style="color:#fff">Book a Telos Session →</a></div></article></div></section>`;
+  html+=`<section class="uc-sec"><h2>Custom work</h2><div class="uc-grid"><article class="card uc custom"><h3>Anything else</h3><p>Describe the job in your own words. If it happens in your tools, Morning Telos can build an employee for it.</p><ul><li>Your process, your rules</li><li>Works in the tools you use</li><li>Built for you in about a week</li></ul><div class="ft"><a href="https://chat.morningtelos.com/#signup" style="color:#fff">Start your free trial →</a></div></article></div></section>`;
   $("#ucWrap").innerHTML=html||emptyHTML("No roles found","Try another word.");
 }
 $("#ucQ").addEventListener("input",renderTeam);

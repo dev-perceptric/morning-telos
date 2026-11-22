@@ -119,4 +119,4 @@ These are estimates from published plans as of November 2026. Your real cost dep
 
 For most small businesses, an AI receptionist app is the right start. A custom build makes sense when the receptionist has to book into your own software, follow rules no app supports, or handle enough calls that per-call fees add up.
 
-That's where we help at Morning Telos. If an app fits, we pick it, set it up and connect it to your calendar and CRM. If it doesn't, we build a custom AI receptionist around your systems. See our [AI agents service](/services/ai-agents/), our playbooks for [clinics](/solutions/clinics/) and [home services](/solutions/home-services/), or [book a free Telos Session](/book/).
+That's where we help at Morning Telos. If an app fits, we pick it, set it up and connect it to your calendar and CRM. If it doesn't, we build a custom AI receptionist around your systems. See our [AI agents service](/services/ai-agents/), our playbooks for [clinics](/solutions/clinics/) and [home services](/solutions/home-services/), or [start a free trial](https://chat.morningtelos.com/#signup).

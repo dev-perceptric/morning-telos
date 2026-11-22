@@ -20,7 +20,7 @@ offer:
     - "Reply C or R to confirm or reschedule"
     - "Same-day text after a missed appointment"
     - "Recall messages for patients who are overdue"
-  cta: "Book a free Telos Session"
+  cta: "Start your free trial"
   side_title: "Want fewer empty chairs?"
   side_text: "We set up reminders, confirmations and recall for you, usually in about a week."
 promo: "If your front desk can't keep up with calls and confirmations, Morning Telos can set up an [AI receptionist](/services/ai-agents/) that answers patient calls and books visits while your team is busy."
@@ -346,4 +346,4 @@ When the patient is a child, send the message to the parent or guardian's phone.
 
 Front desk time adds up. The median U.S. receptionist earns $18.27 an hour ([BLS, May 2025](https://www.bls.gov/ooh/office-and-administrative-support/receptionists.htm)), and every reminder call made by hand takes some of those hours.
 
-If you'd like these messages to send themselves from your schedule, book a free [Telos Session](/book/). You can also see how we help [clinics and dental offices](/solutions/clinics/), or grab our [missed call text back templates](/blog/missed-call-text-back-templates/) for the calls your team can't pick up.
+If you'd like these messages to send themselves from your schedule, [start a free Morning Telos trial](https://chat.morningtelos.com/#signup). You can also see how we help [clinics and dental offices](/solutions/clinics/), or grab our [missed call text back templates](/blog/missed-call-text-back-templates/) for the calls your team can't pick up.

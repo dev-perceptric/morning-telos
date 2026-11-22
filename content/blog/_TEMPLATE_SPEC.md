@@ -3,7 +3,7 @@
 This file is guidance for writers. It is NOT a post (the builder only reads files that start with `---`; this one doesn't).
 
 ## Brand
-Morning Telos (morningtelos.com) builds software and AI automation for founders, business owners and operators. Booking page: `/book/` (free 30-minute "Telos Session"). Email: meet@morningtelos.com.
+Morning Telos (morningtelos.com) builds software and AI automation for founders, business owners and operators. Sign-up link: `https://chat.morningtelos.com/#signup` (free 14-day trial, no card). Email: meet@morningtelos.com.
 
 Industry pages you may link: `/solutions/clinics/`, `/solutions/home-services/`, `/solutions/real-estate/`, `/solutions/law-firms/`, `/solutions/ecommerce/`, `/solutions/accounting/`, `/solutions/fitness/`, `/solutions/logistics/`, `/solutions/agencies/`, `/solutions/saas/`, `/solutions/insurance/`, `/solutions/recruiting/`.
 Service pages: `/services/ai-agents/`, `/services/ai-automation/`, `/services/crm-sales-automation/`, `/services/partnership/`.
@@ -15,7 +15,7 @@ Existing posts you may link: `/blog/ai-receptionist-cost/`, `/blog/how-to-automa
 - No hype words: revolutionary, game-changing, unlock, leverage, seamless, robust, delve, elevate, in today's fast-paced world.
 - Answer first: the first line under the title is a blockquote starting with `> **Short answer:**`.
 - NEVER invent statistics, studies, prices or quotes. Only use the stats in "Allowed stats" below, with their exact source link. If no stat fits, use none.
-- Promote Morning Telos occasionally and naturally: one [[PROMO]] mid-article, one [[MANUAL]] box after the main templates, one [[OFFER]] near the end, and a final short paragraph linking to `/book/` and one industry page. Don't mention Morning Telos more than ~5 times total.
+- Promote Morning Telos occasionally and naturally: one [[PROMO]] mid-article, one [[MANUAL]] box after the main templates, one [[OFFER]] near the end, and a final short paragraph linking to the free trial and one industry page. Don't mention Morning Telos more than ~5 times total.
 - Templates: realistic, warm, short (texts under ~300 characters; emails can be longer). Use placeholders in square brackets: [Name], [Business], [Day], [Date], [Time], [Address], [Link], [Phone], [Service], [Staff name]. Include opt-out language like "Reply STOP to opt out" in a few marketing-type texts (reviews, follow-ups), not in every reminder.
 - Each template group needs a short `###` heading in the body plus `[[TPL key]]`, and a matching list under `templates.key` in front matter.
 
@@ -105,7 +105,7 @@ Short intro line.
 
 [[OFFER]]
 
-## (optional) Short closing section linking /book/ and one /solutions/ page
+## (optional) Short closing section linking the free trial and one /solutions/ page
 
 (FAQ is rendered automatically from front matter; don't write an FAQ heading.)
 ```

@@ -20,7 +20,7 @@ offer:
     - "Uses your direct Google review link"
     - "One reminder, then it stops"
     - "Alerts you to new reviews so you can reply"
-  cta: "Book a free Telos Session"
+  cta: "Start your free trial"
   side_title: "Want review requests that send themselves?"
   side_text: "We set it up for you, usually in about a week."
 promo: "Most businesses forget to ask on busy days. At Morning Telos we [automate review requests](/services/ai-automation/) so every customer gets the same friendly text after their visit."
@@ -319,4 +319,4 @@ Stay calm, apologize and move the conversation to a phone call. Keep private det
 
 ## Get more reviews on autopilot
 
-Review requests work best when they go out after every single job, even on your busiest days. If you'd like help setting that up, [book a free Telos Session](/book/) with Morning Telos. See how we help [clinics](/solutions/clinics/) and other local businesses.
+Review requests work best when they go out after every single job, even on your busiest days. If you'd like help setting that up, [start a free Morning Telos trial](https://chat.morningtelos.com/#signup). See how we help [clinics](/solutions/clinics/) and other local businesses.

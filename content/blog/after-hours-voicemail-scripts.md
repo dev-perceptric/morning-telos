@@ -20,7 +20,7 @@ offer:
     - "Books into your calendar"
     - "Sends urgent calls to your on-call line"
     - "Texts you a summary of each call"
-  cta: "Book a free Telos Session"
+  cta: "Start your free trial"
   side_title: "Want every after-hours call answered?"
   side_text: "We set it up for you, usually in about a week."
 promo: "If you'd rather callers talk to someone at 9 p.m., Morning Telos can set up an [AI receptionist](/services/ai-agents/) that answers after-hours calls, takes details and books appointments."
@@ -247,4 +247,4 @@ An AI receptionist sits in between. It can answer the call at any hour, answer c
 
 ## Never miss an after-hours lead again
 
-A clear greeting and a quick text go a long way. If you'd like every after-hours call answered instead, book a free [Telos Session](/book/) and we'll show you how it would work for your business. Law firms can see how we handle new client calls on our [law firm page](/solutions/law-firms/).
+A clear greeting and a quick text go a long way. If you'd like every after-hours call answered instead, [start a free Morning Telos trial](https://chat.morningtelos.com/#signup) and see what your AI team can take off your plate. Law firms can see how we handle new client calls on our [law firm page](/solutions/law-firms/).

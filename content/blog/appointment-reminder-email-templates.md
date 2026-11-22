@@ -20,7 +20,7 @@ offer:
     - "Prep notes matched to each service"
     - "One-click confirm and reschedule"
     - "Follow-up after a no-show"
-  cta: "Book a free Telos Session"
+  cta: "Start your free trial"
   side_title: "Want reminders that send themselves?"
   side_text: "We set it up for you, usually in about a week."
 promo: "Email works well for details, but many clients reply by phone. If those calls go unanswered, an [AI receptionist](/services/ai-agents/) from Morning Telos can answer, look up the booking and reschedule it on the spot."
@@ -597,4 +597,4 @@ See how reminders fit into a full setup for [law firms](/solutions/law-firms/) a
 
 These templates work well by hand when you have a few appointments a day. As you grow, it gets easy to miss one, and a missed reminder often turns into a missed visit.
 
-At Morning Telos we set up reminder emails and texts that send themselves, with the right prep notes for each appointment type. See how it works for [clinics](/solutions/clinics/), or [book a free Telos Session](/book/) and we'll help you plan it.
+At Morning Telos we set up reminder emails and texts that send themselves, with the right prep notes for each appointment type. See how it works for [clinics](/solutions/clinics/), or [start a free trial](https://chat.morningtelos.com/#signup) and try it yourself.
