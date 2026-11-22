@@ -62,7 +62,7 @@ def make(ns):
     MORE_CSS = SIG_CSS + '''
   .kan-body { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 18px; min-height: 360px; }
   .kcol { background: var(--ivory); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 8px; align-content: start; }
-  .kcol h5 { font-family: var(--mono); font-weight: 500; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4); display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .kcol h5 { font-family: var(--sans); font-weight: 500; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); display: flex; justify-content: space-between; margin-bottom: 4px; }
   .kcol h5 span { color: var(--ink); }
   .kcol:last-child { background: #fff4ee; border-color: var(--clay-soft); }
   .kcol:last-child h5 span { color: var(--clay); }
@@ -72,8 +72,8 @@ def make(ns):
   .kc .pill { margin-top: 8px; }
   .run-body { display: grid; grid-template-columns: 1fr 1.3fr; min-height: 380px; }
   .run-task { padding: 24px; border-right: 1px solid var(--line); background: var(--ivory); }
-  .run-task small, .run-steps small { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 10px; }
-  .run-task p { font-family: var(--serif); font-size: 24px; line-height: 1.3; }
+  .run-task small, .run-steps small { display: block; font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 10px; }
+  .run-task p { font-family: var(--serif); font-weight: 500; font-size: 24px; line-height: 1.3; }
   .run-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
   .run-tools span { font-size: 12px; padding: 4px 10px; border-radius: 99px; background: var(--white); border: 1px solid var(--line); color: var(--ink-3); }
   .run-steps { padding: 24px; }

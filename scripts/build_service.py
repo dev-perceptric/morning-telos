@@ -264,8 +264,8 @@ SIG_CSS = '''
   .kpi { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--white); opacity: 0; transform: translateY(10px); transition: opacity .5s .2s, transform .6s .2s var(--ease); }
   .kpi:nth-child(2) { transition-delay: .3s; } .kpi:nth-child(3) { transition-delay: .4s; }
   .dash.in .kpi { opacity: 1; transform: none; }
-  .kpi small, .chart small, .tbl small, .rep-chart small, .rep-list small { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 8px; }
-  .kpi b { font-family: var(--serif); font-weight: 400; font-size: 34px; line-height: 1; }
+  .kpi small, .chart small, .tbl small, .rep-chart small, .rep-list small { display: block; font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 8px; }
+  .kpi b { font-family: var(--serif); font-weight: 500; font-size: 34px; line-height: 1; }
   .kpi em { display: block; font-style: normal; font-size: 12px; color: #3f7d4a; margin-top: 6px; }
   .dash-row { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; }
   .chart, .tbl { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--white); }
@@ -278,7 +278,7 @@ SIG_CSS = '''
   .dash.in .tr { opacity: 1; transform: none; }
   .rep-body { display: grid; grid-template-columns: 1.2fr 1fr; min-height: 380px; }
   .rep-chart { padding: 24px; border-right: 1px solid var(--line); }
-  .rep-big { display: block; font-family: var(--serif); font-weight: 400; font-size: 56px; line-height: 1; margin-bottom: 18px; }
+  .rep-big { display: block; font-family: var(--serif); font-weight: 500; font-size: 56px; line-height: 1; margin-bottom: 18px; }
   .rep-big em { font-style: normal; font-family: var(--sans); font-size: 14px; color: var(--ink-3); margin-left: 8px; }
   .rep-chart svg { width: 100%; height: 160px; display: block; overflow: visible; }
   .rep-chart .line { fill: none; stroke: var(--clay); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 420; stroke-dashoffset: 420; transition: stroke-dashoffset 2s var(--ease) .3s; }

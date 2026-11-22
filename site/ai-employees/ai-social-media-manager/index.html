@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 20'%3E%3Cg fill='%23D97757'%3E%3Crect x='8' y='0' width='12' height='4'/%3E%3Crect x='4' y='4' width='20' height='4'/%3E%3Crect x='0' y='8' width='28' height='4'/%3E%3Crect x='0' y='16' width='28' height='4'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
 <link rel="canonical" href="https://morningtelos.com/ai-employees/ai-social-media-manager/">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is an AI social media manager?", "acceptedAnswer": {"@type": "Answer", "text": "An AI teammate that plans, writes and schedules your social posts. Leo does that in your voice and reports what works."}}, {"@type": "Question", "name": "Which networks does Leo post to?", "acceptedAnswer": {"@type": "Answer", "text": "Instagram, Facebook, TikTok and the other networks you connect."}}, {"@type": "Question", "name": "Will he post without my OK?", "acceptedAnswer": {"@type": "Answer", "text": "No. Every post waits for you to approve or skip it, unless you put him on autopilot."}}, {"@type": "Question", "name": "How does he learn my voice?", "acceptedAnswer": {"@type": "Answer", "text": "From your brand notes, your website and the posts you approve. You can edit any post."}}, {"@type": "Question", "name": "How often will he post?", "acceptedAnswer": {"@type": "Answer", "text": "You choose. He suggests a schedule that fits your goal, like three times a week."}}, {"@type": "Question", "name": "Does he tell me what's working?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every Monday he sends a short report on your results and what to post next."}}]}</script>
@@ -22,12 +22,12 @@
   .pcard { border: 1px solid var(--line); border-radius: 16px; background: var(--white); padding: 24px; }
   .pcard .top { display: flex; gap: 14px; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
   .pcard img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); flex: none; }
-  .pcard h3 { font-family: var(--serif); font-weight: 400; font-size: 25px; line-height: 1.15; }
-  .pcard .role { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--clay); }
+  .pcard h3 { font-family: var(--serif); font-weight: 500; font-size: 25px; line-height: 1.15; }
+  .pcard .role { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); }
   .pcard dl { display: grid; gap: 16px; }
-  .pcard dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
+  .pcard dt { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
   .pcard dd { font-size: 15px; line-height: 1.5; color: var(--ink-2); }
-  .pcard .quote { font-family: var(--serif); font-size: 21px; font-style: italic; color: var(--ink); }
+  .pcard .quote { font-family: var(--serif); font-weight: 500; font-size: 21px; font-style: italic; color: var(--ink); }
   .pcard .tools { display: flex; flex-wrap: wrap; gap: 6px; }
   .pcard .tools span { font-size: 12.5px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; background: var(--ivory); }
   .chat-body { padding: 24px; display: grid; gap: 16px; min-height: 400px; align-content: start; background: var(--ivory); }
@@ -38,9 +38,9 @@
   .msg small { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--ink-2); }
   .msg .b { display: inline-block; max-width: 540px; padding: 11px 15px; border-radius: 14px; font-size: 14.5px; line-height: 1.5; background: var(--white); border: 1px solid var(--line); }
   .msg.you .b { background: var(--ink); color: var(--ivory); border-color: var(--ink); }
-  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(20,20,19,.4); }
+  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(46,41,38,.4); }
   .aphead { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
-  .aphead .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
+  .aphead .tag { font-family: var(--sans); font-weight: 600; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
   .apbody { padding: 12px 14px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
   .apbtns { display: flex; gap: 8px; padding: 0 14px 14px; flex-wrap: wrap; }
   .apbtns span { font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); }

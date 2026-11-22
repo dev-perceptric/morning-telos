@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 20'%3E%3Cg fill='%23D97757'%3E%3Crect x='8' y='0' width='12' height='4'/%3E%3Crect x='4' y='4' width='20' height='4'/%3E%3Crect x='0' y='8' width='28' height='4'/%3E%3Crect x='0' y='16' width='28' height='4'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
 <link rel="canonical" href="https://morningtelos.com/solutions/accounting/">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does it work with QuickBooks and Xero?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, along with practice tools like Karbon, TaxDome, Canopy and most document portals."}}, {"@type": "Question", "name": "Is client financial data secure?", "acceptedAnswer": {"@type": "Answer", "text": "Everything runs in your accounts with access limited to what each tool needs, and we use AI providers that don't train on your data."}}, {"@type": "Question", "name": "Will AI make entries without review?", "acceptedAnswer": {"@type": "Answer", "text": "No. Extracted data goes into a review step, and your team approves before anything posts."}}, {"@type": "Question", "name": "Can it remind clients without annoying them?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Reminders are friendly, spaced out, and stop the moment the document arrives."}}, {"@type": "Question", "name": "Can it answer client questions?", "acceptedAnswer": {"@type": "Answer", "text": "It answers routine status questions and drafts replies for anything that needs an accountant."}}, {"@type": "Question", "name": "How long does setup take?", "acceptedAnswer": {"@type": "Answer", "text": "Document collection can go live in about two weeks. Data extraction follows after."}}]}</script>
@@ -27,8 +27,8 @@
   .kpi { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--white); opacity: 0; transform: translateY(10px); transition: opacity .5s .2s, transform .6s .2s var(--ease); }
   .kpi:nth-child(2) { transition-delay: .3s; } .kpi:nth-child(3) { transition-delay: .4s; }
   .dash.in .kpi { opacity: 1; transform: none; }
-  .kpi small, .chart small, .tbl small, .rep-chart small, .rep-list small { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 8px; }
-  .kpi b { font-family: var(--serif); font-weight: 400; font-size: 34px; line-height: 1; }
+  .kpi small, .chart small, .tbl small, .rep-chart small, .rep-list small { display: block; font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 8px; }
+  .kpi b { font-family: var(--serif); font-weight: 500; font-size: 34px; line-height: 1; }
   .kpi em { display: block; font-style: normal; font-size: 12px; color: #3f7d4a; margin-top: 6px; }
   .dash-row { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; }
   .chart, .tbl { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--white); }
@@ -41,7 +41,7 @@
   .dash.in .tr { opacity: 1; transform: none; }
   .rep-body { display: grid; grid-template-columns: 1.2fr 1fr; min-height: 380px; }
   .rep-chart { padding: 24px; border-right: 1px solid var(--line); }
-  .rep-big { display: block; font-family: var(--serif); font-weight: 400; font-size: 56px; line-height: 1; margin-bottom: 18px; }
+  .rep-big { display: block; font-family: var(--serif); font-weight: 500; font-size: 56px; line-height: 1; margin-bottom: 18px; }
   .rep-big em { font-style: normal; font-family: var(--sans); font-size: 14px; color: var(--ink-3); margin-left: 8px; }
   .rep-chart svg { width: 100%; height: 160px; display: block; overflow: visible; }
   .rep-chart .line { fill: none; stroke: var(--clay); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 420; stroke-dashoffset: 420; transition: stroke-dashoffset 2s var(--ease) .3s; }
@@ -65,7 +65,7 @@
 
   .ba-sec { padding: 40px 0 120px; }
   .ba-sec .head { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: end; margin-bottom: 36px; }
-  .ba { border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 40px 80px -50px rgba(20,20,19,.5); padding: 22px 26px 26px; background: var(--ivory-3); transition: background .6s; }
+  .ba { border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 40px 80px -50px rgba(46,41,38,.5); padding: 22px 26px 26px; background: var(--ivory-3); transition: background .6s; }
   .ba[data-s="after"] { background: var(--white); }
   .ba-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
   .ba-tog { position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; padding: 4px; border-radius: 99px; background: var(--white); border: 1px solid var(--line-2); }
@@ -88,12 +88,12 @@
   .ba[data-s="after"] .ba-l.before li { opacity: 0; transform: translateY(-10px); pointer-events: none; }
   .ba time { font-family: var(--mono); font-size: 12px; color: var(--ink-4); }
   .ba em { font-style: normal; font-family: var(--mono); font-size: 11px; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
-  .ba em.m { background: rgba(20,20,19,.07); color: var(--ink-3); }
+  .ba em.m { background: rgba(46,41,38,.07); color: var(--ink-3); }
   .ba em.a { background: rgba(95,163,106,.14); color: #3f7d4a; }
   .ba em.f { background: var(--clay); color: #fff; }
   .flow-body { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 0; min-height: 380px; }
   .flow-msg { padding: 24px; border-right: 1px solid var(--line); background: var(--ivory); }
-  .flow-msg small, .flow-steps::before { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 12px; }
+  .flow-msg small, .flow-steps::before { display: block; font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 12px; }
   .bubble { background: var(--white); border: 1px solid var(--line); border-radius: 16px 16px 16px 4px; padding: 14px 16px; opacity: 0; transform: translateY(12px) scale(.96); transition: opacity .5s .2s, transform .6s cubic-bezier(.3,1.5,.5,1) .2s; }
   .flow.in .bubble { opacity: 1; transform: none; }
   .bubble b { display: block; font-size: 14px; } .bubble p { font-size: 15px; margin: 6px 0 8px; color: var(--ink-2); } .bubble time { font-family: var(--mono); font-size: 11px; color: var(--ink-4); }
@@ -108,7 +108,7 @@
   .flow.in .flow-out { opacity: 1; transform: none; }
   .flow-out .ck { width: 48px; height: 48px; border-radius: 14px; background: var(--clay); display: grid; place-items: center; box-shadow: 0 14px 30px -12px rgba(217,119,87,.9); }
   .flow-out .ck svg { width: 22px; height: 22px; stroke: #fff; fill: none; stroke-width: 2.5; }
-  .flow-out b { font-family: var(--serif); font-weight: 400; font-size: 30px; line-height: 1.1; } .flow-out small { font-size: 14px; color: var(--ink-3); }
+  .flow-out b { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.1; } .flow-out small { font-size: 14px; color: var(--ink-3); }
   @media (max-width: 1000px) { .ba-sec .head { grid-template-columns: 1fr; gap: 18px; } .flow-body { grid-template-columns: 1fr; } .flow-msg, .flow-steps { border-right: 0; border-bottom: 1px solid var(--line); } }
   @media (max-width: 640px) { .ba { padding: 16px 12px 18px; } .ba-l li { grid-template-columns: 50px 1fr; font-size: 14px; padding: 10px 12px; } .ba em { display: none; } .ba-note { display: none; } .ba-sec { padding-bottom: 80px; } }
 </style>

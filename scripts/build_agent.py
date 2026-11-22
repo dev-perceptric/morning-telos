@@ -161,12 +161,12 @@ CSS = '''
   .pcard { border: 1px solid var(--line); border-radius: 16px; background: var(--white); padding: 24px; }
   .pcard .top { display: flex; gap: 14px; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
   .pcard img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); flex: none; }
-  .pcard h3 { font-family: var(--serif); font-weight: 400; font-size: 25px; line-height: 1.15; }
-  .pcard .role { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--clay); }
+  .pcard h3 { font-family: var(--serif); font-weight: 500; font-size: 25px; line-height: 1.15; }
+  .pcard .role { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); }
   .pcard dl { display: grid; gap: 16px; }
-  .pcard dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
+  .pcard dt { font-family: var(--sans); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 5px; }
   .pcard dd { font-size: 15px; line-height: 1.5; color: var(--ink-2); }
-  .pcard .quote { font-family: var(--serif); font-size: 21px; font-style: italic; color: var(--ink); }
+  .pcard .quote { font-family: var(--serif); font-weight: 500; font-size: 21px; font-style: italic; color: var(--ink); }
   .pcard .tools { display: flex; flex-wrap: wrap; gap: 6px; }
   .pcard .tools span { font-size: 12.5px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; background: var(--ivory); }
   .chat-body { padding: 24px; display: grid; gap: 16px; min-height: 400px; align-content: start; background: var(--ivory); }
@@ -177,9 +177,9 @@ CSS = '''
   .msg small { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--ink-2); }
   .msg .b { display: inline-block; max-width: 540px; padding: 11px 15px; border-radius: 14px; font-size: 14.5px; line-height: 1.5; background: var(--white); border: 1px solid var(--line); }
   .msg.you .b { background: var(--ink); color: var(--ivory); border-color: var(--ink); }
-  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(20,20,19,.4); }
+  .apcard { max-width: 540px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); overflow: hidden; box-shadow: 0 14px 30px -22px rgba(46,41,38,.4); }
   .aphead { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
-  .aphead .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
+  .aphead .tag { font-family: var(--sans); font-weight: 600; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--clay); background: rgba(217,119,87,.1); padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
   .apbody { padding: 12px 14px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
   .apbtns { display: flex; gap: 8px; padding: 0 14px 14px; flex-wrap: wrap; }
   .apbtns span { font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); }
