@@ -20,7 +20,7 @@ offer:
     - "Books straight into your calendar"
     - "Hands tricky questions to your team"
     - "Uses your hours, prices and rules"
-  cta: "Book a free Telos Session"
+  cta: "Start your free trial"
   side_title: "Want replies that actually answer?"
   side_text: "We set up your AI receptionist for you, usually in about a week."
 promo: "Auto replies buy you time. If you want the reply to answer the question and book the job too, that's what our [AI receptionist](/services/ai-agents/) does at Morning Telos."
@@ -366,4 +366,4 @@ Speed matters most here. Someone who just filled out your form is often contacti
 
 ## Need replies that do more?
 
-A fixed auto reply is a great start. When you're ready for replies that answer questions and book appointments for you, [book a free Telos Session](/book/) with Morning Telos. If you run a trade business, see how we help [home services companies](/solutions/home-services/).
+A fixed auto reply is a great start. When you're ready for replies that answer questions and book appointments for you, [start a free Morning Telos trial](https://chat.morningtelos.com/#signup). If you run a trade business, see how we help [home services companies](/solutions/home-services/).
