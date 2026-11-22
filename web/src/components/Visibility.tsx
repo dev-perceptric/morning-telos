@@ -1,6 +1,6 @@
 "use client";
 
-// Artemis's Visibility tab: the AI questions she tracks and the content plan, from Arrowsterr, with one drawer for
+// Theseus's Visibility tab: the AI questions he tracks and the content plan, from Arrowsterr, with one drawer for
 // any question or topic. The data and the rules are in src/lib/seoWork.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
@@ -103,7 +103,7 @@ export function SeoVisibility({ sb, ws, editor, onAsk, onAskWeb }: { sb: Supabas
           <span>{data.summary}</span>
         </p>
       ) : null}
-      {data && !data.ready ? <Notice>Artemis&apos;s SEO tools are still setting up. Check back in a few minutes.</Notice> : null}
+      {data && !data.ready ? <Notice>Theseus&apos;s SEO tools are still setting up. Check back in a few minutes.</Notice> : null}
       {error || data?.error ? <ErrorText>{error || data?.error}</ErrorText> : null}
       {note ? <Notice>{note}</Notice> : null}
 
@@ -148,7 +148,7 @@ export function SeoVisibility({ sb, ws, editor, onAsk, onAskWeb }: { sb: Supabas
               </span>
               <span className="main">
                 <b>{q.prompt}</b>
-                <small>{q.wait ? "Artemis wants to track this" : q.position !== null ? `You show up at #${Math.round(q.position)} when you're named` : "No AI names you yet"}</small>
+                <small>{q.wait ? "Theseus wants to track this" : q.position !== null ? `You show up at #${Math.round(q.position)} when you're named` : "No AI names you yet"}</small>
               </span>
               {q.wait ? (
                 <span className="tag clay wt">Waiting for your OK</span>
@@ -162,7 +162,7 @@ export function SeoVisibility({ sb, ws, editor, onAsk, onAskWeb }: { sb: Supabas
             </button>
           ))}
           {data && !questions.length ? (
-            <Empty title="No questions yet">Artemis asks ChatGPT, Perplexity and Gemini these every day. Your first results show up the day after you add one.</Empty>
+            <Empty title="No questions yet">Theseus asks ChatGPT, Perplexity and Gemini these every day. Your first results show up the day after you add one.</Empty>
           ) : null}
           {data === null && !error ? <div className="empty">Loading...</div> : null}
         </div>
@@ -180,7 +180,7 @@ export function SeoVisibility({ sb, ws, editor, onAsk, onAskWeb }: { sb: Supabas
               {t.wait ? <span className="tag clay wt">Waiting for your OK</span> : <span className={`tag ${STATUS_TONE[t.status] ?? ""}`}>{STATUS_WORD[t.status] ?? t.status}</span>}
             </button>
           ))}
-          {data && !plan.length ? <Empty title="No topics yet">Artemis plans what to write next from the questions people ask.</Empty> : null}
+          {data && !plan.length ? <Empty title="No topics yet">Theseus plans what to write next from the questions people ask.</Empty> : null}
           {data === null && !error ? <div className="empty">Loading...</div> : null}
         </div>
       )}
@@ -204,7 +204,7 @@ export function SeoVisibility({ sb, ws, editor, onAsk, onAskWeb }: { sb: Supabas
             editor={editor}
             busy={busy}
             onAsk={onAsk}
-            onTrack={(question) => run(() => act({ action: "track", question }), "Artemis starts asking it tomorrow.")}
+            onTrack={(question) => run(() => act({ action: "track", question }), "Theseus starts asking it tomorrow.")}
             onDecide={(action) => open.item?.wait && run(() => decide(open.item!.wait!.approvalId, action), action === "approve" ? "Approved." : "Turned down.")}
           />
         ) : open?.kind === "t" ? (
@@ -218,8 +218,8 @@ export function SeoVisibility({ sb, ws, editor, onAsk, onAskWeb }: { sb: Supabas
             onWrite={(t) =>
               run(async () => {
                 if (t.id) await act({ action: "status", id: t.id, status: "writing" });
-                onAskWeb(`Write a page for "${t.keyword}"${t.notes ? `. Notes from Artemis: ${t.notes}` : ""}`);
-              }, "Hephaestus is on it.")
+                onAskWeb(`Write a page for "${t.keyword}"${t.notes ? `. Notes from Theseus: ${t.notes}` : ""}`);
+              }, "Archon is on it.")
             }
             onRemove={(t) => t.id && run(() => act({ action: "remove_topic", id: t.id }), "Removed from the content plan.")}
             onDecide={(action) => open.item?.wait && run(() => decide(open.item!.wait!.approvalId, action), action === "approve" ? "Approved." : "Turned down.")}
@@ -290,7 +290,7 @@ function QuestionDrawer({
       {item.wait ? (
         <p className="po-take">
           <Face agent="seo" size={24} />
-          <span>Artemis wants to track this question. It counts toward your plan once you approve it.</span>
+          <span>Theseus wants to track this question. It counts toward your plan once you approve it.</span>
         </p>
       ) : (
         <>
@@ -323,7 +323,7 @@ function QuestionDrawer({
               </div>
             </div>
           ) : answers ? (
-            <Empty title="No answers yet">Artemis asks this tomorrow.</Empty>
+            <Empty title="No answers yet">Theseus asks this tomorrow.</Empty>
           ) : null}
           {item.mostNamed.length ? (
             <div className="dsec">
@@ -352,7 +352,7 @@ function QuestionDrawer({
         ) : null}
         <button type="button" className="btn" onClick={onAsk}>
           <Icon name="message" small />
-          Ask Artemis
+          Ask Theseus
         </button>
       </div>
     </>
@@ -446,7 +446,7 @@ function TopicDrawer({
         ) : null}
         <button type="button" className="btn" onClick={onAsk}>
           <Icon name="message" small />
-          Ask Artemis
+          Ask Theseus
         </button>
         <span className="sp" />
         {editor && item.id && !item.wait ? (

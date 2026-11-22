@@ -1,9 +1,9 @@
 // The AI team: who is on it, what each one does, and which ones are coming soon (none since plan phase 4, step 2).
-// Ported from the old app (app/lib/agents.js AGENTS and ORDER), so the names, gods and order stay the same. Iris, Hora,
-// Hermes and Hestia are still "coming soon" in the old app; here they work through the customer's own apps
-// (src/lib/composio/catalog.ts APP_ACCESS), so their jobs say what they really do. Hephaestus also builds on the
-// owner's own site builder here, so his job says more than the old app's. Shared by the server and the browser. The SQL check lists in supabase/011_ai_team.sql must match ORDER
-// (tests/team.test.ts checks they do).
+// Keys and order are ported from the old app (app/lib/agents.js AGENTS and ORDER). The names changed from Greek gods to
+// the team on the website (Alexander, Midas, Irene, Cleo, Cyrus, Leo, Theseus, Archon); the field is still called god,
+// and OLD_NAMES keeps the old ones working. Here every teammate works through the customer's own apps
+// (src/lib/composio/catalog.ts APP_ACCESS), so their jobs say what they really do. Shared by the server and the browser.
+// The SQL check lists in supabase/011_ai_team.sql must match ORDER (tests/team.test.ts checks they do).
 
 export type AgentKey = "chief" | "sales" | "support" | "forms" | "email" | "social" | "seo" | "web";
 /** The products an agent works through. "*" means every product the workspace has. */
@@ -33,13 +33,13 @@ const appsLine = (apps: string, part: string) =>
   `You work through the business's own apps: ${apps}. If the app you need isn't connected, say which one to connect in Settings, Apps. Then still do the useful part here in chat: ${part}, so the owner can use it right away.`;
 const SENDS = ["Never send, book, post or change anything without the owner's OK, unless the owner put you on autopilot. Show the owner the exact words first."];
 const VOICE = "Write every email in the business's own voice, from Knowledge and Memory. Short lines, plain words and one clear ask.";
-/** Hestia never answers these herself. tests/agentLoop.test.ts checks it is in her prompt. */
+/** Irene never answers these herself. tests/agentLoop.test.ts checks it is in her prompt. */
 export const ESCALATE =
   "Never answer refunds, legal questions, medical questions or angry customers yourself. Hand them to the owner: say in chat who wrote, what they want and why it needs the owner, and send nothing to the customer.";
 
 /**
- * How Aphrodite runs "grow my social media", the way the approved demo plays out: goal, choices, plan, post previews,
- * a connect card when no channel is connected, then progress. tests/cards.test.ts checks it is in her prompt.
+ * How Leo runs "grow my social media", the way the approved demo plays out: goal, choices, plan, post previews,
+ * a connect card when no channel is connected, then progress. tests/cards.test.ts checks it is in his prompt.
  */
 export const SOCIAL_FLOW = [
   "When the owner wants to grow on social media, work toward a number. First propose a goal with set_goal, like followers on the network that fits the business, with a realistic number and date.",
@@ -53,7 +53,7 @@ export const SOCIAL_FLOW = [
 export const AGENTS: Record<AgentKey, Agent> = {
   chief: {
     key: "chief",
-    god: "Athena",
+    god: "Alexander",
     name: "Chief of Staff",
     apps: ["*"],
     readOnly: true,
@@ -62,7 +62,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
   },
   sales: {
     key: "sales",
-    god: "Hermes",
+    god: "Midas",
     name: "Sales Rep",
     apps: [],
     job: "Replies to new leads, books the call and follows up every quote from your email, calendar and CRM. Nothing goes out until you approve it.",
@@ -78,7 +78,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
   },
   support: {
     key: "support",
-    god: "Hestia",
+    god: "Irene",
     name: "Customer Support",
     apps: [],
     job: "Answers customers from your knowledge in Gmail, Outlook, Zendesk or Help Scout after you approve, and hands refunds, legal questions and upset customers to you.",
@@ -93,7 +93,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
   },
   forms: {
     key: "forms",
-    god: "Hora",
+    god: "Cleo",
     name: "Forms + Scheduling",
     apps: [],
     job: "Finds open times in your Google Calendar or Calendly, books meetings and sends invites and reminders after you approve. Follows up on form replies that land in your inbox.",
@@ -108,7 +108,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
   },
   email: {
     key: "email",
-    god: "Iris",
+    god: "Cyrus",
     name: "Email Marketing",
     apps: [],
     job: "Writes email campaigns and follow-ups in your voice and sends them from your Gmail or Outlook after you approve.",
@@ -123,7 +123,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
   },
   social: {
     key: "social",
-    god: "Aphrodite",
+    god: "Leo",
     name: "Social Media",
     apps: ["capybaroar"],
     job: "Plans, writes and schedules your social posts, and reports what works.",
@@ -132,7 +132,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
   },
   seo: {
     key: "seo",
-    god: "Artemis",
+    god: "Theseus",
     name: "SEO Specialist",
     apps: ["arrowsterr"],
     job: "Gets you found on Google and in AI answers: keywords, content plan, rankings and AI visibility.",
@@ -140,7 +140,7 @@ export const AGENTS: Record<AgentKey, Agent> = {
   },
   web: {
     key: "web",
-    god: "Hephaestus",
+    god: "Archon",
     name: "Website Builder",
     // Arrowsterr for keywords and the content plan. The site builders are in APP_ACCESS (composio/catalog.ts).
     apps: ["arrowsterr"],
@@ -168,9 +168,13 @@ export const LEAD: AgentKey = "chief";
 
 export const isAgentKey = (k: unknown): k is AgentKey => typeof k === "string" && Object.hasOwn(AGENTS, k);
 
-const BY_GOD: Record<string, AgentKey> = Object.fromEntries(ORDER.map((k) => [AGENTS[k].god.toLowerCase(), k]));
+/** The team's names before the rename. Old chats and links still use them, so they keep working, and the screen shows the new name. */
+export const OLD_NAMES: Record<string, AgentKey> = {
+  athena: "chief", hermes: "sales", hestia: "support", hora: "forms", iris: "email", aphrodite: "social", artemis: "seo", hephaestus: "web",
+};
+const BY_GOD: Record<string, AgentKey> = { ...OLD_NAMES, ...Object.fromEntries(ORDER.map((k) => [AGENTS[k].god.toLowerCase(), k])) };
 
-/** The agent a name like "Athena" or "athena" stands for, or null. */
+/** The agent a name like "Alexander" or "alexander" stands for, or null. */
 export const agentByGod = (name: unknown): AgentKey | null => (typeof name === "string" ? (BY_GOD[name.toLowerCase()] ?? null) : null);
 
 /** Teammates who can take work now. */

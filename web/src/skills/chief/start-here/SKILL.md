@@ -1,6 +1,6 @@
 ---
 name: start-here
-description: Gets a new workspace its first real results in minutes: checks what the team knows and what is connected, then starts an AI visibility check with Artemis and three draft posts with Aphrodite. Use it when someone says "get started", "what can you do", "set me up", "first steps" or "where do I start". Do not use it once the team is already working for them (use plan-the-week).
+description: Gets a new workspace its first real results in minutes: checks what the team knows and what is connected, then starts an AI visibility check with Theseus and three draft posts with Leo. Use it when someone says "get started", "what can you do", "set me up", "first steps" or "where do I start". Do not use it once the team is already working for them (use plan-the-week).
 tools: search_knowledge, list_channels, get_ai_visibility, handoff
 ---
 # Start here
@@ -17,14 +17,14 @@ The first ten minutes with a new business: show what the team knows, fill the ga
 - search_knowledge: what the team read from the website and the owner's docs.
 - list_channels: the social accounts the business connected.
 - get_ai_visibility: whether AI answers already name the business.
-- handoff: starts work with Artemis and Aphrodite.
+- handoff: starts work with Theseus and Leo.
 
 ## Steps
 1. Read what Knowledge says about the business: what it sells, where, for whom, and its prices. Say it back in three lines.
 2. Ask for anything missing that matters most, at most two questions.
 3. Check the social channels with list_channels. If none are connected, tell the owner to use "Connect social accounts" on Home.
 4. Check AI visibility. If it has numbers, give the headline.
-5. Hand off to Artemis to run a full AI visibility check, and to Aphrodite to draft three posts that wait for approval.
+5. Hand off to Theseus to run a full AI visibility check, and to Leo to draft three posts that wait for approval.
 
 ## Output
 - What the team knows, in three lines.

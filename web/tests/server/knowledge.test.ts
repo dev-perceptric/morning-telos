@@ -167,7 +167,7 @@ test("knowledgeForPrompt reads only this workspace's docs for everyone and this 
   ];
   const fake = readDb(rows);
   const text = await knowledgeForPrompt(WS, "social", 5000, fake as never);
-  assert.equal(text, '<doc title="About Ana\'s" source="website">\nWe bake bread.\n</doc>\n<doc title="Post ideas" for="Aphrodite">\nShow the ovens.\n</doc>');
+  assert.equal(text, '<doc title="About Ana\'s" source="website">\nWe bake bread.\n</doc>\n<doc title="Post ideas" for="Leo">\nShow the ovens.\n</doc>');
   assert.deepEqual(fake.calls[0].eq, [["workspace_id", WS]]);
   assert.equal(fake.calls[0].or, "agent.is.null,agent.eq.social");
   await assert.rejects(knowledgeForPrompt("not-a-uuid", "social", 5000, fake as never), /Missing workspace/);

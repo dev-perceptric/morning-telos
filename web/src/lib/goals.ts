@@ -170,7 +170,7 @@ export function goalPercent(g: Pick<GoalRow, "current" | "target" | "baseline" |
   return Math.max(0, Math.min(100, Math.round(((g.current - from) / span) * 100)));
 }
 
-/** Athena's line at the top of her Goals tab. Null with no goals yet. */
+/** Alexander's line at the top of his Goals tab. Null with no goals yet. */
 export function goalsSummary(statuses: readonly string[]): string | null {
   if (!statuses.length) return null;
   const active = statuses.filter((s) => s !== "done").length;

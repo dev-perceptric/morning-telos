@@ -1,7 +1,7 @@
 -- ─────────────── leads ───────────────
--- Hermes's list of leads and open quotes, for businesses with no CRM (src/lib/leads.ts). The Leads tab on his page
--- shows it (src/components/Leads.tsx); Hermes keeps it up to date with save_lead and reads it with find_leads.
--- Members read; editors and up add, change and delete. Hermes writes as the server.
+-- Midas's list of leads and open quotes, for businesses with no CRM (src/lib/leads.ts). The Leads tab on his page
+-- shows it (src/components/Leads.tsx); Midas keeps it up to date with save_lead and reads it with find_leads.
+-- Members read; editors and up add, change and delete. Midas writes as the server.
 create table if not exists public.leads (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces (id) on delete cascade,

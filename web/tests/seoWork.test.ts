@@ -1,4 +1,4 @@
-// Artemis's Visibility tab (src/lib/seoWork.ts): reading Arrowsterr's answers, the once-a-day copy, the waiting
+// Theseus's Visibility tab (src/lib/seoWork.ts): reading Arrowsterr's answers, the once-a-day copy, the waiting
 // items, the question limit, and the person's own changes. Every dependency is a fake: no Arrowsterr, no database.
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -43,7 +43,7 @@ test("visibilityOf, questionsOf and planOf keep what the tab shows, and drop emp
   assert.deepEqual(planOf({ items: "nope" }), []);
 });
 
-test("waitingOf: Artemis's pending questions and topics, nothing else", () => {
+test("waitingOf: Theseus's pending questions and topics, nothing else", () => {
   const w = waitingOf([
     { id: 3, tool: "add_prompts", status: "pending", input: { topic: "Local", prompts: ["plumber seo checklist", "", 5] } },
     { id: 4, tool: "add_to_content_plan", status: "pending", input: { items: [{ keyword: "plumber seo", volume: 880 }, { notes: "no keyword" }] } },

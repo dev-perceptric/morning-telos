@@ -1,4 +1,4 @@
-// Hestia's Inbox tab (src/lib/inboxWork.ts): her replies read from her approvals.
+// Irene's Inbox tab (src/lib/inboxWork.ts): her replies read from her approvals.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { faqOf, inboxSummary, repliesOf } from "../src/lib/inboxWork.ts";
@@ -17,7 +17,7 @@ const row = (o: Partial<{ id: number; product: string; tool: string; title: stri
   ...o,
 });
 
-test("repliesOf: Hestia's replies with who, subject and words, from her support apps only", () => {
+test("repliesOf: Irene's replies with who, subject and words, from her support apps only", () => {
   const r = repliesOf([
     row({ id: 1 }),
     row({ id: 2, status: "done", product: "outlook", tool: "OUTLOOK_SEND_EMAIL", input: { to: ["luis@shop.com"], subject: "Second location", body: "Yes, we can track it." } }),

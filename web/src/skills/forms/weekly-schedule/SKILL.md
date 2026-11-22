@@ -18,7 +18,7 @@ The week ahead on one screen: what's booked, where the gaps are and what needs a
 - search_knowledge: working hours and the days the business is closed.
 - app_search_actions: shows the connected calendar apps and their actions.
 - app_action: reads the events and free times for the week. It only reads here.
-- handoff: passes a sales meeting to Hermes or a customer issue to Hestia when one needs work.
+- handoff: passes a sales meeting to Midas or a customer issue to Irene when one needs work.
 
 ## Steps
 1. Check the calendar with app_search_actions. If none is connected, say to connect Google Calendar or Calendly in Settings, Apps, and stop.

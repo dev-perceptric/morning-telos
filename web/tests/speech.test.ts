@@ -32,7 +32,7 @@ test("spokenText: settled words and the words still being heard", () => {
 
 test("withSpoken: spoken words follow what was typed, with one space", () => {
   assert.equal(withSpoken("", { final: "Hello", interim: "team" }), "Hello team");
-  assert.equal(withSpoken("@Aphrodite", { final: "post this", interim: "" }), "@Aphrodite post this");
+  assert.equal(withSpoken("@Leo", { final: "post this", interim: "" }), "@Leo post this");
   assert.equal(withSpoken("Hi ", { final: "there", interim: "" }), "Hi there");
   assert.equal(withSpoken("Typed", { final: "", interim: "" }), "Typed");
 });

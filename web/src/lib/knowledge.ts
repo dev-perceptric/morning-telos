@@ -24,14 +24,14 @@ export type KnowledgeDoc = {
  * Every teammate can take work now (none is marked soon), so a doc for any of them is read the next time they answer.
  */
 export const DOC_AGENTS: { key: string; name: string; job: string }[] = [
-  { key: "chief", name: "Athena", job: "Chief of staff" },
-  { key: "seo", name: "Artemis", job: "SEO and AI visibility" },
-  { key: "web", name: "Hephaestus", job: "Website pages" },
-  { key: "social", name: "Aphrodite", job: "Social posts" },
-  { key: "email", name: "Iris", job: "Email campaigns" },
-  { key: "forms", name: "Hora", job: "Forms and booking" },
-  { key: "sales", name: "Hermes", job: "Sales follow-up" },
-  { key: "support", name: "Hestia", job: "Customer support" },
+  { key: "chief", name: "Alexander", job: "Chief of staff" },
+  { key: "seo", name: "Theseus", job: "SEO and AI visibility" },
+  { key: "web", name: "Archon", job: "Website pages" },
+  { key: "social", name: "Leo", job: "Social posts" },
+  { key: "email", name: "Cyrus", job: "Email campaigns" },
+  { key: "forms", name: "Cleo", job: "Forms and booking" },
+  { key: "sales", name: "Midas", job: "Sales follow-up" },
+  { key: "support", name: "Irene", job: "Customer support" },
 ];
 export const agentName = (key: string | null) => (key ? (DOC_AGENTS.find((a) => a.key === key)?.name ?? key) : "Everyone");
 

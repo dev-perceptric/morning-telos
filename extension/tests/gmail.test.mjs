@@ -72,12 +72,12 @@ test("readEmail keeps the newest part of a long thread, and says when there is n
   assert.equal(empty.title, "Email in Gmail");
 });
 
-test("pickReplyAgent: the tagged teammate, else Hermes for sales mail and Hestia for the rest", () => {
-  assert.equal(pickReplyAgent({ title: "Quote for 3 cakes", text: "" }), "Hermes");
-  assert.equal(pickReplyAgent({ title: "Hello", text: "What's your pricing?" }), "Hermes");
-  assert.equal(pickReplyAgent({ title: "My order is late", text: "Where is it" }), "Hestia");
-  assert.equal(pickReplyAgent({ title: "Help", text: "The door code doesn't work" }), "Hestia");
-  assert.equal(pickReplyAgent({ title: "Quote", text: "" }, "make it short @iris"), "Iris");
+test("pickReplyAgent: the tagged teammate, else Midas for sales mail and Irene for the rest", () => {
+  assert.equal(pickReplyAgent({ title: "Quote for 3 cakes", text: "" }), "Midas");
+  assert.equal(pickReplyAgent({ title: "Hello", text: "What's your pricing?" }), "Midas");
+  assert.equal(pickReplyAgent({ title: "My order is late", text: "Where is it" }), "Irene");
+  assert.equal(pickReplyAgent({ title: "Help", text: "The door code doesn't work" }), "Irene");
+  assert.equal(pickReplyAgent({ title: "Quote", text: "" }, "make it short @cyrus"), "Cyrus");
 });
 
 test("the Gmail functions run in the tab on their own", () => {

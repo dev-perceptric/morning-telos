@@ -109,7 +109,7 @@ async function usable(ctx: ToolContext, deps: AppToolDeps) {
   const { toolkits, reads } = (deps.access ?? access)(ctx.agent);
   const direct = reads ? [] : directFor(ctx.agent, AGENTS[ctx.agent]?.soon === true);
   const own = direct.length && deps.direct ? (await deps.direct(ctx.workspace.id).catch(() => [] as string[])).filter((d) => direct.includes(d)) : [];
-  // Only a teammate that changes things is told what to connect: Athena just reads whatever is there.
+  // Only a teammate that changes things is told what to connect: Alexander just reads whatever is there.
   const unset = (have: string[]) => (reads ? [] : notConnected(toolkits, [...have, ...own], deps.on, direct));
   if (!deps.on || !toolkits.length) return { conns: [] as Conn[], gone: [] as string[], unset: unset([]), reads };
   const rows = (await deps.connections(ctx.workspace.id)).filter((r) => r.workspace_id === ctx.workspace.id && toolkits.includes(r.toolkit));

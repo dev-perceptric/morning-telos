@@ -79,8 +79,8 @@ beforeEach(() => {
     beta: {
       messages: {
         create: async (p: Req) => {
-          // An untagged message is routed first. Athena takes it, as before routing.
-          if (isRouter(p)) return routerReply("Athena");
+          // An untagged message is routed first. Alexander takes it, as before routing.
+          if (isRouter(p)) return routerReply("Alexander");
           requests.push(structuredClone(p));
           const r = replies.shift() ?? text("Here is the plan.");
           return { id: "m", type: "message", role: "assistant", model: p.model, ...r, usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } };
@@ -120,7 +120,7 @@ test("run_routine: a new chat called Routine: <title>, the instruction as the me
   );
   assert.deepEqual(db.tables.messages[0].meta, { routine: R1 });
   assert.equal(requests.length, 1);
-  assert.match(requests[0].system[0].text, /^You are Aphrodite/);
+  assert.match(requests[0].system[0].text, /^You are Leo/);
   // Knowledge, Memory, the skills list and the skill the instruction picked.
   const extra = requests[0].system[1].text;
   assert.match(extra, /Open 7 to 3\./);
@@ -136,8 +136,8 @@ test("run_routine: a new chat called Routine: <title>, the instruction as the me
   assert.equal(db.tables.ai_usage[0].workspace_id, WS);
 });
 
-test("run_routine: Iris, Hora, Hermes and Hestia take routines, with their own skills and the line on connecting apps", async () => {
-  const gods = { email: "Iris", forms: "Hora", sales: "Hermes", support: "Hestia" } as const;
+test("run_routine: Cyrus, Cleo, Midas and Irene take routines, with their own skills and the line on connecting apps", async () => {
+  const gods = { email: "Cyrus", forms: "Cleo", sales: "Midas", support: "Irene" } as const;
   const skill = { email: "write-a-campaign", forms: "reminder-emails", sales: "follow-up-new-leads", support: "daily-inbox-triage" } as const;
   for (const agent of Object.keys(gods) as (keyof typeof gods)[]) {
     requests = [];
@@ -154,11 +154,11 @@ test("run_routine: Iris, Hora, Hermes and Hestia take routines, with their own s
     assert.match(requests[0].system[1].text, new RegExp(`The person picked the skill "${skill[agent]}"`), agent);
     assert.deepEqual(
       requests[0].tools?.map((x) => x.name),
-      // Hermes also keeps the leads list (src/lib/leadTools.ts).
+      // Midas also keeps the leads list (src/lib/leadTools.ts).
       agent === "sales"
         ? ["find_leads", "log_progress", "remember", "save_lead", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"]
         : agent === "email"
-          ? // Iris also writes campaign drafts (src/lib/campaignTools.ts).
+          ? // Cyrus also writes campaign drafts (src/lib/campaignTools.ts).
             ["log_progress", "mailing_lists", "remember", "save_campaign", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"]
           : ["log_progress", "remember", "search_knowledge", "set_goal", "set_plan", "show_card", "update_step", "use_skill", "handoff"],
       agent,
@@ -240,7 +240,7 @@ test("Run now: a new routine chat streams, with the routine's own words and team
   assert.equal(routine().last_thread_id, id);
   assert.equal(routine().last_note, null);
   assert.ok(Date.now() - Date.parse(String(routine().last_run_at)) < 5000);
-  assert.match(requests[0].system[0].text, /^You are Aphrodite/);
+  assert.match(requests[0].system[0].text, /^You are Leo/);
 });
 
 test("Run now: another workspace's routine is not found, viewers can't run one, and nothing is saved", async () => {
@@ -255,14 +255,14 @@ test("Run now: another workspace's routine is not found, viewers can't run one, 
 });
 
 test("a skill picked with / goes into that turn for the teammate who has it, after the cached parts", async () => {
-  await lines(await post("editor1", { text: "@Artemis /find-keywords for sourdough" }));
+  await lines(await post("editor1", { text: "@Theseus /find-keywords for sourdough" }));
   const sys = requests[0].system;
-  assert.match(sys[0].text, /^You are Artemis/);
+  assert.match(sys[0].text, /^You are Theseus/);
   assert.match(sys[1].text, /Closed on Mondays/);
   assert.ok(sys[1].text.indexOf("<skills>") < sys[1].text.indexOf('picked the skill "find-keywords"'));
   // A workspace skill with the same name takes the place of ours.
   db.tables.skills = [{ id: "s1", workspace_id: WS, agent: "seo", name: "find-keywords", description: "Our way. Use it when x.", body: "# Our way\n\nAsk Ana first.", updated_at: "2026-11-01" }];
-  await lines(await post("editor1", { text: "@Artemis /find-keywords" }));
+  await lines(await post("editor1", { text: "@Theseus /find-keywords" }));
   assert.match(requests[1].system[1].text, /Ask Ana first\./);
   assert.doesNotMatch(requests[1].system[1].text, /Real search data/);
   // Another workspace's skills never show.
@@ -276,7 +276,7 @@ test("use_skill and remember from a chat: the skill's steps come back, a fact is
     { content: [{ type: "tool_use", id: "a", name: "use_skill", input: { name: "write-a-post" } }, { type: "tool_use", id: "b", name: "remember", input: { fact: "The owner likes short posts." } }, { type: "tool_use", id: "c", name: "remember", input: { fact: "Our Instagram password is Crois5ant!" } }], stop_reason: "tool_use" },
     text("Done."),
   ];
-  const ev = await lines(await post("editor1", { text: "@Aphrodite remember I like short posts and write one" }));
+  const ev = await lines(await post("editor1", { text: "@Leo remember I like short posts and write one" }));
   const threadId = ev[0].id;
   const results = requests[1].messages.at(-1)!.content as { tool_use_id: string; content: string; is_error?: boolean }[];
   const by = Object.fromEntries(results.map((r) => [r.tool_use_id, r]));
@@ -289,7 +289,7 @@ test("use_skill and remember from a chat: the skill's steps come back, a fact is
   assert.ok(!db.tables.memories.some((m) => /password/.test(String(m.fact))));
   // The same fact again is not saved twice.
   replies = [call("remember", { fact: "the owner likes SHORT posts" }), text("Ok.")];
-  await lines(await post("editor1", { text: "@Aphrodite again", threadId }));
+  await lines(await post("editor1", { text: "@Leo again", threadId }));
   assert.equal(db.tables.memories.filter((m) => m.workspace_id === WS).length, 2);
   const again = requests[3].messages.at(-1)!.content as { content: string }[];
   assert.equal(again[0].content, MEMORY_MESSAGES.same);

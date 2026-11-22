@@ -1,4 +1,4 @@
--- Morning Telos migration 019: the website builders Hephaestus works in (Framer, Webflow, WordPress.com).
+-- Morning Telos migration 019: the website builders Archon works in (Framer, Webflow, WordPress.com).
 -- Run once in Supabase → SQL Editor, after 018_email_log.sql. Safe to run again.
 -- Only the list of apps a workspace can connect grows. Who reads app_connections and how stays as 016 set it.
 --

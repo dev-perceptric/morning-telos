@@ -247,7 +247,7 @@ test("a new email starts a chat titled from the subject, saves the trimmed words
   assert.equal(w.sent.length, 1);
   const s = w.sent[0];
   assert.equal(s.to, "ana@bakery.com");
-  assert.equal(s.o.from, "Aphrodite at Morning Telos <acme@team.morningtelos.com>");
+  assert.equal(s.o.from, "Leo at Morning Telos <acme@team.morningtelos.com>");
   assert.equal(s.o.replyTo, `acme+t${t.token}@team.morningtelos.com`);
   assert.equal(s.o.headers["In-Reply-To"], "<in1@mail.gmail.com>");
   assert.equal(s.o.headers.References, "<in1@mail.gmail.com>");
@@ -359,14 +359,14 @@ test("approvals: each one in the email with an Approve link for the member who e
 
 test("the answer is sent by the teammate who wrote the last reply; one failed send is tried again, two fail the job", async () => {
   const events: ChatEvent[] = [
-    { type: "message", agent: "chief", text: "Hermes can take this." },
+    { type: "message", agent: "chief", text: "Midas can take this." },
     { type: "handoff", from: "chief", to: "sales", note: "Quote" },
     { type: "message", agent: "sales", text: "Here is the quote." },
   ];
   const w = world({ events, sendFails: 1 });
   w.emails.set("e1", email());
   assert.deepEqual(await processTeamEmail(w.job("e1"), w.d), { status: "done" });
-  assert.equal(w.sent[0].o.from, "Hermes at Morning Telos <acme@team.morningtelos.com>");
+  assert.equal(w.sent[0].o.from, "Midas at Morning Telos <acme@team.morningtelos.com>");
   assert.match(w.sent[0].mail.text, /Here is the quote\./);
 
   const f = world({ sendFails: 2 });
@@ -378,11 +378,11 @@ test("the answer is sent by the teammate who wrote the last reply; one failed se
 
 test("a forward keeps the forwarded email, and a tag in the subject picks the teammate", async () => {
   const w = world();
-  w.emails.set("e1", email({ subject: "Fwd: @Hestia customer question", text: "Can you answer?\n\n---------- Forwarded message ---------\nFrom: Bo <bo@c.com>\n\nWhere is my order?" }));
+  w.emails.set("e1", email({ subject: "Fwd: @Irene customer question", text: "Can you answer?\n\n---------- Forwarded message ---------\nFrom: Bo <bo@c.com>\n\nWhere is my order?" }));
   await processTeamEmail(w.job("e1"), w.d);
   assert.match(w.db.saved[0].content, /Where is my order\?/);
-  assert.match(w.turns[0].text, /^@Hestia customer question\n/);
-  assert.equal(w.db.threads[0].title, "@Hestia customer question");
+  assert.match(w.turns[0].text, /^@Irene customer question\n/);
+  assert.equal(w.db.threads[0].title, "@Irene customer question");
 });
 
 test("attachments: images and PDFs become chat files on the message; other files are named only; files alone are enough", async () => {

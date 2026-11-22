@@ -2,7 +2,7 @@
 // lists them in groups, Home suggests three by the business's industry, and "Try in chat" starts a chat with the
 // use case's starter message (tagging the teammate, and picking its skill the way the composer's / menu does).
 // Pure, so the screens and the tests read one list. Every app here is one the app can connect (src/lib/composio/
-// catalog.ts) or a social network Aphrodite posts to; tests/useCases.test.ts checks each teammate can use its apps.
+// catalog.ts) or a social network Leo posts to; tests/useCases.test.ts checks each teammate can use its apps.
 
 import { appName, isAppId } from "./composio/catalog.ts";
 import { networkName } from "./socialChannels.ts";
@@ -19,7 +19,7 @@ export const USE_CASE_GROUPS: { id: UseCaseGroup; label: string }[] = [
   { id: "website", label: "Website and search" },
 ];
 
-/** The social networks Aphrodite posts to, shown as logos on social use cases. */
+/** The social networks Leo posts to, shown as logos on social use cases. */
 export const SOCIAL_APPS = ["instagram", "facebook", "linkedin", "tiktok"] as const;
 const isSocialApp = (id: string) => (SOCIAL_APPS as readonly string[]).includes(id);
 
@@ -344,7 +344,7 @@ export const USE_CASES: UseCase[] = [
     title: "Hand-off desk",
     agent: "chief",
     apps: [],
-    line: "Tell Athena the job, and she hands it to the right teammate.",
+    line: "Tell Alexander the job, and he hands it to the right teammate.",
     outcomes: ["One place to ask", "The right teammate on it", "You see who does what"],
     ask: "I have a few jobs for the team. Hand each one to the right teammate.",
   },
@@ -431,7 +431,7 @@ export const USE_CASES: UseCase[] = [
 const BY_ID: Readonly<Record<string, UseCase>> = Object.fromEntries(USE_CASES.map((u) => [u.id, u]));
 export const findUseCase = (id: string): UseCase | undefined => (Object.hasOwn(BY_ID, id) ? BY_ID[id] : undefined);
 
-/** An app the use case cards can show: one the app connects, or a social network Aphrodite posts to. */
+/** An app the use case cards can show: one the app connects, or a social network Leo posts to. */
 export const isUseCaseApp = (id: string) => isAppId(id) || isSocialApp(id);
 /** The app's name, for the logo's label. */
 export const caseAppName = (id: string) => (isSocialApp(id) ? networkName(id) : appName(id));
@@ -443,7 +443,7 @@ export function casesIn(group: UseCaseGroup | null): UseCase[] {
 
 /**
  * The first message of the chat "Try in chat" starts: the teammate tagged, their skill picked the way the composer's
- * / menu writes it, then the result asked for. Like "@Aphrodite /plan-weekly-posts Start: Social media manager. Keep
+ * / menu writes it, then the result asked for. Like "@Leo /plan-weekly-posts Start: Social media manager. Keep
  * my channels full, on brand and on schedule."
  */
 export function starterMessage(u: UseCase): string {

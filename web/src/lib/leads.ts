@@ -1,4 +1,4 @@
-// Hermes's leads: the list he keeps for a business with no CRM (028_leads.sql). Shared by the Leads tab
+// Midas's leads: the list he keeps for a business with no CRM (028_leads.sql). Shared by the Leads tab
 // (src/components/Leads.tsx), his save_lead and find_leads tools (src/lib/leadTools.ts) and the tests.
 import { emailWords } from "./cards.ts";
 
@@ -15,6 +15,7 @@ export type Lead = {
   next_date: string | null;
   last_contact: string | null;
   notes: string;
+  /** "hermes" means Midas wrote it: the value is from before the team was renamed, and 028_leads.sql only allows it. */
   source: "person" | "hermes";
   created_at: string;
   updated_at: string;
@@ -22,7 +23,7 @@ export type Lead = {
 export const LEAD_COLUMNS = "id, name, company, email, phone, value, stage, next_step, next_date, last_contact, notes, source, created_at, updated_at";
 export const STAGES: Stage[] = ["open", "won", "lost"];
 
-/** The fields a person or Hermes may set, checked. */
+/** The fields a person or Midas may set, checked. */
 export type LeadFields = { name: string; company: string; email: string | null; phone: string | null; value: number | null; stage: Stage; next_step: string; next_date: string | null; notes: string };
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -67,7 +68,7 @@ export function cleanLead(v: Record<string, unknown>, partial = false): { ok: tr
   return { ok: true, value: out };
 }
 
-/** Hermes's line at the top of the Leads tab. Null with no open leads and nothing waiting. */
+/** Midas's line at the top of the Leads tab. Null with no open leads and nothing waiting. */
 export function leadsSummary(leads: readonly Pick<Lead, "stage" | "value">[], waiting: number): string | null {
   const open = leads.filter((l) => l.stage === "open");
   if (!open.length && !waiting) return null;
@@ -77,7 +78,7 @@ export function leadsSummary(leads: readonly Pick<Lead, "stage" | "value">[], wa
   return `${parts.join(", and ")}.`;
 }
 
-/** Hermes's emails waiting for the person's OK, by the address they go to. */
+/** Midas's emails waiting for the person's OK, by the address they go to. */
 export function followupsByEmail(rows: readonly { id: number; product: string; input: Record<string, unknown> | null; status: string }[]): Map<string, { approvalId: number; to: string; subject: string | null; body: string | null; input: Record<string, unknown> }[]> {
   const out = new Map<string, { approvalId: number; to: string; subject: string | null; body: string | null; input: Record<string, unknown> }[]>();
   for (const r of rows) {

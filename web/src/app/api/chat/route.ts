@@ -149,7 +149,7 @@ async function chat(request: Request) {
         const client = teamClient();
         await runTurn({ workspace: team, threadId: thread, text: words, forced, model, shot: again ? null : screenshot }, {
           client,
-          // Picks who answers an untagged message: Claude Haiku 5.5, cut off after 1.5 seconds (then Athena).
+          // Picks who answers an untagged message: Claude Haiku 5.5, cut off after 1.5 seconds (then Alexander).
           router: client ? claudeRouter(client) : null,
           signal: stopped.signal,
           // Files on the thread's newest messages, read from storage once for the whole turn.

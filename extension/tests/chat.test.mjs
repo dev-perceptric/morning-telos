@@ -29,24 +29,26 @@ test("chatBody sends the page and screenshot only when there is a page", () => {
 });
 
 test("@ tagging works like the app", () => {
-  assert.deepEqual(parseMentions("@hermes and @Artemis, @nobody"), ["sales", "seo"]);
+  assert.deepEqual(parseMentions("@midas and @Theseus, @nobody"), ["sales", "seo"]);
+  // Old names from before the rename still work.
+  assert.deepEqual(parseMentions("@hermes and @Artemis"), ["sales", "seo"]);
   assert.equal(mentionQuery("ask @art"), "art");
   assert.equal(mentionQuery("mail@x"), null);
-  assert.deepEqual(mentionMatches("he"), ["sales", "support", "web"]);
+  assert.deepEqual(mentionMatches("c"), ["forms", "email", "chief", "support"]);
   assert.deepEqual(mentionMatches("sales"), ["sales"]);
   assert.equal(mentionMatches("").length, AGENTS.length);
-  assert.deepEqual(insertMention("hi @her", 7, "sales"), { text: "hi @Hermes ", cursor: 11 });
+  assert.deepEqual(insertMention("hi @mid", 7, "sales"), { text: "hi @Midas ", cursor: 10 });
 });
 
 test("quick actions tag the right teammate and name the page's domain", () => {
   const page = { url: "https://www.anasbakery.com/menu" };
   assert.equal(domainOf(page.url), "anasbakery.com");
   assert.equal(domainOf("nope"), "");
-  assert.match(quickMessage("check", page), /^@Artemis .*domain_overview on anasbakery\.com/);
-  assert.match(quickMessage("lead", page), /^@Hermes .*CRM.*wait.*OK.*which app to connect/s);
-  assert.match(quickMessage("summary", page), /^@Athena /);
+  assert.match(quickMessage("check", page), /^@Theseus .*domain_overview on anasbakery\.com/);
+  assert.match(quickMessage("lead", page), /^@Midas .*CRM.*wait.*OK.*which app to connect/s);
+  assert.match(quickMessage("summary", page), /^@Alexander /);
   assert.throws(() => quickMessage("other", page));
   assert.deepEqual(QUICK.map((q) => parseMentions(quickMessage(q.id, page))[0]), ["seo", "sales", "chief"]);
-  assert.match(draftMessage("Hestia"), /^@Hestia Draft a reply/);
+  assert.match(draftMessage("Irene"), /^@Irene Draft a reply/);
   for (const q of QUICK) assert.doesNotMatch(quickMessage(q.id, page), /[–—]/);
 });

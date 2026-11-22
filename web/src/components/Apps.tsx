@@ -212,7 +212,7 @@ function AppRow(p: { app: AppEntry; conn: Conn | null; ready: boolean; admin: bo
 }
 
 /**
- * SEO tools Artemis reads, like Cloudflare for which AI tools visit the site. Owners and admins sign in on the tool's
+ * SEO tools Theseus reads, like Cloudflare for which AI tools visit the site. Owners and admins sign in on the tool's
  * own page, and it comes back here through /settings/social/return. Hidden until there is a tool to connect.
  */
 function ToolsSection({ sb, ws }: { sb: SupabaseClient; ws: Workspace }) {

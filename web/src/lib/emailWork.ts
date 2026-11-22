@@ -1,4 +1,4 @@
-// Iris's Campaigns tab, the server's part (src/app/api/work/email): approving a campaign schedules it, after checking
+// Cyrus's Campaigns tab, the server's part (src/app/api/work/email): approving a campaign schedules it, after checking
 // the law's and the inbox's needs, and a test goes to the person first. Drafts are written and canceled straight in
 // the database under the campaigns policies (029_campaigns.sql). Pure: the deps come from the route.
 import { cleanCampaign, emailFor, footer, type Campaign } from "./campaigns.ts";
@@ -11,9 +11,9 @@ export const EMAIL_MESSAGES = {
   campaign: "That campaign was not found.",
   notDraft: "Only a draft can be scheduled. Move it back to drafts first.",
   time: "Pick a send time in the next year.",
-  address: "Add your mailing address in Iris's Settings first. The law requires it on marketing emails.",
+  address: "Add your mailing address in Cyrus's Settings first. The law requires it on marketing emails.",
   inbox: "Connect Gmail or Outlook in Settings, Apps first. Campaigns go out from your own inbox.",
-  empty: "Nobody on that list can get it yet. Import your contacts in Iris's Settings.",
+  empty: "Nobody on that list can get it yet. Import your contacts in Cyrus's Settings.",
   noEmail: "We don't know your email to send the test to.",
   action: "That action isn't supported.",
 };

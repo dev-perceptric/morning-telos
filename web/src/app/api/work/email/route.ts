@@ -4,7 +4,7 @@ import { emailAct } from "@/lib/emailWork";
 import { routeError } from "@/lib/routeError";
 import { adminClient, roleGate } from "@/lib/serverAuth";
 
-// Iris's Campaigns tab (src/components/Campaigns.tsx, src/lib/emailWork.ts).
+// Cyrus's Campaigns tab (src/components/Campaigns.tsx, src/lib/emailWork.ts).
 // POST { workspaceId, action: "schedule" | "test", campaignId, sendAt? } (editors and up).
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

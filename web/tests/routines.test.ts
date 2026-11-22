@@ -42,7 +42,7 @@ test("daysText and timeText read the schedule in plain words", () => {
 test("a run's chat title, and the notes left when a run is skipped", () => {
   assert.equal(routineThreadTitle("Plan the week"), "Routine: Plan the week");
   assert.equal(routineThreadTitle("x".repeat(300)).length, 200);
-  assert.equal(SKIP_NOTES.paused("social"), "Skipped: Aphrodite is paused. Turn them back on in Team.");
+  assert.equal(SKIP_NOTES.paused("social"), "Skipped: Leo is paused. Turn them back on in Team.");
   assert.equal(SKIP_NOTES.blocked(CAP_MESSAGES.allowance), `Skipped. ${CAP_MESSAGES.allowance}`);
   for (const n of [SKIP_NOTES.paused("seo"), SKIP_NOTES.soon("sales"), SKIP_NOTES.starting, SKIP_NOTES.blocked(CAP_MESSAGES.trialAllowance)]) assert.ok(n.length <= 300);
 });

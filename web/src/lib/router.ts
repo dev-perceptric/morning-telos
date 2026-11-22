@@ -1,7 +1,7 @@
 // Who answers a message. A tagged message goes to the tagged teammates. An untagged follow-up stays with the teammate
 // who answered last. Anything else goes to a fast, cheap router call (Claude Haiku 5.5) that picks the teammate whose
-// job fits, so Athena only gets general questions, questions about the whole business or the team, and jobs that
-// need several teammates. Any router error or a slow answer falls back to Athena, so the turn never waits long.
+// job fits, so Alexander only gets general questions, questions about the whole business or the team, and jobs that
+// need several teammates. Any router error or a slow answer falls back to Alexander, so the turn never waits long.
 //
 // Pure: the router call comes in as a function (RouterAsk), so tests use a fake. agentLoop.ts runs it for each turn
 // and meters its tokens like every other Claude call.
@@ -13,7 +13,7 @@ import { AGENTS, agentByGod, isAgentKey, LEAD, ORDER, parseMentions, type AgentK
 
 /** The model that routes. Fast and cheap: about $0.0001 a routed message (tests/router.test.ts checks the math). */
 export const ROUTER_MODEL = MODELS.haiku;
-/** The router gets this long. Past it, Athena answers. */
+/** The router gets this long. Past it, Alexander answers. */
 export const ROUTER_TIMEOUT_MS = 1500;
 /** Earlier messages the router reads. */
 export const ROUTER_HISTORY = 4;
@@ -27,7 +27,7 @@ const isTeamNote = (m: StoredMessage) => SKIP_META.some((f) => m.meta?.[f]);
 /**
  * How the teammate was picked. forced: the person picked them (Retry, Ask someone else, a routine). tag: @ in the
  * message. follow: a follow-up to the last answer. router: the router call. topic: no router answer, but the message
- * names one teammate's work. lead: no router, so Athena. fallback: the router failed or was too slow, so Athena.
+ * names one teammate's work. lead: no router, so Alexander. fallback: the router failed or was too slow, so Alexander.
  */
 export type RouteHow = "forced" | "tag" | "follow" | "router" | "topic" | "lead" | "fallback";
 /** agents: who answers, in order. reason: one short line, for staff and the screen's tooltip. */
@@ -42,7 +42,7 @@ export type RouterAsk = (params: RouterParams, signal: AbortSignal) => Promise<A
 
 /**
  * Words that point at a teammate's work. A follow-up only stays with the last teammate when it names no one else's
- * work: "and last month?" stays with Artemis, "now write a welcome email" goes to the router. Athena's words are
+ * work: "and last month?" stays with Theseus, "now write a welcome email" goes to the router. Alexander's words are
  * about the business as a whole and the team itself.
  */
 export const TOPICS: Record<AgentKey, RegExp> = {
@@ -61,8 +61,8 @@ export const topicsOf = (text: string): AgentKey[] => ORDER.filter((k) => TOPICS
 
 /**
  * The one teammate whose work the message names, for when the router can't answer (no key, an error, too slow).
- * Athena's words ("who handles", "the team") don't count against a specialist: "who handles our social media?" is
- * Aphrodite's. Null when no teammate or more than one fits, so Athena takes it.
+ * Alexander's words ("who handles", "the team") don't count against a specialist: "who handles our social media?" is
+ * Leo's. Null when no teammate or more than one fits, so Alexander takes it.
  */
 export function topicPick(text: string, working: readonly AgentKey[]): AgentKey | null {
   const fits = topicsOf(text).filter((k) => k !== LEAD && working.includes(k));
@@ -214,7 +214,7 @@ export type RouteInput = {
   log?: (message: string) => void;
 };
 
-/** Who answers this message. Never throws: any trouble with the router means Athena. */
+/** Who answers this message. Never throws: any trouble with the router means Alexander. */
 export async function routeMessage(o: RouteInput): Promise<Route> {
   const tagged = parseMentions(o.text);
   if (o.forced) return { agents: [o.forced, ...tagged.filter((k) => k !== o.forced)], how: "forced", reason: "Picked by you" };

@@ -68,5 +68,5 @@ export const TOOLS_PRODUCT: Product = "arrowsterr";
 
 /** SEO tools we have a logo and a line for (Settings, Apps). Others show their name only. */
 export const TOOLS: Record<string, { logo: string; blurb: string }> = {
-  cloudflare: { logo: "/img/tools/cloudflare.svg", blurb: "So Artemis can see which AI tools visit and read your site." },
+  cloudflare: { logo: "/img/tools/cloudflare.svg", blurb: "So Theseus can see which AI tools visit and read your site." },
 };

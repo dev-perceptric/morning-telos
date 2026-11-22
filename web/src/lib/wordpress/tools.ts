@@ -1,4 +1,4 @@
-// Hephaestus's tools on a self-hosted WordPress site (src/lib/wordpress/wordpress.ts), as one tool source.
+// Archon's tools on a self-hosted WordPress site (src/lib/wordpress/wordpress.ts), as one tool source.
 // Reads run at once: site info, pages, posts and categories. Every change waits for the owner's approval unless he is
 // on autopilot, and runWordpressApproval checks it again before it runs:
 //   - new pages and posts are always made as drafts, and the answer carries the draft's preview link,
@@ -43,7 +43,7 @@ const MAX_CONTENT = 40_000;
 const MAX_IMAGE = 10 * 1024 * 1024;
 const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp" };
 
-/** Whether this teammate gets the WordPress tools: Hephaestus, unless he is coming soon. */
+/** Whether this teammate gets the WordPress tools: Archon, unless he is coming soon. */
 export function mayUseWordpress(agent: AgentKey): boolean {
   const a = AGENTS[agent];
   return !!a && !a.readOnly && directFor(agent, a.soon === true).includes("wordpress");

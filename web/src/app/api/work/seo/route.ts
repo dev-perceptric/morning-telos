@@ -3,8 +3,8 @@ import { adminClient, roleGate } from "@/lib/serverAuth";
 import { seoAct, seoAnswers, seoWork } from "@/lib/seoWork";
 import { seoData } from "@/lib/seoWorkServer";
 
-// Artemis's Visibility tab (src/components/Visibility.tsx, src/lib/seoWork.ts).
-// GET ?workspaceId: her questions, content plan and line (viewers and up), from a copy read at most once a day.
+// Theseus's Visibility tab (src/components/Visibility.tsx, src/lib/seoWork.ts).
+// GET ?workspaceId: his questions, content plan and line (viewers and up), from a copy read at most once a day.
 // GET ?workspaceId&prompt: each AI tool's latest answer to one question.
 // POST { workspaceId, action, ... }: track a question, or add, move or remove a topic (editors and up).
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     if (q.has("prompt")) return reply(await seoAnswers(q.get("prompt"), { gate, read: data.read }));
     return reply(await seoWork({ gate, ...data }));
   } catch (e) {
-    return routeError(e, "seo-work", "We couldn't load Artemis's work. Try again.");
+    return routeError(e, "seo-work", "We couldn't load Theseus's work. Try again.");
   }
 }
 

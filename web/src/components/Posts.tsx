@@ -1,6 +1,6 @@
 "use client";
 
-// Aphrodite's Posts tab: her accounts, one calendar of what's waiting, scheduled and posted, and one drawer for any
+// Leo's Posts tab: his accounts, one calendar of what's waiting, scheduled and posted, and one drawer for any
 // post. The data and the rules are in src/lib/socialWork.ts; the calendar dates in src/lib/calendar.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
@@ -107,7 +107,7 @@ export function SocialPosts({ sb, ws, editor, onAsk, onReconnect }: { sb: Supaba
           <span>{data.summary}</span>
         </p>
       ) : null}
-      {data && !data.ready ? <Notice>Aphrodite&apos;s social media is still setting up. Check back in a few minutes.</Notice> : null}
+      {data && !data.ready ? <Notice>Leo&apos;s social media is still setting up. Check back in a few minutes.</Notice> : null}
       {error || data?.error ? <ErrorText>{error || data?.error}</ErrorText> : null}
       {note ? <Notice>{note}</Notice> : null}
 
@@ -326,7 +326,7 @@ function PostDrawer({
             })}
           </div>
           <label htmlFor="po-text">Post</label>
-          <textarea id="po-text" value={text} maxLength={MAX} placeholder="Write it yourself, or ask Aphrodite to write it." onChange={(e) => setText(e.target.value)} />
+          <textarea id="po-text" value={text} maxLength={MAX} placeholder="Write it yourself, or ask Leo to write it." onChange={(e) => setText(e.target.value)} />
           <div className="cnt">
             {text.length.toLocaleString()} of {MAX.toLocaleString()}
           </div>
@@ -361,7 +361,7 @@ function PostDrawer({
         {status !== "wait" ? (
           <button type="button" className="btn" onClick={onAsk}>
             <Icon name="message" small />
-            {status === "new" ? "Ask Aphrodite to write it" : "Ask Aphrodite"}
+            {status === "new" ? "Ask Leo to write it" : "Ask Leo"}
           </button>
         ) : null}
         {item?.url ? (

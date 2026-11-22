@@ -1,6 +1,6 @@
 "use client";
 
-// Iris's Campaigns tab and her mailing list settings. Drafts are written and canceled straight in the database under
+// Cyrus's Campaigns tab and his mailing list settings. Drafts are written and canceled straight in the database under
 // the campaigns policies (029_campaigns.sql); approving one schedules it through /api/work/email, which checks the
 // address, the inbox and the list first. The worker sends it a few at a time (src/lib/campaignSend.ts).
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -49,7 +49,7 @@ export function IrisCampaigns({ sb, ws, editor, onAsk, onSettings }: { sb: Supab
     let live = true;
     Promise.all([sb.from("campaigns").select(CAMPAIGN_COLUMNS).eq("workspace_id", ws.id).order("created_at", { ascending: false }).limit(200), loadSetup(sb, ws.id)]).then(([c, s]) => {
       if (!live) return;
-      if (c.error) return setError("We couldn't load Iris's campaigns. Try again.");
+      if (c.error) return setError("We couldn't load Cyrus's campaigns. Try again.");
       setError("");
       setList((c.data ?? []) as Campaign[]);
       setSetup(s);
@@ -139,7 +139,7 @@ export function IrisCampaigns({ sb, ws, editor, onAsk, onSettings }: { sb: Supab
               <b>{c.subject}</b>
               <small>
                 {c.list ?? "Everyone"}
-                {c.source === "iris" ? ", written by Iris" : ""}
+                {c.source === "iris" ? ", written by Cyrus" : ""}
               </small>
             </span>
             <span className="goal-r">
@@ -153,7 +153,7 @@ export function IrisCampaigns({ sb, ws, editor, onAsk, onSettings }: { sb: Supab
         ))}
         {list && !shown.length ? (
           view === "draft" ? (
-            <Empty title="No drafts">Ask Iris to write a campaign, or write one yourself.</Empty>
+            <Empty title="No drafts">Ask Cyrus to write a campaign, or write one yourself.</Empty>
           ) : view === "out" ? (
             <Empty title="Nothing going out">Campaigns you approve go out from your inbox a few at a time.</Empty>
           ) : (
@@ -347,7 +347,7 @@ function CampaignDrawer({
         ) : null}
         <button type="button" className="btn" onClick={onAsk}>
           <Icon name="message" small />
-          {c ? "Ask Iris" : "Ask Iris to write it"}
+          {c ? "Ask Cyrus" : "Ask Cyrus to write it"}
         </button>
         <span className="sp" />
         {editor && c && (c.status === "draft" || c.status === "canceled") ? (
@@ -371,7 +371,7 @@ function CampaignDrawer({
   );
 }
 
-/** Iris's Settings: the mailing address every campaign ends with, and the mailing list. */
+/** Cyrus's Settings: the mailing address every campaign ends with, and the mailing list. */
 export function MailingSettings({ sb, ws, admin, editor }: { sb: SupabaseClient; ws: Workspace; admin: boolean; editor: boolean }) {
   const [setup, setSetup] = useState<Setup | null>(null);
   const [settings, setSettings] = useState<Record<string, unknown>>({});

@@ -1,5 +1,5 @@
-// Iris's campaigns: the list and the words (src/lib/campaigns.ts), the sender (src/lib/campaignSend.ts), approving
-// and testing (src/lib/emailWork.ts) and her tools (src/lib/campaignTools.ts). Fakes only: no Gmail, no database.
+// Cyrus's campaigns: the list and the words (src/lib/campaigns.ts), the sender (src/lib/campaignSend.ts), approving
+// and testing (src/lib/emailWork.ts) and his tools (src/lib/campaignTools.ts). Fakes only: no Gmail, no database.
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ToolContext } from "../src/lib/agentLoop.ts";
@@ -175,12 +175,12 @@ test("unsubscribePage asks first, so a mail scanner opening the link can't unsub
   assert.match(unsubscribePage("bad"), /That link didn't work\./);
 });
 
-// ─────────────── Iris's tools ───────────────
+// ─────────────── Cyrus's tools ───────────────
 
 const WS = { id: "w1", name: "B", website: null } as ToolContext["workspace"];
 const ctx = (agent: ToolContext["agent"]): ToolContext => ({ workspace: WS, agent, threadId: "t1", trust: 0, emit: () => {} });
 
-test("only Iris gets save_campaign and mailing_lists; drafts are saved and changed, sent ones aren't", async () => {
+test("only Cyrus gets save_campaign and mailing_lists; drafts are saved and changed, sent ones aren't", async () => {
   const calls: string[] = [];
   const deps: CampaignToolDeps = {
     byId: async (_ws, id) => (id === ID ? { id, status: "draft", subject: "Old" } : id === "22222222-2222-4222-8222-222222222222" ? { id, status: "sent", subject: "Done" } : null),

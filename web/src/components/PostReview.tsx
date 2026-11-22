@@ -1,6 +1,6 @@
 "use client";
 
-// Aphrodite's posts inside an approval card (Approvals page and chat): where each one goes, when, and the words,
+// Leo's posts inside an approval card (Approvals page and chat): where each one goes, when, and the words,
 // instead of the raw fields. Editing changes the words and the time; the rules are in src/lib/socialWork.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";

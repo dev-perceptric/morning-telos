@@ -194,7 +194,7 @@ function day(v: unknown, path: string): string {
 function teammate(v: unknown, path: string, fallback: AgentKey): AgentKey {
   if (v === undefined || v === null || v === "") return fallback;
   const k = isAgentKey(v) ? v : agentByGod(v);
-  if (!k) bad(path, "must be a teammate's name, like Aphrodite");
+  if (!k) bad(path, "must be a teammate's name, like Leo");
   return k as AgentKey;
 }
 

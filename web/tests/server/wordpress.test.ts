@@ -1,6 +1,6 @@
 // Settings, Apps for a self-hosted WordPress site, end to end: POST /api/apps/wordpress (connect, disconnect), the
 // way back from WordPress (GET /api/apps/wordpress/callback), POST /api/apps/list, an approved WordPress change
-// through POST /api/approvals/:id, and Hephaestus's tools from teamTools. A fake database, a fake WordPress behind the
+// through POST /api/approvals/:id, and Archon's tools from teamTools. A fake database, a fake WordPress behind the
 // stubbed network (stubs/wordpressNet.ts), and globalThis.fetch that fails on any address.
 // Run with: node --conditions=react-server --test tests/server/*.test.ts (part of npm test).
 
@@ -151,7 +151,7 @@ test("disconnect: admins remove the site and its login, and are told they can al
   assert.deepEqual([again.status, (await again.json()).error], [404, "WordPress is already disconnected."]);
 });
 
-test("Hephaestus gets the WordPress tools from teamTools; an approved draft runs on the site after checking again; a revoked login is marked broken", async () => {
+test("Archon gets the WordPress tools from teamTools; an approved draft runs on the site after checking again; a revoked login is marked broken", async () => {
   await approveOn((await connect()).body.url);
   db.tables.services = [];
   db.tables.approvals = [];

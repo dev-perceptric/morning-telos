@@ -1,4 +1,4 @@
--- Morning Telos migration 020: Hephaestus on the owner's own WordPress site, and Shopify in the app list.
+-- Morning Telos migration 020: Archon on the owner's own WordPress site, and Shopify in the app list.
 -- Run once in Supabase → SQL Editor, after 019_website_builders.sql. Safe to run again.
 --
 -- A self-hosted WordPress site isn't connected through Composio. The owner types the site's address on Settings,

@@ -192,7 +192,7 @@ test("the database's own check: someone the server thinks is an editor but who i
 
 // ─────────────── the chat route with product tools ───────────────
 
-test("chat: Aphrodite gets Capybaroar's tools through the brand key, and a change is saved for approval, not run", async () => {
+test("chat: Leo gets Capybaroar's tools through the brand key, and a change is saved for approval, not run", async () => {
   const requests: { tools?: { name: string }[]; system: { text: string }[] }[] = [];
   let step = 0;
   claude.client = {
@@ -213,7 +213,7 @@ test("chat: Aphrodite gets Capybaroar's tools through the brand key, and a chang
       },
     },
   };
-  const res = await chat.POST(new Request("https://app.test/api/chat", { method: "POST", headers: { Authorization: "Bearer editor1" }, body: JSON.stringify({ workspaceId: WS, threadId: THREAD, text: "@Aphrodite post about bread" }) }));
+  const res = await chat.POST(new Request("https://app.test/api/chat", { method: "POST", headers: { Authorization: "Bearer editor1" }, body: JSON.stringify({ workspaceId: WS, threadId: THREAD, text: "@Leo post about bread" }) }));
   const events = (await res.text())
     .trim()
     .split("\n")
@@ -249,7 +249,7 @@ test("chat: on autopilot the change runs right away and is logged", async () => 
       },
     },
   };
-  const res = await chat.POST(new Request("https://app.test/api/chat", { method: "POST", headers: { Authorization: "Bearer editor1" }, body: JSON.stringify({ workspaceId: WS, threadId: THREAD, text: "@Aphrodite post it" }) }));
+  const res = await chat.POST(new Request("https://app.test/api/chat", { method: "POST", headers: { Authorization: "Bearer editor1" }, body: JSON.stringify({ workspaceId: WS, threadId: THREAD, text: "@Leo post it" }) }));
   await res.text();
   assert.deepEqual(productCalls().map((c) => c.params.name), ["create_posts"]);
   assert.equal(db.tables.approvals.length, 2, "no approval saved");

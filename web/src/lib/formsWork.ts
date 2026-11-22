@@ -1,6 +1,6 @@
-// Hora's Calendar tab (src/components/Meetings.tsx): the business's meetings from Google Calendar (or Calendly when
-// Google isn't connected), the invites Hora is waiting to send, and what a person can do to a meeting.
-// Reads run on the workspace's own Composio connection. Invites Hora made while on "Ask me first" are pending
+// Cleo's Calendar tab (src/components/Meetings.tsx): the business's meetings from Google Calendar (or Calendly when
+// Google isn't connected), the invites Cleo is waiting to send, and what a person can do to a meeting.
+// Reads run on the workspace's own Composio connection. Invites Cleo made while on "Ask me first" are pending
 // approvals of GOOGLECALENDAR_CREATE_EVENT, shown as "waiting"; approving goes through /api/approvals/<id>.
 // Pure: the route in src/app/api/work/forms passes the connections and the Composio calls in as deps.
 
@@ -8,7 +8,7 @@ type Result = { status: number; body: Record<string, unknown> };
 type Gate = (min: "owner" | "admin" | "editor" | "viewer") => Promise<{ ok: true; userId: string } | { ok: false; status: number; error: string }>;
 
 export type CalSource = "googlecalendar" | "calendly";
-/** One thing on Hora's calendar. "busy": the owner's own time (no guests), shown gray and not opened. */
+/** One thing on Cleo's calendar. "busy": the owner's own time (no guests), shown gray and not opened. */
 export type Meeting = {
   key: string;
   source: CalSource;
@@ -99,7 +99,7 @@ export function calendlyMeetings(data: unknown, now: number): Meeting[] {
 
 type ApprovalRow = { id: number; product: string; tool: string; input: Record<string, unknown> | null; status: string };
 
-/** Hora's invites waiting for the person's OK: pending GOOGLECALENDAR_CREATE_EVENT approvals. */
+/** Cleo's invites waiting for the person's OK: pending GOOGLECALENDAR_CREATE_EVENT approvals. */
 export function waitingMeetings(rows: readonly ApprovalRow[]): Meeting[] {
   const out: Meeting[] = [];
   for (const r of rows) {
@@ -122,7 +122,7 @@ export function cleanRange(from: unknown, to: unknown): { ok: true; from: string
   return span > 0 && span <= 92 * 86_400_000 ? { ok: true, from: f, to: t } : { ok: false };
 }
 
-/** Hora's one line: what's coming up in the range, from now on. */
+/** Cleo's one line: what's coming up in the range, from now on. */
 export function formsSummary(meetings: readonly Meeting[], now: number): string | null {
   const coming = meetings.filter((m) => m.status === "booked" && Date.parse(m.start) >= now);
   const waiting = meetings.filter((m) => m.status === "wait").length;
@@ -134,13 +134,13 @@ export function formsSummary(meetings: readonly Meeting[], now: number): string 
 
 export const FORMS_MESSAGES = {
   range: "Pick a range of up to 92 days.",
-  none: "Connect Google Calendar or Calendly so Hora can see your meetings.",
+  none: "Connect Google Calendar or Calendly so Cleo can see your meetings.",
   load: "We couldn't load your calendar. Try again.",
   meeting: "That meeting was not found.",
   time: "Pick a start and end time, with the end after the start.",
   past: "Pick a time in the future.",
   action: "That action isn't supported.",
-  calendlyMove: "Calendly meetings can't be moved from here. Cancel it, or ask Hora to find a new time.",
+  calendlyMove: "Calendly meetings can't be moved from here. Cancel it, or ask Cleo to find a new time.",
   failed: "That didn't save. Try again.",
 };
 
@@ -197,7 +197,7 @@ export type FormsActDeps = {
   now?: () => number;
 };
 
-/** The changes a person may make on Hora's calendar, by app. Composio runs nothing else from this tab. */
+/** The changes a person may make on Cleo's calendar, by app. Composio runs nothing else from this tab. */
 export const SCREEN_ACTIONS: Record<CalSource, { cancel: string; move?: string }> = {
   googlecalendar: { cancel: "GOOGLECALENDAR_DELETE_EVENT", move: "GOOGLECALENDAR_PATCH_EVENT" },
   calendly: { cancel: "CALENDLY_CANCEL_SCHEDULED_EVENT" },

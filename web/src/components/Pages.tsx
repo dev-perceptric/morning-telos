@@ -1,6 +1,6 @@
 "use client";
 
-// Hephaestus's Pages tab: the pages and posts he made on the business's own site, waiting or done, and one drawer to
+// Archon's Pages tab: the pages and posts he made on the business's own site, waiting or done, and one drawer to
 // read, approve, turn down or open one. The rules are in src/lib/pagesWork.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
@@ -40,7 +40,7 @@ export function HephaestusPages({ sb, ws, editor, onAsk }: { sb: SupabaseClient;
       .limit(100)
       .then(({ data, error: e }) => {
         if (!live) return;
-        if (e) return setError("We couldn't load Hephaestus's pages. Try again.");
+        if (e) return setError("We couldn't load Archon's pages. Try again.");
         setError("");
         setPages(pagesOf((data ?? []) as Parameters<typeof pagesOf>[0]));
       });
@@ -124,9 +124,9 @@ export function HephaestusPages({ sb, ws, editor, onAsk }: { sb: SupabaseClient;
         ))}
         {pages && !list.length ? (
           view === "wait" ? (
-            <Empty title="Nothing waiting">Ask Hephaestus for a page. He writes it as a draft on your site and waits for your OK.</Empty>
+            <Empty title="Nothing waiting">Ask Archon for a page. He writes it as a draft on your site and waits for your OK.</Empty>
           ) : (
-            <Empty title="No pages yet">Pages Hephaestus put on your site show up here.</Empty>
+            <Empty title="No pages yet">Pages Archon put on your site show up here.</Empty>
           )
         ) : null}
         {pages === null && !error ? <div className="empty">Loading...</div> : null}
@@ -170,7 +170,7 @@ export function HephaestusPages({ sb, ws, editor, onAsk }: { sb: SupabaseClient;
               ) : null}
               <button type="button" className="btn" onClick={() => onAsk(`About "${open.title}": `)}>
                 <Icon name="message" small />
-                Ask Hephaestus
+                Ask Archon
               </button>
             </div>
           </>

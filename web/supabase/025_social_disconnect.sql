@@ -1,4 +1,4 @@
--- Disconnecting a social account from Aphrodite's Settings (src/lib/socialWork.ts disconnectSocial) removes its row
+-- Disconnecting a social account from Leo's Settings (src/lib/socialWork.ts disconnectSocial) removes its row
 -- from social_channels. Capybaroar then sends channel.lost, which must not bring the account back as one that needs
 -- reconnecting. So a "lost" event for a channel we don't have is skipped; "connected" still adds a new one.
 -- Everything else is as in 007_social.sql: an older event never replaces a newer one. Server only.

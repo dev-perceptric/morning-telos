@@ -13,7 +13,7 @@ A content plan the team can write from: what to write next, for which search, an
 
 ## When not to use
 - They want a single keyword checked. Use find-keywords.
-- They want a page written now. Hand it to Hephaestus.
+- They want a page written now. Hand it to Archon.
 
 ## What you have
 - get_content_plan: what is planned, being written, in review and published.

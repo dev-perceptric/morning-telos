@@ -129,7 +129,7 @@ test("docsFor: the website doc first, then this agent's docs, then everyone's, n
 test("buildKnowledgePrompt fits whole docs in the budget, cuts one, and names the rest", () => {
   assert.equal(buildKnowledgePrompt([], "chief", 1000), NO_DOCS);
   const small = buildKnowledgePrompt([doc('Prices "2026"', "Loaf $8", { agent: "chief" }), doc("Hours", "7 to 3", { source: "file" })], "chief", 10_000);
-  assert.equal(small, '<doc title="Prices 2026" for="Athena">\nLoaf $8\n</doc>\n<doc title="Hours" source="file">\n7 to 3\n</doc>');
+  assert.equal(small, '<doc title="Prices 2026" for="Alexander">\nLoaf $8\n</doc>\n<doc title="Hours" source="file">\n7 to 3\n</doc>');
 
   const docs = [
     doc("About", "A".repeat(500), { source: "website" }),

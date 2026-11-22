@@ -1,4 +1,4 @@
-// Dates for the work tabs' calendars (Aphrodite's posts, later Hora's meetings). Weeks start on Monday. Pure: every
+// Dates for the work tabs' calendars (Leo's posts, later Cleo's meetings). Weeks start on Monday. Pure: every
 // function takes the dates it needs, in the browser's own time zone.
 
 export const addDays = (d: Date, n: number) => {

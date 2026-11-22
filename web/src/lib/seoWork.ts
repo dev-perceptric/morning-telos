@@ -1,8 +1,8 @@
-// Artemis's Visibility tab (src/components/Visibility.tsx): the AI questions she tracks in Arrowsterr and the content
+// Theseus's Visibility tab (src/components/Visibility.tsx): the AI questions he tracks in Arrowsterr and the content
 // plan, read with the workspace's brand key.
 // Each Arrowsterr read uses one of our tasks, and Arrowsterr checks the AI tools once a day, so the tab keeps what it
 // read in work_cache (026_work_cache.sql) and reads again at most once a day, or after a change made on the tab.
-// Questions and topics Artemis added while on "Ask me first" are pending approvals of add_prompts and
+// Questions and topics Theseus added while on "Ask me first" are pending approvals of add_prompts and
 // add_to_content_plan, shown as "waiting". Approving one goes through /api/approvals/<id>.
 // Pure: the routes in src/app/api/work/seo pass the database and the product calls in as deps.
 
@@ -68,7 +68,7 @@ export function planOf(v: Record<string, unknown> | null): Topic[] {
 
 type ApprovalRow = { id: number; tool: string; input: Record<string, unknown> | null; status: string };
 
-/** Artemis's pending questions and topics, from add_prompts and add_to_content_plan approvals. */
+/** Theseus's pending questions and topics, from add_prompts and add_to_content_plan approvals. */
 export function waitingOf(rows: readonly ApprovalRow[]): { questions: Question[]; plan: Topic[] } {
   const questions: Question[] = [];
   const plan: Topic[] = [];
@@ -90,7 +90,7 @@ export function waitingOf(rows: readonly ApprovalRow[]): { questions: Question[]
   return { questions, plan };
 }
 
-/** Artemis's one line at the top of the tab. Null before the first daily check. */
+/** Theseus's one line at the top of the tab. Null before the first daily check. */
 export function seoSummary(v: Visibility | null): string | null {
   if (!v || v.visibility === null) return null;
   let line = `AI tools named you in ${Math.round(v.visibility)}% of answers in the last 30 days`;
@@ -106,8 +106,8 @@ export function seoSummary(v: Visibility | null): string | null {
 export const stale = (fetchedAt: string | null, now: number, maxAgeMs = 20 * 3_600_000) => !fetchedAt || now - Date.parse(fetchedAt) > maxAgeMs;
 
 export const SEO_MESSAGES = {
-  setup: "Artemis's SEO tools are still setting up. Check back in a few minutes.",
-  load: "We couldn't load Artemis's work. Try again.",
+  setup: "Theseus's SEO tools are still setting up. Check back in a few minutes.",
+  load: "We couldn't load Theseus's work. Try again.",
   question: "Write the question people ask an AI.",
   questionLong: "Keep the question under 300 characters.",
   full: (max: number) => (max ? `Your plan tracks ${max} questions, and they're all in use. Upgrade to track more.` : "Your plan has ended. Pick a plan to track questions."),

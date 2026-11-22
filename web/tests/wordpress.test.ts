@@ -1,4 +1,4 @@
-// Self-hosted WordPress for Hephaestus (src/lib/wordpress): the site's address, finding WordPress, the sealed connect
+// Self-hosted WordPress for Archon (src/lib/wordpress): the site's address, finding WordPress, the sealed connect
 // note, the way back, the REST calls and the tools with approvals. A fake WordPress (tests/fakeWordpress.ts) and fake
 // DNS: nothing reaches a real site, Composio or Anthropic.
 import assert from "node:assert/strict";
@@ -258,7 +258,7 @@ function setup(o: { row?: Partial<WpRow> | null; wp?: ReturnType<typeof fakeWord
   return { wp, row, deps, approvals, activity, broken, source: wordpressToolSource(deps) };
 }
 
-test("the WordPress tools: only Hephaestus gets them, only for a connected site that works; a broken one says to connect again", async () => {
+test("the WordPress tools: only Archon gets them, only for a connected site that works; a broken one says to connect again", async () => {
   assert.deepEqual(ORDER.filter(mayUseWordpress), ["web"]);
   await withSoon("web", () => assert.equal(mayUseWordpress("web"), false));
   const s = setup();

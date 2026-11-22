@@ -84,7 +84,7 @@ export function parseRoute(path: string): Route {
   if (p === "/use-cases") return { page: "useCases" };
   if (p === "/team") return { page: "team" };
   // One teammate's own page, like the current app's #agent/<key>.
-  // Their name works too: /team/athena opens the same page as /team/chief.
+  // Their name works too: /team/alexander opens the same page as /team/chief.
   const agent = /^\/team\/([a-z]+)$/i.exec(p);
   const key = agent ? (isAgentKey(agent[1]) ? agent[1] : agentByGod(agent[1])) : null;
   if (key) return { page: "agent", key };

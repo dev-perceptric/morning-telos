@@ -1,6 +1,6 @@
-// Hora's booking rules: the days and hours she books meetings in, how long they are, and the gap between them. The
-// owner or an admin sets them on Hora's Settings tab; they're saved in agent_prefs.settings.booking
-// (027_booking_rules.sql) and given to Hora in her instructions (agentLoop.ts systemPrompt). Shared by the browser and
+// Cleo's booking rules: the days and hours she books meetings in, how long they are, and the gap between them. The
+// owner or an admin sets them on Cleo's Settings tab; they're saved in agent_prefs.settings.booking
+// (027_booking_rules.sql) and given to Cleo in her instructions (agentLoop.ts systemPrompt). Shared by the browser and
 // the server.
 
 export type Booking = { days: number[]; start: string; end: string; length: number; gap: number };
@@ -47,7 +47,7 @@ export function daysText(days: number[]): string {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : (names[0] ?? "");
 }
 
-/** The rule line Hora gets in her instructions. */
+/** The rule line Cleo gets in her instructions. */
 export function bookingLine(b: Booking, timezone?: string | null): string {
   return `Booking rules from the owner: book meetings ${daysText(b.days)}, ${time(b.start)} to ${time(b.end)}${timezone ? ` (${timezone} time)` : ""}. Meetings are ${b.length} minutes${b.gap ? `, with ${b.gap} minutes between them` : ""}. Never book outside these rules unless the person asks.`;
 }

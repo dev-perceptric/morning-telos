@@ -111,7 +111,7 @@ test("every kind reads: choices, quick replies, table, chart, connect, post and 
 
   const g = ok({ kind: "goal", metric: "followers", lead: "Grow LinkedIn by", target: 150, unit: "followers", due: "2027-01-31" }) as Extract<Card, { kind: "goal" }>;
   assert.equal(g.step, 25);
-  const p = ok({ kind: "plan", steps: [{ title: "Find 4 topics", owner: "Artemis" }, { title: "Write 3 posts", note: "you approve each" }] }) as Extract<Card, { kind: "plan" }>;
+  const p = ok({ kind: "plan", steps: [{ title: "Find 4 topics", owner: "Theseus" }, { title: "Write 3 posts", note: "you approve each" }] }) as Extract<Card, { kind: "plan" }>;
   assert.deepEqual(p.steps.map((s) => s.agent), ["seo", "social"], "a step without an owner is the teammate's own");
   assert.equal(p.go, "Go");
   const pr = ok({ kind: "progress", goal_id: "g1", lead: "Grow LinkedIn by", target: 150, unit: "followers", due: "2027-01-31", start: "2026-11-20", current: 12, points: [{ at: "2026-11-27", value: 12 }], status: "on_track" });
@@ -196,7 +196,7 @@ test("stored cards are checked again on the way out, and broken ones are dropped
   assert.deepEqual(storedCards({ cards: "x" }), []);
   for (const c of [
     ok({ kind: "table", columns: ["A", "B"], rows: [["x", 1]] }),
-    ok({ kind: "plan", steps: [{ title: "A", owner: "Artemis", note: "n" }] }),
+    ok({ kind: "plan", steps: [{ title: "A", owner: "Theseus", note: "n" }] }),
     ok({ kind: "post_preview", posts: [{ approval_id: 3, network: "x", text: "hi" }] }),
     ok({ kind: "goal", metric: "followers", lead: "Grow by", target: 150, unit: "followers", due: "2027-01-31" }),
   ]) {
@@ -258,7 +258,7 @@ test("choices: the picks go back as the person's message, and a reloaded card fi
 
 test("goal and plan answers name what the person started", () => {
   assert.equal(goalStartText({ lead: "Grow LinkedIn by", target: 150, unit: "followers", due: "2027-01-31" }, Date.parse("2026-11-20")), "Start the goal: Grow LinkedIn by 150 followers by Jan 31.");
-  assert.equal(planGoText([{ title: "Find 4 topics.", agent: "seo" }, { title: "Write 3 posts", agent: "social" }]), "Go. Run the plan: 1. Find 4 topics (Artemis). 2. Write 3 posts (Aphrodite).");
+  assert.equal(planGoText([{ title: "Find 4 topics.", agent: "seo" }, { title: "Write 3 posts", agent: "social" }]), "Go. Run the plan: 1. Find 4 topics (Theseus). 2. Write 3 posts (Leo).");
 });
 
 test("editing a preview changes the approval's own details: the post's words, or the email's to, subject and body", () => {

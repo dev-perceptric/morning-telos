@@ -1,4 +1,4 @@
-// What the chat says while a teammate's tool runs, in plain words: "Artemis is checking katalon.com" instead of
+// What the chat says while a teammate's tool runs, in plain words: "Theseus is checking katalon.com" instead of
 // "SEO and AI visibility: domain overview". And the short name that goes in the "Used: ..." note under the answer.
 // Pure, so the agent loop and the tests share it. Tool names come from src/lib/productTools.ts (product__tool), the
 // Morning Telos tools (search_knowledge, use_skill, remember) and the WordPress and Apps tools, whose labels already
@@ -90,7 +90,7 @@ const afterColon = (label: string) => {
 };
 const startsWithVerb = (s: string) => /^[a-z]+ing\b/i.test(s);
 
-/** The quiet line while a tool runs, like "Artemis is checking katalon.com". */
+/** The quiet line while a tool runs, like "Theseus is checking katalon.com". */
 export function progressLine(god: string, tool: ToolFace, input?: unknown): string {
   const verb = VERBS[baseName(tool.name)];
   if (verb) {

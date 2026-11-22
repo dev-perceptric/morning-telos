@@ -1,4 +1,4 @@
-// Hermes's leads (src/lib/leads.ts) and his save_lead and find_leads tools (src/lib/leadTools.ts). Fakes only.
+// Midas's leads (src/lib/leads.ts) and his save_lead and find_leads tools (src/lib/leadTools.ts). Fakes only.
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ToolContext } from "../src/lib/agentLoop.ts";
@@ -29,7 +29,7 @@ test("leadsSummary: open deals, their worth, and follow-ups waiting", () => {
   assert.equal(leadsSummary([{ stage: "open", value: null }], 0), "1 open deal.");
 });
 
-test("followupsByEmail: Hermes's waiting emails by the address they go to", () => {
+test("followupsByEmail: Midas's waiting emails by the address they go to", () => {
   const m = followupsByEmail([
     { id: 1, product: "gmail", status: "pending", input: { recipient_email: "Maria@Lopez.com", subject: "Checking in", body: "Hi Maria" } },
     { id: 2, product: "outlook", status: "pending", input: { to: ["dan@price.com", "ops@price.com"], subject: "Quote", body: "Hi Dan" } },
@@ -40,7 +40,7 @@ test("followupsByEmail: Hermes's waiting emails by the address they go to", () =
   assert.equal(m.get("maria@lopez.com")![0].approvalId, 1);
 });
 
-// ─────────────── Hermes's tools ───────────────
+// ─────────────── Midas's tools ───────────────
 
 const WS = { id: "w1", name: "B", website: null } as ToolContext["workspace"];
 const ctx = (agent: ToolContext["agent"]): ToolContext => ({ workspace: WS, agent, threadId: "t1", trust: 0, emit: () => {} });
@@ -59,7 +59,7 @@ function fake(saved: Lead[] = []) {
   return { deps, calls };
 }
 
-test("only Hermes gets save_lead and find_leads", async () => {
+test("only Midas gets save_lead and find_leads", async () => {
   const src = leadToolSource(fake().deps);
   assert.deepEqual((await src(ctx("sales"))).tools.map((t) => t.definition.name), ["save_lead", "find_leads"]);
   assert.deepEqual((await src(ctx("support"))).tools, []);

@@ -1,4 +1,4 @@
-// Hora's Calendar tab (src/lib/formsWork.ts) and booking rules (src/lib/booking.ts). Every dependency is a fake:
+// Cleo's Calendar tab (src/lib/formsWork.ts) and booking rules (src/lib/booking.ts). Every dependency is a fake:
 // no Composio, no Google, no Calendly.
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -64,7 +64,7 @@ test("calendlyMeetings: every active booking is a meeting, with its id from the 
   ]);
 });
 
-test("waitingMeetings: Hora's pending invites, with the end from the length when there's no end", () => {
+test("waitingMeetings: Cleo's pending invites, with the end from the length when there's no end", () => {
   const w = waitingMeetings([
     { id: 9, product: "googlecalendar", tool: "GOOGLECALENDAR_CREATE_EVENT", status: "pending", input: { summary: "Intro: Dan", start_datetime: "2027-01-08T14:00:00Z", event_duration_minutes: 45, attendees: ["dan@price.com", { email: "x@y.com" }] } },
     { id: 10, product: "googlecalendar", tool: "GOOGLECALENDAR_CREATE_EVENT", status: "pending", input: { start_datetime: "2027-01-09T14:00:00Z", end_datetime: "2027-01-09T15:00:00Z" } },
@@ -211,7 +211,7 @@ test("bookingProblem and daysText", () => {
   assert.equal(daysText([6]), "Saturday");
 });
 
-test("bookingLine is the plain rule Hora gets", () => {
+test("bookingLine is the plain rule Cleo gets", () => {
   assert.equal(
     bookingLine(DEFAULT_BOOKING, "America/Chicago"),
     "Booking rules from the owner: book meetings Monday to Friday, 9:00 AM to 5:00 PM (America/Chicago time). Meetings are 30 minutes, with 15 minutes between them. Never book outside these rules unless the person asks.",

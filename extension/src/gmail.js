@@ -82,11 +82,11 @@ export function insertReply(text, doc = document) {
 const SALES = /\b(quote|quotes|pricing|price|prices|cost|costs|estimate|proposal|buy|purchase|discount|demo|interested|availability|book a call|hire|rates?)\b/i;
 
 /**
- * Who drafts the reply: whoever the person tagged, else Hermes for sales mail (prices, quotes, buying) and Hestia for
+ * Who drafts the reply: whoever the person tagged, else Midas for sales mail (prices, quotes, buying) and Irene for
  * everything else (questions, problems, support). Returns the teammate's name.
  */
 export function pickReplyAgent(email, typed = "") {
-  const tag = /(?:^|[^\w@])@(Athena|Hermes|Hestia|Hora|Iris|Aphrodite|Artemis|Hephaestus)\b/i.exec(String(typed));
+  const tag = /(?:^|[^\w@])@(Alexander|Midas|Irene|Cleo|Cyrus|Leo|Theseus|Archon)\b/i.exec(String(typed));
   if (tag) return tag[1][0].toUpperCase() + tag[1].slice(1).toLowerCase();
-  return SALES.test(`${email?.title ?? ""}\n${email?.text ?? ""}`) ? "Hermes" : "Hestia";
+  return SALES.test(`${email?.title ?? ""}\n${email?.text ?? ""}`) ? "Midas" : "Irene";
 }

@@ -1,4 +1,4 @@
-// The AI team's turn: a message goes in, the tagged teammates (or Athena) answer, and they can hand work to each other.
+// The AI team's turn: a message goes in, the tagged teammates (or Alexander) answer, and they can hand work to each other.
 // Ported from the old app's runTurn and runAgent (app/lib/agents.js) and shaped like Omniscient's ask.ts: a cached
 // system prompt, parallel tool calls with every result sent back in one message, and progress events for an
 // NDJSON stream.
@@ -6,7 +6,7 @@
 // Replies stream word by word: each step uses the streaming API and sends `delta` events as text arrives, then the
 // whole reply goes out as one `message` event, as before, so saving and older screens still work. Stopping (the
 // person's Stop button aborts the request) ends the Claude call and saves what was written with a "Stopped" note.
-// Untagged messages go to the teammate whose job fits (src/lib/router.ts), not always to Athena.
+// Untagged messages go to the teammate whose job fits (src/lib/router.ts), not always to Alexander.
 //
 // Pure: the Anthropic client, the tools and the database come in as deps, so tests run it with fakes and the route
 // (src/app/api/chat/route.ts) wires in the real ones. Nothing here reads the environment.
@@ -104,7 +104,7 @@ export type TeamStore = {
 /** What the chat stream sends, one JSON object per line. */
 export type ChatEvent =
   | { type: "thread"; id: string }
-  /** Who answers, sent as soon as it is known, so the screen says "Aphrodite is answering" right away. */
+  /** Who answers, sent as soon as it is known, so the screen says "Leo is answering" right away. */
   | { type: "route"; agent: AgentKey; how: RouteHow; reason: string }
   | { type: "status"; agent: AgentKey; text: string }
   /**
@@ -114,7 +114,7 @@ export type ChatEvent =
   | { type: "delta"; agent: AgentKey; text: string; start?: boolean }
   /**
    * A tool started. text: its label, as older screens (the Chrome extension) show it. line: the same in plain words
-   * ("Artemis is checking katalon.com"). used: its short name for "Used: ...".
+   * ("Theseus is checking katalon.com"). used: its short name for "Used: ...".
    */
   | { type: "tool"; agent: AgentKey; text: string; line?: string; used?: string }
   | { type: "handoff"; from: AgentKey; to: AgentKey; note: string }
@@ -201,7 +201,7 @@ export type TurnDeps = {
   /** A line for staff (server log, Sentry). Never shown to the customer. */
   log?: (message: string) => void;
   now?: () => number;
-  /** Picks who answers an untagged message (src/lib/router.ts). Without it, Athena does. */
+  /** Picks who answers an untagged message (src/lib/router.ts). Without it, Alexander does. */
   router?: RouterAsk | null;
   /** Aborted when the person presses Stop (the request is cancelled). The reply so far is saved as stopped. */
   signal?: AbortSignal;
@@ -294,9 +294,9 @@ export function systemPrompt(ws: { name: string; website: string | null; tone?: 
     PAGE_RULE,
     FILE_RULE,
     o.missing.length ? `Not available right now: ${o.missing.join("; ")}. If the job needs it, say so plainly.` : null,
-    // The teammate's own rules (team.ts), like which app to connect and what Hestia hands to the owner.
+    // The teammate's own rules (team.ts), like which app to connect and what Irene hands to the owner.
     ...(a.rules ?? []),
-    // Hora's booking rules, from her Settings tab.
+    // Cleo's booking rules, from her Settings tab.
     key === "forms" && o.booking ? bookingLine(o.booking, ws.timezone) : null,
     "Write in plain English at a 9th grade level. Short sentences. No em dashes. Keep replies short and easy to skim.",
     toneRule(ws.tone),
@@ -393,7 +393,7 @@ export function historyFor(rows: StoredMessage[], key: AgentKey, shot?: Screensh
   });
 }
 
-/** Who answers without the router, in order: the picked teammate first, then the tagged ones, else Athena. */
+/** Who answers without the router, in order: the picked teammate first, then the tagged ones, else Alexander. */
 export function whoAnswers(text: string, forced?: AgentKey | null): AgentKey[] {
   const tagged = parseMentions(text);
   if (forced) return [forced, ...tagged.filter((k) => k !== forced)];

@@ -165,7 +165,7 @@ test("goalPercent: from the start to the target, never past 0 or 100", () => {
   assert.equal(goalPercent({ current: 5, target: 5, baseline: 5, status: "active" }), 100);
 });
 
-test("goalsSummary: one plain line for Athena", () => {
+test("goalsSummary: one plain line for Alexander", () => {
   assert.equal(goalsSummary([]), null);
   assert.equal(goalsSummary(["on_track"]), "1 goal in progress.");
   assert.equal(goalsSummary(["on_track", "needs_you", "needs_you", "done"]), "3 goals in progress, 2 need you, 1 done.");
