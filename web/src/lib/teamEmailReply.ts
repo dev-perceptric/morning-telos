@@ -8,7 +8,7 @@ import { replySubject, teamAddress, TEAM_EMAIL_MESSAGES } from "./teamEmail.ts";
 /** An approval the turn prepared. approveUrl is null when the sender can't approve (an extra sender). */
 export type ReplyApproval = { id: number; title: string; approveUrl: string | null; openUrl: string };
 
-/** "Hermes at Morning Telos". */
+/** "Midas at Morning Telos". */
 export const replyFromName = (agent: AgentKey) => `${AGENTS[agent].god} at Morning Telos`;
 
 /** The From line: the teammate's name and the workspace's own address. */

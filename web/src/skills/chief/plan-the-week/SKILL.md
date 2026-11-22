@@ -1,6 +1,6 @@
 ---
 name: plan-the-week
-description: Plans the coming week with the owner and hands each job to the right teammate: posts for Aphrodite, keywords and content for Artemis, pages for Hephaestus, emails for Iris, bookings for Hora, leads and quotes for Hermes, customer replies for Hestia. Use it when someone says "plan my week", "what should we do this week", "set up next week" or "give everyone their jobs". Do not use it for a report on the week that ended (use weekly-report).
+description: Plans the coming week with the owner and hands each job to the right teammate: posts for Leo, keywords and content for Theseus, pages for Archon, emails for Cyrus, bookings for Cleo, leads and quotes for Midas, customer replies for Irene. Use it when someone says "plan my week", "what should we do this week", "set up next week" or "give everyone their jobs". Do not use it for a report on the week that ended (use weekly-report).
 tools: get_content_plan, list_posts, get_analytics, get_ai_visibility, search_knowledge, handoff
 ---
 # Plan the week

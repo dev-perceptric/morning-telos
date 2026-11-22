@@ -13,13 +13,13 @@ Every new lead gets a real reply and a way to book a call, fast.
 
 ## When not to use
 - The lead already has a quote. Use quote-follow-up.
-- It's a customer with a problem. Hand it to Hestia.
+- It's a customer with a problem. Hand it to Irene.
 
 ## What you have
 - search_knowledge: services, prices, service area, the booking link and the tone.
 - app_search_actions: shows the connected email, calendar and CRM apps and their actions.
 - app_action: reads new emails and contacts, and sends replies after the owner approves.
-- handoff: gives a support question to Hestia or a booking to Hora.
+- handoff: gives a support question to Irene or a booking to Cleo.
 - remember: saves facts the owner teaches you, like "we don't serve that area".
 
 ## Steps
@@ -28,7 +28,7 @@ Every new lead gets a real reply and a way to book a call, fast.
 3. For each lead, read what they asked and the matching service and price with search_knowledge.
 4. Write a short reply: thank them, answer their question, and offer a call with two times or the booking link.
 5. Send each reply with app_action. They wait for the owner's approval.
-6. Hand support questions to Hestia with handoff.
+6. Hand support questions to Irene with handoff.
 7. If no email app is connected, write the replies in chat and say to connect Gmail or Outlook in Settings, Apps.
 
 ## Output

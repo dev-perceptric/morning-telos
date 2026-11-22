@@ -2,18 +2,23 @@
 // and the @ tagging helpers copied from there.
 
 export const AGENTS = [
-  { key: "chief", god: "Athena", name: "Chief of Staff" },
-  { key: "sales", god: "Hermes", name: "Sales Rep" },
-  { key: "support", god: "Hestia", name: "Customer Support" },
-  { key: "forms", god: "Hora", name: "Forms + Scheduling" },
-  { key: "email", god: "Iris", name: "Email Marketing" },
-  { key: "social", god: "Aphrodite", name: "Social Media" },
-  { key: "seo", god: "Artemis", name: "SEO Specialist" },
-  { key: "web", god: "Hephaestus", name: "Website Builder" },
+  { key: "chief", god: "Alexander", name: "Chief of Staff" },
+  { key: "sales", god: "Midas", name: "Sales Rep" },
+  { key: "support", god: "Irene", name: "Customer Support" },
+  { key: "forms", god: "Cleo", name: "Forms + Scheduling" },
+  { key: "email", god: "Cyrus", name: "Email Marketing" },
+  { key: "social", god: "Leo", name: "Social Media" },
+  { key: "seo", god: "Theseus", name: "SEO Specialist" },
+  { key: "web", god: "Archon", name: "Website Builder" },
 ];
 
 export const byKey = (k) => AGENTS.find((a) => a.key === k) ?? AGENTS[0];
-export const byGod = (name) => AGENTS.find((a) => a.god.toLowerCase() === String(name ?? "").toLowerCase()) ?? null;
+// The team's names before the rename, so old habits like @hermes still reach the right teammate.
+const OLD_NAMES = { athena: "chief", hermes: "sales", hestia: "support", hora: "forms", iris: "email", aphrodite: "social", artemis: "seo", hephaestus: "web" };
+export const byGod = (name) => {
+  const n = String(name ?? "").toLowerCase();
+  return AGENTS.find((a) => a.god.toLowerCase() === n) ?? AGENTS.find((a) => a.key === OLD_NAMES[n]) ?? null;
+};
 
 /** Teammates tagged with @ in a message, in the order they are first tagged. */
 export function parseMentions(text) {

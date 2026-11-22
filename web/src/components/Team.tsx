@@ -41,7 +41,7 @@ import { Empty, ErrorText, PageHead, Section, Switch, to } from "./ui";
 
 export { Face } from "./Chat";
 
-/** Teammates whose tools can change something, in our products or the business's own apps (not Athena, who only reads, and not the ones coming soon). */
+/** Teammates whose tools can change something, in our products or the business's own apps (not Alexander, who only reads, and not the ones coming soon). */
 const makesChanges = (k: AgentKey) =>
   !AGENTS[k].soon &&
   !AGENTS[k].readOnly &&

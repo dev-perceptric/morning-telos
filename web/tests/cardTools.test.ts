@@ -147,7 +147,7 @@ test("set_goal: a goal card the person starts; a due date in the past, an unknow
   const card = r.cards![0] as Extract<Card, { kind: "goal" }>;
   assert.deepEqual({ kind: card.kind, metric: card.metric, target: card.target, step: card.step, due: card.due, agent: card.agent, title: card.title }, { kind: "goal", metric: "followers", target: 150, step: 25, due: "2027-01-31", agent: "social", title: "Goal" });
   assert.match(r.content, /wait for Start/);
-  assert.equal((await tool(deps, "set_goal", "chief")({ metric: "other", lead: "Get", target: 20, unit: "bookings", due: "2027-01-31", owner: "Hora" })).cards![0].agent, "forms");
+  assert.equal((await tool(deps, "set_goal", "chief")({ metric: "other", lead: "Get", target: 20, unit: "bookings", due: "2027-01-31", owner: "Cleo" })).cards![0].agent, "forms");
   assert.match((await set({ metric: "other", lead: "Get", target: 20, unit: "bookings", due: "2026-11-01" })).content, /after today/);
   assert.match((await set({ metric: "other", lead: "Get", target: 20, unit: "bookings", due: "2030-01-01" })).content, /within two years/);
   assert.match((await set({ metric: "other", lead: "Get", target: 20, unit: "bookings", due: "2027-01-31", owner: "Zeus" })).content, /owner must be a teammate/);
@@ -158,14 +158,14 @@ test("set_goal: a goal card the person starts; a due date in the past, an unknow
 
 test("set_plan: a plan card with who does each step; a teammate who can't take work is refused", async () => {
   const { deps } = fakes();
-  const r = await tool(deps, "set_plan")({ steps: [{ title: "Learn your brand", owner: "Aphrodite" }, { title: "Find 4 topics", owner: "Artemis" }, { title: "Check in every Monday", owner: "Athena" }] });
+  const r = await tool(deps, "set_plan")({ steps: [{ title: "Learn your brand", owner: "Leo" }, { title: "Find 4 topics", owner: "Theseus" }, { title: "Check in every Monday", owner: "Alexander" }] });
   assert.equal(r.isError, undefined, r.content);
   const card = r.cards![0] as Extract<Card, { kind: "plan" }>;
   assert.deepEqual(card.steps.map((s) => s.agent), ["social", "seo", "chief"]);
   assert.equal(card.note, "3 steps");
   assert.match(r.content, /wait for Go/);
   await withSoon("seo", async () => {
-    assert.match((await tool(deps, "set_plan")({ steps: [{ title: "Find topics", owner: "Artemis" }] })).content, /can't take work/);
+    assert.match((await tool(deps, "set_plan")({ steps: [{ title: "Find topics", owner: "Theseus" }] })).content, /can't take work/);
   });
 });
 

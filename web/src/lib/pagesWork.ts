@@ -1,10 +1,10 @@
-// Hephaestus's Pages tab (src/components/Pages.tsx): the pages and posts he made on the business's own site, read from
+// Archon's Pages tab (src/components/Pages.tsx): the pages and posts he made on the business's own site, read from
 // his approvals (approvals.ts). Waiting ones are pending approvals; done ones went to the site, as a draft unless the
 // change was a publish. Members read approvals straight from the database (013_approvals.sql). Shared by the browser
 // and the tests.
 import { appName } from "./composio/catalog.ts";
 
-/** The site builders Hephaestus works in: Composio's toolkits, and self-hosted WordPress ("wordpress", direct). */
+/** The site builders Archon works in: Composio's toolkits, and self-hosted WordPress ("wordpress", direct). */
 export const SITE_PRODUCTS = ["framer", "webflow", "wordpress_com", "shopify", "wordpress"] as const;
 
 export type Page = {
@@ -76,7 +76,7 @@ export function urlIn(result: string | null): string | null {
 
 const STATUS: Record<string, Page["status"] | null> = { pending: "wait", approved: "wait", running: "wait", done: "done", failed: "failed", denied: "denied" };
 
-/** Hephaestus's site changes as pages. Uploads and reads are left out; so are changes that weren't to his sites. */
+/** Archon's site changes as pages. Uploads and reads are left out; so are changes that weren't to his sites. */
 export function pagesOf(rows: readonly Row[]): Page[] {
   const out: Page[] = [];
   for (const r of rows) {
@@ -103,7 +103,7 @@ export function pagesOf(rows: readonly Row[]): Page[] {
   return out;
 }
 
-/** Hephaestus's line at the top of the tab. Null before his first page. */
+/** Archon's line at the top of the tab. Null before his first page. */
 export function pagesSummary(pages: readonly Page[]): string | null {
   const waiting = pages.filter((p) => p.status === "wait").length;
   const done = pages.filter((p) => p.status === "done").length;

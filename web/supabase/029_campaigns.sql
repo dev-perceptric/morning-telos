@@ -1,5 +1,5 @@
--- ─────────────── Iris's email campaigns ───────────────
--- The business's own mailing list, Iris's campaigns, and what went to whom (src/lib/campaigns.ts). Campaigns go out
+-- ─────────────── Cyrus's email campaigns ───────────────
+-- The business's own mailing list, Cyrus's campaigns, and what went to whom (src/lib/campaigns.ts). Campaigns go out
 -- from the business's own Gmail or Outlook through Composio, a few at a time under the inbox's daily limit
 -- (src/lib/campaignSend.ts, called by the worker). Every email ends with the business's mailing address and an
 -- unsubscribe link (/api/unsubscribe), and nobody who unsubscribed is emailed again.

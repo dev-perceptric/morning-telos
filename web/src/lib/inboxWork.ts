@@ -1,11 +1,11 @@
-// Hestia's Inbox tab (src/components/Inbox.tsx): the replies she wrote to customers, read from her approvals
+// Irene's Inbox tab (src/components/Inbox.tsx): the replies she wrote to customers, read from her approvals
 // (approvals.ts). Waiting ones are pending approvals the person can edit, send or turn down; sent ones went out from
 // the business's own Gmail, Outlook, Zendesk or Help Scout. Members read approvals straight from the database
 // (013_approvals.sql). Shared by the browser and the tests.
 import { emailWords } from "./cards.ts";
 import { appName } from "./composio/catalog.ts";
 
-/** The apps Hestia answers customers in. */
+/** The apps Irene answers customers in. */
 export const SUPPORT_APPS = ["gmail", "outlook", "zendesk", "help_scout"] as const;
 
 export type Reply = {
@@ -24,7 +24,7 @@ type Row = { id: number; product: string; tool: string; title: string; input: Re
 
 const STATUS: Record<string, Reply["status"] | null> = { pending: "wait", approved: "wait", running: "wait", done: "sent", failed: "failed", denied: "denied" };
 
-/** Hestia's replies from her approvals. Changes that aren't replies (labels, drafts of other kinds) are left out. */
+/** Irene's replies from her approvals. Changes that aren't replies (labels, drafts of other kinds) are left out. */
 export function repliesOf(rows: readonly Row[]): Reply[] {
   const out: Reply[] = [];
   for (const r of rows) {
@@ -48,7 +48,7 @@ export function repliesOf(rows: readonly Row[]): Reply[] {
   return out;
 }
 
-/** Hestia's line at the top of the tab. Null before her first reply. */
+/** Irene's line at the top of the tab. Null before her first reply. */
 export function inboxSummary(replies: readonly Reply[], now = Date.now()): string | null {
   const week = replies.filter((r) => r.status === "sent" && now - Date.parse(r.at) < 7 * 86_400_000).length;
   const waiting = replies.filter((r) => r.status === "wait").length;

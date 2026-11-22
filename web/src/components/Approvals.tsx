@@ -165,7 +165,7 @@ export function Review({ sb, ws, ap, onDecided, compact }: { sb: SupabaseClient;
   const [error, setError] = useState("");
   const [said, setSaid] = useState("");
   const set = useCallback((path: Path, next: unknown) => setDraft((d) => setPath(d, path, next)), []);
-  // Aphrodite's posts show as posts, not fields.
+  // Leo's posts show as posts, not fields.
   const posts = reviewPosts(ap.product, ap.tool, ap.input);
 
   const decide = async (action: "approve" | "deny") => {

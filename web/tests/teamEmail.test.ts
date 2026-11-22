@@ -172,8 +172,8 @@ test("subjects: Re: and Fwd: come off, titles are cut at a word, answers start w
 });
 
 test("routingText: tags in the subject or first line count; tags further down (quoted text) don't", () => {
-  assert.equal(routingText("@Hermes the quote", "Can you send it?\n\nOn Mon Bo wrote:\n> @Artemis check SEO"), "@Hermes the quote\nCan you send it?\n\nOn Mon Bo wrote:\n> Artemis check SEO");
-  assert.equal(routingText("Quote", "\n\n@Iris please write the newsletter\nthanks @Hermes"), "Quote\n@Iris please write the newsletter\nthanks Hermes");
+  assert.equal(routingText("@Midas the quote", "Can you send it?\n\nOn Mon Bo wrote:\n> @Theseus check SEO"), "@Midas the quote\nCan you send it?\n\nOn Mon Bo wrote:\n> Theseus check SEO");
+  assert.equal(routingText("Quote", "\n\n@Cyrus please write the newsletter\nthanks @Midas"), "Quote\n@Cyrus please write the newsletter\nthanks Midas");
   assert.equal(routingText("", ""), "");
 });
 

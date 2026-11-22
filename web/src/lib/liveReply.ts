@@ -1,5 +1,5 @@
 // The reply being written, as the chat screen follows the NDJSON stream (src/components/Chat.tsx): who is answering,
-// the text so far, the one quiet line ("Aphrodite is answering", "Artemis is checking katalon.com") and the tools
+// the text so far, the one quiet line ("Leo is answering", "Theseus is checking katalon.com") and the tools
 // used. Pure, so the screen and the tests share it.
 
 import type { ChatEvent } from "./agentLoop.ts";

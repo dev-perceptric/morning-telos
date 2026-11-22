@@ -168,7 +168,7 @@ export function decideDeps(db: SupabaseClient, ws: string, log: (message: string
   };
 }
 
-/** The leads table for Hermes's tools (028_leads.sql), as the server. Every call is for one workspace. */
+/** The leads table for Midas's tools (028_leads.sql), as the server. Every call is for one workspace. */
 export function leadDeps(db: SupabaseClient): LeadToolDeps {
   const num = (l: Lead) => ({ ...l, value: l.value === null ? null : Number(l.value) });
   const one = async (q: PromiseLike<{ data: unknown; error: { message: string } | null }>) => {
@@ -193,7 +193,7 @@ export function leadDeps(db: SupabaseClient): LeadToolDeps {
   };
 }
 
-/** Iris's campaigns and lists (029_campaigns.sql), as the server. Every call is for one workspace. */
+/** Cyrus's campaigns and lists (029_campaigns.sql), as the server. Every call is for one workspace. */
 export function campaignDeps(db: SupabaseClient): CampaignToolDeps {
   return {
     async byId(ws, id) {
@@ -233,9 +233,9 @@ export function toolSources(db: SupabaseClient, log?: (message: string) => void)
     knowledgeToolSource((ws, q, n) => searchKnowledge(ws, q, n, db)),
     // Answer cards and goals for every working agent (show_card, set_goal, set_plan, update_step, log_progress).
     cardToolSource(cardDeps(db, log)),
-    // Hermes's leads list (save_lead, find_leads).
+    // Midas's leads list (save_lead, find_leads).
     leadToolSource(leadDeps(db)),
-    // Iris's campaign drafts and lists (save_campaign, mailing_lists).
+    // Cyrus's campaign drafts and lists (save_campaign, mailing_lists).
     campaignToolSource(campaignDeps(db)),
   ];
 }

@@ -393,7 +393,7 @@ function PendingFiles({ files, onRemove }: { files: Pending[]; onRemove: (key: s
 /**
  * A message box like the current app's: one rounded box, + (attach files or save one to Knowledge), @ Tag (and the
  * model on Home) at the bottom left, and the mic and a round send button at the right. Typing @ opens a menu of
- * teammates, and / a menu of the tagged teammate's skills (Athena's, or `agent`'s, when nobody is tagged). Enter
+ * teammates, and / a menu of the tagged teammate's skills (Alexander's, or `agent`'s, when nobody is tagged). Enter
  * sends and Shift+Enter starts a new line. Files can also be dropped on the box or pasted (images). The mic types
  * what the person says (src/lib/speech.ts) and stands where Send is while the box is empty, like Lindy.
  */

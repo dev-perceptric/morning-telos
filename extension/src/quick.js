@@ -11,19 +11,19 @@ export function domainOf(url) {
 }
 
 export const QUICK = [
-  { id: "check", label: "Check this site", agent: "Artemis" },
-  { id: "lead", label: "Save as a lead", agent: "Hermes" },
-  { id: "summary", label: "Summarize this page", agent: "Athena" },
+  { id: "check", label: "Check this site", agent: "Theseus" },
+  { id: "lead", label: "Save as a lead", agent: "Midas" },
+  { id: "summary", label: "Summarize this page", agent: "Alexander" },
 ];
 
 /** The message a quick action sends for this page. */
 export function quickMessage(id, page) {
   const domain = domainOf(page?.url);
   if (id === "check")
-    return `@Artemis Check this site: ${domain}. Use domain_overview on ${domain} to see its Google traffic and best keywords. Then tell me in a few short points what stands out and what to do next.`;
+    return `@Theseus Check this site: ${domain}. Use domain_overview on ${domain} to see its Google traffic and best keywords. Then tell me in a few short points what stands out and what to do next.`;
   if (id === "lead")
-    return "@Hermes Save this as a lead. From the attached page, pull the business name, its contact details and any person shown. Then save it to my CRM with your CRM tools, so it waits for my OK. If no CRM is connected, list the lead here and tell me which app to connect.";
-  if (id === "summary") return "@Athena Summarize this page in a few short points.";
+    return "@Midas Save this as a lead. From the attached page, pull the business name, its contact details and any person shown. Then save it to my CRM with your CRM tools, so it waits for my OK. If no CRM is connected, list the lead here and tell me which app to connect.";
+  if (id === "summary") return "@Alexander Summarize this page in a few short points.";
   throw new Error(`Unknown quick action: ${id}`);
 }
 

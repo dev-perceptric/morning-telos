@@ -1,4 +1,4 @@
-// The database and Composio behind Iris's campaigns (src/lib/campaignSend.ts, src/lib/emailWork.ts). Server only.
+// The database and Composio behind Cyrus's campaigns (src/lib/campaignSend.ts, src/lib/emailWork.ts). Server only.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/nextjs";
 import { cleanAddress } from "./campaigns.ts";
@@ -26,7 +26,7 @@ export async function inboxOf(db: SupabaseClient, ws: string): Promise<App | nul
   return rows.some((c) => c.toolkit === "gmail") ? "gmail" : rows.some((c) => c.toolkit === "outlook") ? "outlook" : null;
 }
 
-/** The business's name and Iris's mailing address (agent_prefs.settings.mail_address), or null without an address. */
+/** The business's name and Cyrus's mailing address (agent_prefs.settings.mail_address), or null without an address. */
 export async function senderOf(db: SupabaseClient, ws: string): Promise<{ business: string; address: string } | null> {
   const [w, p] = await Promise.all([
     db.from("workspaces").select("name").eq("id", ws).maybeSingle(),

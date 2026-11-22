@@ -48,7 +48,7 @@ beforeEach(() => {
     beta: {
       messages: {
         create: async (p: Req) => {
-          if (isRouter(p)) return routerReply("Athena");
+          if (isRouter(p)) return routerReply("Alexander");
           requests.push(structuredClone(p));
           return { id: "m", type: "message", role: "assistant", model: p.model, content: [{ type: "text", text: "Looks good." }], stop_reason: "end_turn", usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } };
         },

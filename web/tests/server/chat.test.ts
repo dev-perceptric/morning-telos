@@ -47,7 +47,7 @@ beforeEach(() => {
   ]);
   requests = [];
   routed = [];
-  pick = "Athena";
+  pick = "Alexander";
   claude.client = {
     beta: {
       messages: {
@@ -108,7 +108,7 @@ test("an editor's message starts a thread and streams NDJSON: thread, route, sta
     ],
   );
   assert.deepEqual(db.tables.messages[0].meta, { user: "editor1@example.com" });
-  // Two calls metered: the router (no agent, Haiku) and Athena's answer.
+  // Two calls metered: the router (no agent, Haiku) and Alexander's answer.
   assert.equal(routed.length, 1);
   assert.equal(routed[0].model, "claude-haiku-5-5");
   assert.equal(db.tables.ai_usage.length, 2);
@@ -125,12 +125,12 @@ test("an editor's message starts a thread and streams NDJSON: thread, route, sta
 test("a second message goes on the same thread, and the agent sees the earlier ones", async () => {
   const first = await lines(await post("editor1", { text: "Hi" }));
   const threadId = first[0].id;
-  const ev = await lines(await post("editor1", { text: "@Artemis and you?", threadId }));
+  const ev = await lines(await post("editor1", { text: "@Theseus and you?", threadId }));
   assert.equal(ev[0].id, threadId);
   assert.equal(db.tables.threads.filter((t) => t.workspace_id === WS).length, 1);
   assert.equal(db.tables.messages.length, 4);
-  // Artemis answers. Athena's earlier reply comes to her as user text.
-  assert.match(requests[1].system[0].text, /^You are Artemis/);
+  // Theseus answers. Alexander's earlier reply comes to him as user text.
+  assert.match(requests[1].system[0].text, /^You are Theseus/);
 });
 
 test("another workspace's thread is not found, and nothing is saved", async () => {
@@ -184,20 +184,20 @@ test("a database failure mid-turn ends the stream with one short line", async ()
   assert.deepEqual(ev.slice(1), [{ type: "message", agent: "chief", text: "Something went wrong. Try again in a moment.", error: true }, { type: "done" }]);
 });
 
-test("an untagged message goes to the teammate the router picks, who answers in place of Athena", async () => {
-  pick = "Aphrodite";
+test("an untagged message goes to the teammate the router picks, who answers in place of Alexander", async () => {
+  pick = "Leo";
   const ev = await lines(await post("editor1", { text: "Who's responsible for the social media here?" }));
   assert.deepEqual(ev[1], { type: "route", agent: "social", how: "router", reason: "Fits the job" });
-  assert.match(requests[0].system[0].text, /^You are Aphrodite/);
+  assert.match(requests[0].system[0].text, /^You are Leo/);
   assert.match(routed[0].messages[0].content, /<new_message>\nWho's responsible for the social media here\?\n<\/new_message>/);
   assert.equal(db.tables.messages[1].agent, "social");
 });
 
-test("a broken router answer falls back to Athena", async () => {
+test("a broken router answer falls back to Alexander", async () => {
   pick = "Zeus";
   const ev = await lines(await post("editor1", { text: "Hello there" }));
   assert.deepEqual(ev[1], { type: "route", agent: "chief", how: "fallback", reason: "Answers general questions" });
-  assert.match(requests[0].system[0].text, /^You are Athena/);
+  assert.match(requests[0].system[0].text, /^You are Alexander/);
 });
 
 test("again (Retry, Ask someone else): the last message is answered by the picked teammate, and nothing new is saved for the person", async () => {
@@ -212,7 +212,7 @@ test("again (Retry, Ask someone else): the last message is answered by the picke
     added.map((m) => [m.role, m.agent]),
     [["agent", "seo"]],
   );
-  // Artemis answers the person's real last message, not the words sent with the retry.
+  // Theseus answers the person's real last message, not the words sent with the retry.
   const said = JSON.stringify((requests.at(-1) as unknown as { messages: unknown }).messages);
   assert.match(said, /Check our traffic/);
   assert.doesNotMatch(said, /anything/);
@@ -231,7 +231,7 @@ test("Stop: cancelling the stream stops the reply and saves what was written, ma
   claude.client = {
     beta: {
       messages: {
-        create: async (p: unknown) => (isRouter(p) ? routerReply("Athena") : Promise.reject(new Error("the team streams"))),
+        create: async (p: unknown) => (isRouter(p) ? routerReply("Alexander") : Promise.reject(new Error("the team streams"))),
         stream: (_p: unknown, o?: { signal?: AbortSignal }) => {
           let onText: (d: string, s: string) => void = () => {};
           let current: unknown;

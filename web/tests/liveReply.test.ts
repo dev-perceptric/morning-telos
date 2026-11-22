@@ -7,15 +7,15 @@ import { IDLE, LIVE_WORDS, started, step, type Live } from "../src/lib/liveReply
 const run = (s: Live, events: ChatEvent[]) => events.reduce(step, s);
 
 test("right after Send: the teammate when known, else finding the right one", () => {
-  assert.deepEqual(started("social"), { answering: "social", text: "", line: "Aphrodite is answering", used: [] });
+  assert.deepEqual(started("social"), { answering: "social", text: "", line: "Leo is answering", used: [] });
   assert.deepEqual(started(null), { answering: null, text: "", line: "Finding the right teammate", used: [] });
 });
 
 test("route, then deltas: the line names who answers, then the text takes its place as it grows", () => {
   let s = run(started(null), [{ type: "thread", id: "t" }, { type: "route", agent: "seo", how: "router", reason: "SEO" }]);
-  assert.equal(s.line, "Artemis is answering");
+  assert.equal(s.line, "Theseus is answering");
   s = step(s, { type: "status", agent: "seo", text: "Thinking" });
-  assert.equal(s.line, "Artemis is answering");
+  assert.equal(s.line, "Theseus is answering");
   s = run(s, [
     { type: "delta", agent: "seo", text: "Traffic ", start: true },
     { type: "delta", agent: "seo", text: "is up." },
@@ -27,12 +27,12 @@ test("route, then deltas: the line names who answers, then the text takes its pl
 test("tools: the progress line updates, the used list grows once per tool, and a new step's text starts over", () => {
   const s = run(started("seo"), [
     { type: "delta", agent: "seo", text: "Let me look.", start: true },
-    { type: "tool", agent: "seo", text: "SEO and AI visibility: domain overview", line: "Artemis is checking katalon.com", used: "domain overview" },
-    { type: "tool", agent: "seo", text: "SEO and AI visibility: keyword research", line: "Artemis is researching keywords", used: "keyword research" },
-    { type: "tool", agent: "seo", text: "SEO and AI visibility: domain overview", line: "Artemis is checking katalon.com", used: "domain overview" },
+    { type: "tool", agent: "seo", text: "SEO and AI visibility: domain overview", line: "Theseus is checking katalon.com", used: "domain overview" },
+    { type: "tool", agent: "seo", text: "SEO and AI visibility: keyword research", line: "Theseus is researching keywords", used: "keyword research" },
+    { type: "tool", agent: "seo", text: "SEO and AI visibility: domain overview", line: "Theseus is checking katalon.com", used: "domain overview" },
     { type: "status", agent: "seo", text: "Working" },
   ]);
-  assert.equal(s.line, "Artemis is checking katalon.com", "the tool line stays between steps");
+  assert.equal(s.line, "Theseus is checking katalon.com", "the tool line stays between steps");
   assert.deepEqual(s.used, ["domain overview", "keyword research"]);
   assert.equal(s.text, "Let me look.");
   const next = step(s, { type: "delta", agent: "seo", text: "katalon.com gets", start: true });
@@ -46,11 +46,11 @@ test("a tool event from an older server, with only its label, still shows a line
 
 test("a handoff: the next teammate is answering, with a fresh reply", () => {
   const s = run(started("chief"), [
-    { type: "delta", agent: "chief", text: "Over to Artemis.", start: true },
-    { type: "message", agent: "chief", text: "Over to Artemis." },
+    { type: "delta", agent: "chief", text: "Over to Theseus.", start: true },
+    { type: "message", agent: "chief", text: "Over to Theseus." },
     { type: "handoff", from: "chief", to: "seo", note: "Check" },
   ]);
-  assert.deepEqual(s, { answering: "seo", text: "", line: "Artemis is answering", used: [] });
+  assert.deepEqual(s, { answering: "seo", text: "", line: "Theseus is answering", used: [] });
   // A delta from someone else than who was answering starts a new reply too.
   assert.equal(step({ ...s, text: "old" }, { type: "delta", agent: "web", text: "New" }).text, "New");
 });

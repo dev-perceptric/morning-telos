@@ -1,6 +1,6 @@
 # Morning Telos
 
-Morning Telos sells an AI team to small businesses. Each customer gets a workspace with AI employees (named after Greek gods) they chat with, tag with @, and approve work from.
+Morning Telos sells an AI team to small businesses. Each customer gets a workspace with AI employees (Alexander, Midas, Irene, Cleo, Cyrus, Leo, Theseus and Archon; see `web/src/lib/team.ts`) they chat with, tag with @, and approve work from.
 
 **The plan is the source of truth:** the "Morning Telos SaaS Plan" doc (https://claude.ai/artifact/5BnjVisY2z2vwxrCEYfyNm). Read it before planning or building. Work only on the current phase. If an issue conflicts with the plan, the plan wins: comment on the issue and label it `agent-blocked`.
 

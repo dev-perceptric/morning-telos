@@ -1,4 +1,4 @@
-// The database and product calls behind Aphrodite's Posts tab (src/lib/socialWork.ts). Server only.
+// The database and product calls behind Leo's Posts tab (src/lib/socialWork.ts). Server only.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/nextjs";
 import type { Channel } from "./socialWork.ts";

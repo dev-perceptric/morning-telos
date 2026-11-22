@@ -1,6 +1,6 @@
-// Iris's campaign tools (src/lib/campaigns.ts): save_campaign writes or changes a draft on her Campaigns tab, and
+// Cyrus's campaign tools (src/lib/campaigns.ts): save_campaign writes or changes a draft on his Campaigns tab, and
 // mailing_lists says who's on the business's lists. Nothing is sent: the person approves a campaign on the tab, which
-// schedules it (src/lib/emailWork.ts). So they need no approval. Only Iris gets them. Pure: the database comes in.
+// schedules it (src/lib/emailWork.ts). So they need no approval. Only Cyrus gets them. Pure: the database comes in.
 import type { ToolDef } from "./agentLoop.ts";
 import { cleanCampaign, type Campaign } from "./campaigns.ts";
 import type { ToolSource } from "./toolRegistry.ts";
@@ -58,7 +58,7 @@ export function campaignTools(deps: CampaignToolDeps): ToolDef[] {
   return [save, lists];
 }
 
-/** save_campaign and mailing_lists for Iris only. */
+/** save_campaign and mailing_lists for Cyrus only. */
 export function campaignToolSource(deps: CampaignToolDeps): ToolSource {
   const tools = campaignTools(deps);
   return async (ctx) => ({ tools: ctx.agent === "email" ? tools : [], missing: [] });

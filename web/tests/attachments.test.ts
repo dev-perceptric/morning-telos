@@ -197,7 +197,7 @@ test("historyFor: a message of only files still counts as the person's turn", ()
   assert.equal(h.length, 1);
   assert.match(blocks[0].text!, /<attached_file/);
   assert.equal(blocks[1].text, ONLY_FILES);
-  assert.deepEqual(historyFor([{ role: "user", agent: null, content: "", meta: {} }], "chief", null, { workspaceId: WS, loaded: [] }), [{ role: "user", content: "Athena, it's your turn. Answer the last message." }]);
+  assert.deepEqual(historyFor([{ role: "user", agent: null, content: "", meta: {} }], "chief", null, { workspaceId: WS, loaded: [] }), [{ role: "user", content: "Alexander, it's your turn. Answer the last message." }]);
 });
 
 test("every teammate's system prompt has the file rule", () => {

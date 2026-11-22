@@ -1,4 +1,4 @@
-// Hephaestus's Pages tab (src/lib/pagesWork.ts): his site changes read from his approvals.
+// Archon's Pages tab (src/lib/pagesWork.ts): his site changes read from his approvals.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { bodyIn, pagesOf, pagesSummary, plainText, titleIn, urlIn } from "../src/lib/pagesWork.ts";
@@ -41,7 +41,7 @@ test("urlIn finds the link the builder gave back, https only", () => {
   assert.equal(urlIn(null), null);
 });
 
-test("pagesOf: waiting, done and failed pages from Hephaestus's site changes only", () => {
+test("pagesOf: waiting, done and failed pages from Archon's site changes only", () => {
   const pages = pagesOf([
     row({ id: 1 }),
     row({ id: 2, status: "done", result: '{"link":"https://blog.example.com/p"}' }),

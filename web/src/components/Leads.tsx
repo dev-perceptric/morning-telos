@@ -1,6 +1,6 @@
 "use client";
 
-// Hermes's Leads tab: the business's leads and open quotes (028_leads.sql), his follow-ups waiting for the person's
+// Midas's Leads tab: the business's leads and open quotes (028_leads.sql), his follow-ups waiting for the person's
 // OK, and one drawer to change, close, delete or follow up on a lead. Editors change leads straight in the database
 // under its policies. The rules are in src/lib/leads.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -37,7 +37,7 @@ export function HermesLeads({ sb, ws, editor, onAsk }: { sb: SupabaseClient; ws:
       sb.from("approvals").select("id, product, input, status").eq("workspace_id", ws.id).eq("agent", "sales").eq("status", "pending").in("product", ["gmail", "outlook"]).limit(200),
     ]).then(([l, a]) => {
       if (!live) return;
-      if (l.error) return setError("We couldn't load Hermes's leads. Try again.");
+      if (l.error) return setError("We couldn't load Midas's leads. Try again.");
       setError("");
       setLeads(((l.data ?? []) as Lead[]).map((x) => ({ ...x, value: x.value === null ? null : Number(x.value) })));
       setFollow(followupsByEmail((a.data ?? []) as Parameters<typeof followupsByEmail>[0]));
@@ -121,7 +121,7 @@ export function HermesLeads({ sb, ws, editor, onAsk }: { sb: SupabaseClient; ws:
         })}
         {leads && !list.length ? (
           view === "open" ? (
-            <Empty title="No open leads">Hermes adds every new lead he finds in your inbox. You can add one too.</Empty>
+            <Empty title="No open leads">Midas adds every new lead he finds in your inbox. You can add one too.</Empty>
           ) : (
             <Empty title={view === "won" ? "No wins yet" : "Nothing lost"}>{view === "won" ? "Deals you win show up here." : "Deals that didn't happen show up here."}</Empty>
           )
@@ -144,7 +144,7 @@ export function HermesLeads({ sb, ws, editor, onAsk }: { sb: SupabaseClient; ws:
                   open.lead
                     ? sb.from("leads").update({ ...f, updated_at: new Date().toISOString() }).eq("workspace_id", ws.id).eq("id", open.lead.id)
                     : sb.from("leads").insert({ ...f, workspace_id: ws.id, source: "person" }),
-                open.lead ? "Saved." : "Lead added. Hermes will follow up.",
+                open.lead ? "Saved." : "Lead added. Midas will follow up.",
               )
             }
             onStage={(stage) => open.lead && run(() => sb.from("leads").update({ stage, updated_at: new Date().toISOString() }).eq("workspace_id", ws.id).eq("id", open.lead!.id), stage === "won" ? "Marked won." : stage === "lost" ? "Marked lost." : "Opened again.")}
@@ -203,7 +203,7 @@ function LeadDrawer({
     <>
       {first ? (
         <div className="dsec">
-          <h4>Hermes&apos;s follow-up, waiting for your OK</h4>
+          <h4>Midas&apos;s follow-up, waiting for your OK</h4>
           <div className="po-f">
             {first.subject ? <p className="hint-s">Subject: {first.subject}</p> : null}
             <textarea aria-label="Follow-up email" value={draft} style={{ minHeight: 140 }} disabled={!editor} onChange={(e) => setDraft(e.target.value)} />
@@ -297,7 +297,7 @@ function LeadDrawer({
         {lead ? (
           <button type="button" className="btn" onClick={onAsk}>
             <Icon name="message" small />
-            Ask Hermes
+            Ask Midas
           </button>
         ) : null}
         <span className="sp" />

@@ -135,7 +135,7 @@ export async function POST(request: Request) {
   const stale = await db.rpc("fail_stale_approvals", { p_older: STALE_AFTER });
   if (stale.error) warn(/fail_stale_approvals/.test(stale.error.message) ? "Run supabase/013_approvals.sql in Supabase." : `Stale approvals: ${stale.error.message}`);
 
-  // Iris's scheduled campaigns, a few emails a minute from each business's own inbox (src/lib/campaignSend.ts).
+  // Cyrus's scheduled campaigns, a few emails a minute from each business's own inbox (src/lib/campaignSend.ts).
   try {
     const mail = await sendDue(sendDeps(db));
     if (mail.failed) warn(`Campaigns: ${mail.failed} emails didn't go out this run.`, "campaigns");

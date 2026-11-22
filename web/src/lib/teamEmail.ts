@@ -234,7 +234,7 @@ export function emailThreadTitle(subject: unknown): string {
 export const replySubject = (subject: unknown) => `Re: ${cleanSubject(subject) || "Your email"}`;
 
 /**
- * The text that picks who answers. A tag in the subject or the email's first line counts, like "@Hermes" in chat.
+ * The text that picks who answers. A tag in the subject or the email's first line counts, like "@Midas" in chat.
  * Tags further down (in quoted or forwarded text) don't, so they can't pull in teammates nobody asked for.
  */
 export function routingText(subject: unknown, body: string): string {

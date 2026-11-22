@@ -5,27 +5,27 @@ import test from "node:test";
 import { EMAIL_TEXT_MAX, emailText, htmlToText, trimEmail } from "../src/lib/emailText.ts";
 
 test("Gmail reply: the 'On ... wrote:' line and everything under it come off", () => {
-  const t = "Yes, Friday works.\n\nThanks!\n\nOn Mon, Nov 16, 2026 at 9:00 AM Hermes at Morning Telos <acme@team.morningtelos.com> wrote:\n> Can we meet Friday?\n> Hermes";
+  const t = "Yes, Friday works.\n\nThanks!\n\nOn Mon, Nov 16, 2026 at 9:00 AM Midas at Morning Telos <acme@team.morningtelos.com> wrote:\n> Can we meet Friday?\n> Midas";
   assert.equal(trimEmail(t), "Yes, Friday works.\n\nThanks!");
 });
 
 test("the 'On ... wrote:' line split over two lines is found too", () => {
-  const t = "Sounds good.\n\nOn Mon, Nov 16, 2026 at 9:00 AM Hermes at Morning Telos <acme@team.morningtelos.com>\nwrote:\n\n> Old text";
+  const t = "Sounds good.\n\nOn Mon, Nov 16, 2026 at 9:00 AM Midas at Morning Telos <acme@team.morningtelos.com>\nwrote:\n\n> Old text";
   assert.equal(trimEmail(t), "Sounds good.");
 });
 
 test("Outlook reply: the From/Sent/To block and the underscore line come off", () => {
-  const a = "Please book it.\r\n\r\nFrom: Hermes at Morning Telos <acme@team.morningtelos.com>\r\nSent: Monday, November 16, 2026 9:00 AM\r\nTo: Ana <ana@x.com>\r\nSubject: Re: Quote\r\n\r\nOld words";
+  const a = "Please book it.\r\n\r\nFrom: Midas at Morning Telos <acme@team.morningtelos.com>\r\nSent: Monday, November 16, 2026 9:00 AM\r\nTo: Ana <ana@x.com>\r\nSubject: Re: Quote\r\n\r\nOld words";
   assert.equal(trimEmail(a), "Please book it.");
-  const b = "Go ahead.\n________________________________\nFrom: Hermes\nSent: Monday\nTo: Ana\n\nOld";
+  const b = "Go ahead.\n________________________________\nFrom: Midas\nSent: Monday\nTo: Ana\n\nOld";
   assert.equal(trimEmail(b), "Go ahead.");
-  const c = "Do it.\n\n-----Original Message-----\nFrom: Hermes\nOld";
+  const c = "Do it.\n\n-----Original Message-----\nFrom: Midas\nOld";
   assert.equal(trimEmail(c), "Do it.");
 });
 
 test("other languages' quote lines come off", () => {
-  assert.equal(trimEmail("Oui.\n\nLe lun. 16 nov. 2026 à 09:00, Hermes <a@b.com> a écrit :\n> vieux"), "Oui.");
-  assert.equal(trimEmail("Ja.\n\nAm Mo., 16. Nov. 2026 um 09:00 Uhr schrieb Hermes <a@b.com>:\n> alt"), "Ja.");
+  assert.equal(trimEmail("Oui.\n\nLe lun. 16 nov. 2026 à 09:00, Midas <a@b.com> a écrit :\n> vieux"), "Oui.");
+  assert.equal(trimEmail("Ja.\n\nAm Mo., 16. Nov. 2026 um 09:00 Uhr schrieb Midas <a@b.com>:\n> alt"), "Ja.");
 });
 
 test("signatures come off: the '-- ' line and phone lines", () => {

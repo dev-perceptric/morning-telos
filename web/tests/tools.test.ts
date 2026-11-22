@@ -87,7 +87,7 @@ test("composeTools: sources run together, a failing source is left out, the firs
 
 // ─────────────── which agent gets what ───────────────
 
-test("productsFor: social on Capybaroar, seo and web on Arrowsterr, Athena on both; Iris, Hora, Hermes and Hestia work through the customer's own apps instead", async () => {
+test("productsFor: social on Capybaroar, seo and web on Arrowsterr, Alexander on both; Cyrus, Cleo, Midas and Irene work through the customer's own apps instead", async () => {
   assert.deepEqual(productsFor("social"), ["capybaroar"]);
   assert.deepEqual(productsFor("seo"), ["arrowsterr"]);
   assert.deepEqual(productsFor("web"), ["arrowsterr"]);
@@ -96,7 +96,7 @@ test("productsFor: social on Capybaroar, seo and web on Arrowsterr, Athena on bo
   await withSoon("social", () => assert.deepEqual(productsFor("social"), [], "coming soon teammates get none"));
 });
 
-test("each agent gets its own apps' tools, namespaced; Athena gets reads only; hidden tools never show", async () => {
+test("each agent gets its own apps' tools, namespaced; Alexander gets reads only; hidden tools never show", async () => {
   const s = setup();
   assert.deepEqual(names((await s.source(ctx("social"))).tools), ["capybaroar__create_posts", "capybaroar__generate_media", "capybaroar__list_channels"]);
   assert.deepEqual(names((await s.source(ctx("seo"))).tools), ["arrowsterr__add_to_content_plan", "arrowsterr__get_ai_visibility", "arrowsterr__list_brands", "arrowsterr__remove_from_content_plan"]);
@@ -234,9 +234,9 @@ test("a turn with product tools: namespaced tools reach Claude, a change becomes
     },
   };
   const mem = memoryStore();
-  await mem.store.addMessage({ thread_id: "t-1", workspace_id: WS.id, role: "user", agent: null, content: "@Aphrodite post about bread", meta: {} });
+  await mem.store.addMessage({ thread_id: "t-1", workspace_id: WS.id, role: "user", agent: null, content: "@Leo post about bread", meta: {} });
   const events: ChatEvent[] = [];
-  await runTurn({ workspace: WS, threadId: "t-1", text: "@Aphrodite post about bread" }, { client, store: mem.store, emit: (e) => events.push(e), tools: reg, now: () => NOW });
+  await runTurn({ workspace: WS, threadId: "t-1", text: "@Leo post about bread" }, { client, store: mem.store, emit: (e) => events.push(e), tools: reg, now: () => NOW });
 
   assert.deepEqual(
     (requests[0].tools as { name: string }[]).map((t) => t.name),

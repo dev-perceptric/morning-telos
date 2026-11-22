@@ -1,6 +1,6 @@
 "use client";
 
-// Hestia's Inbox tab: the replies she wrote to customers, waiting or sent, and one drawer to edit, send, turn down or
+// Irene's Inbox tab: the replies she wrote to customers, waiting or sent, and one drawer to edit, send, turn down or
 // save one to Knowledge. The rules are in src/lib/inboxWork.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
@@ -37,7 +37,7 @@ export function HestiaInbox({ sb, ws, editor, onAsk }: { sb: SupabaseClient; ws:
       .limit(100)
       .then(({ data, error: e }) => {
         if (!live) return;
-        if (e) return setError("We couldn't load Hestia's replies. Try again.");
+        if (e) return setError("We couldn't load Irene's replies. Try again.");
         setError("");
         setRows((data ?? []) as Row[]);
       });
@@ -124,7 +124,7 @@ export function HestiaInbox({ sb, ws, editor, onAsk }: { sb: SupabaseClient; ws:
         ))}
         {rows && !list.length ? (
           view === "wait" ? (
-            <Empty title="All caught up">Hestia writes replies from your Knowledge and waits for your OK before anything goes to a customer.</Empty>
+            <Empty title="All caught up">Irene writes replies from your Knowledge and waits for your OK before anything goes to a customer.</Empty>
           ) : (
             <Empty title="Nothing sent yet">Replies you approve show up here.</Empty>
           )
@@ -143,7 +143,7 @@ export function HestiaInbox({ sb, ws, editor, onAsk }: { sb: SupabaseClient; ws:
             onAsk={() => onAsk(`About the reply "${open.subject}": `)}
             onSend={(input) => run(() => decide(open.approvalId, "approve", input), "Sent.")}
             onDeny={() => run(() => decide(open.approvalId, "deny"), "Turned down. Nothing was sent.")}
-            onFaq={() => run(() => callApi(sb, "/api/knowledge", { workspaceId: ws.id, agent: "support", ...faqOf(open) }), "Saved to Knowledge. Hestia uses it from now on.")}
+            onFaq={() => run(() => callApi(sb, "/api/knowledge", { workspaceId: ws.id, agent: "support", ...faqOf(open) }), "Saved to Knowledge. Irene uses it from now on.")}
           />
         ) : null}
       </Drawer>
@@ -196,7 +196,7 @@ function ReplyDrawer({
           <label htmlFor="r-subj">Subject</label>
           <input id="r-subj" type="text" value={subject} onChange={(e) => setSubject(e.target.value)} />
           <label htmlFor="r-body" className="mt-3">
-            Hestia&apos;s reply
+            Irene&apos;s reply
           </label>
           <textarea id="r-body" value={body} style={{ minHeight: 180 }} onChange={(e) => setBody(e.target.value)} />
         </div>
@@ -224,7 +224,7 @@ function ReplyDrawer({
         ) : null}
         <button type="button" className="btn" onClick={onAsk}>
           <Icon name="message" small />
-          Ask Hestia
+          Ask Irene
         </button>
       </div>
     </>

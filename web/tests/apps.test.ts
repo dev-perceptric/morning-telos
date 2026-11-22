@@ -42,7 +42,7 @@ test("catalog: the fourteen apps the team needs, with their Composio slugs, and 
   // Composio has no app of its own for these, so they need our own auth config. Framer takes only an API key.
   assert.deepEqual(APPS.filter((a) => !a.managed).map((a) => a.toolkit), ["pipedrive", "help_scout", "framer", "webflow", "wordpress_com", "shopify"]);
   assert.deepEqual(APPS.filter((a) => a.scheme !== "OAUTH2").map((a) => [a.toolkit, a.scheme]), [["framer", "API_KEY"]]);
-  // The website builders are their own group on the Apps page, for Hephaestus.
+  // The website builders are their own group on the Apps page, for Archon.
   assert.deepEqual(APPS.filter((a) => a.group === "website").map((a) => [a.toolkit, a.name]), [["framer", "Framer"], ["webflow", "Webflow"], ["wordpress_com", "WordPress.com"], ["shopify", "Shopify"]]);
   assert.deepEqual(GROUPS.at(-1), { id: "website", label: "Website" });
   // The newest migration that sets the list (020) names the same apps.
@@ -56,14 +56,14 @@ test("catalog: each app's own auth config can be set in .env.example (and so in 
   for (const k of ["COMPOSIO_API_KEY", "COMPOSIO_BASE_URL", ...APPS.map((a) => `COMPOSIO_AUTH_CONFIG_${a.toolkit.toUpperCase()}`)]) assert.match(example, new RegExp(`^${k}=$`, "m"), k);
 });
 
-test("access: Athena reads every app; Iris, Hora, Hermes, Hestia and Hephaestus use their own apps and may change things; the rest get none", () => {
+test("access: Alexander reads every app; Cyrus, Cleo, Midas, Irene and Archon use their own apps and may change things; the rest get none", () => {
   assert.deepEqual(Object.keys(APP_ACCESS).sort(), ["chief", "email", "forms", "sales", "support", "web"]);
   assert.deepEqual(access("chief"), { toolkits: APPS.map((a) => a.toolkit), reads: true });
   assert.deepEqual(access("email"), { toolkits: ["gmail", "outlook"], reads: false });
   assert.deepEqual(access("forms"), { toolkits: ["googlecalendar", "calendly", "gmail", "outlook"], reads: false });
   assert.deepEqual(access("sales"), { toolkits: ["gmail", "outlook", "googlecalendar", "calendly", "hubspot", "pipedrive", "salesforce"], reads: false });
   assert.deepEqual(access("support"), { toolkits: ["gmail", "outlook", "slack", "zendesk", "help_scout"], reads: false });
-  // Hephaestus: the owner's own site builder.
+  // Archon: the owner's own site builder.
   assert.deepEqual(access("web"), { toolkits: ["framer", "webflow", "wordpress_com", "shopify"], reads: false });
   // And his own WordPress site, which Morning Telos connects itself.
   assert.deepEqual(directFor("web", false), ["wordpress"]);
@@ -280,7 +280,7 @@ const ctx = (agent: AgentKey, trust: Trust = 0): ToolContext => ({ workspace: WS
 const tool = (tools: ToolDef[], name: string) => tools.find((t) => t.definition.name === name)!;
 const run = async (tools: ToolDef[], name: string, input: Record<string, unknown>, c: ToolContext) => tool(tools, name).run(input, c);
 
-test("app tools: Athena gets the two tools for the apps her workspace connected, reads only", async () => {
+test("app tools: Alexander gets the two tools for the apps his workspace connected, reads only", async () => {
   const s = setup();
   const set = await s.source(ctx("chief"));
   assert.deepEqual(set.tools.map((t) => t.definition.name), [SEARCH_TOOL, ACTION_TOOL]);
@@ -336,19 +336,19 @@ test("app tools with the real map: each teammate gets app_action only for connec
   // The workspace has Gmail and HubSpot (and another workspace has Slack).
   const s = setup();
   const enumOf = (tools: ToolDef[]) => (tool(tools, ACTION_TOOL).definition.input_schema as { properties: { app: { enum: string[] } } }).properties.app.enum;
-  const iris = await s.source(ctx("email"));
-  assert.deepEqual(enumOf(iris.tools), ["gmail"], "Iris never gets HubSpot");
-  assert.equal(tool(iris.tools, ACTION_TOOL).write, true);
-  assert.deepEqual(iris.missing, []);
-  const hermes = await s.source(ctx("sales"));
-  assert.deepEqual(enumOf(hermes.tools), ["gmail", "hubspot"]);
-  assert.deepEqual(hermes.missing, ["Calendar and booking (connect Google Calendar or Calendly in Settings, Apps)"]);
-  const hora = await s.source(ctx("forms"));
-  assert.deepEqual(enumOf(hora.tools), ["gmail"]);
-  assert.deepEqual(hora.missing, ["Calendar and booking (connect Google Calendar or Calendly in Settings, Apps)"]);
-  const hestia = await s.source(ctx("support"));
-  assert.deepEqual(enumOf(hestia.tools), ["gmail"], "another workspace's Slack is never offered");
-  assert.deepEqual(hestia.missing, ["Team chat (connect Slack in Settings, Apps)", "Customer support (connect Zendesk or Help Scout in Settings, Apps)"]);
+  const cyrus = await s.source(ctx("email"));
+  assert.deepEqual(enumOf(cyrus.tools), ["gmail"], "Cyrus never gets HubSpot");
+  assert.equal(tool(cyrus.tools, ACTION_TOOL).write, true);
+  assert.deepEqual(cyrus.missing, []);
+  const midas = await s.source(ctx("sales"));
+  assert.deepEqual(enumOf(midas.tools), ["gmail", "hubspot"]);
+  assert.deepEqual(midas.missing, ["Calendar and booking (connect Google Calendar or Calendly in Settings, Apps)"]);
+  const cleo = await s.source(ctx("forms"));
+  assert.deepEqual(enumOf(cleo.tools), ["gmail"]);
+  assert.deepEqual(cleo.missing, ["Calendar and booking (connect Google Calendar or Calendly in Settings, Apps)"]);
+  const irene = await s.source(ctx("support"));
+  assert.deepEqual(enumOf(irene.tools), ["gmail"], "another workspace's Slack is never offered");
+  assert.deepEqual(irene.missing, ["Team chat (connect Slack in Settings, Apps)", "Customer support (connect Zendesk or Help Scout in Settings, Apps)"]);
   // Nothing connected: no app tools, and the prompt says which apps to connect.
   const none = setup({ rows: [] });
   assert.deepEqual(await none.source(ctx("email")), { tools: [], missing: ["Email (connect Gmail or Outlook in Settings, Apps)"] });
@@ -363,10 +363,10 @@ test("app tools with the real map: each teammate gets app_action only for connec
   // Apps not set up on the server: one line, so the teammate does the work in chat.
   assert.deepEqual(await setup({ on: false }).source(ctx("email")), { tools: [], missing: ["Gmail or Outlook (connecting apps isn't ready yet, so do the work here in chat)"] });
   assert.deepEqual(notConnected([], [], true), []);
-  for (const m of [...hermes.missing, ...hestia.missing]) assert.doesNotMatch(m, /[—–]/);
+  for (const m of [...midas.missing, ...irene.missing]) assert.doesNotMatch(m, /[—–]/);
 });
 
-test("app tools with the real map: a send by Iris, a CRM change by Hermes and a reply by Hestia wait for approval", async () => {
+test("app tools with the real map: a send by Cyrus, a CRM change by Midas and a reply by Irene wait for approval", async () => {
   const s = setup();
   const send = { recipient_email: "bob@x.com", subject: "Hi", body: "Hello Bob" };
   for (const k of ["email", "forms", "sales", "support"] as AgentKey[]) {
@@ -378,11 +378,11 @@ test("app tools with the real map: a send by Iris, a CRM change by Hermes and a 
     // Deleting never runs, even on autopilot.
     assert.equal((await run(set.tools, ACTION_TOOL, { app: "gmail", action: "GMAIL_DELETE_MESSAGE" }, ctx(k, 2))).isError, true, k);
   }
-  const hermes = await s.source(ctx("sales"));
-  assert.ok((await run(hermes.tools, ACTION_TOOL, { app: "hubspot", action: "HUBSPOT_UPDATE_DEAL", arguments: { id: "9" } }, ctx("sales"))).approval);
-  // Iris can't reach HubSpot even if she names it.
-  const iris = await s.source(ctx("email"));
-  assert.equal((await run(iris.tools, ACTION_TOOL, { app: "hubspot", action: "HUBSPOT_UPDATE_DEAL", arguments: { id: "9" } }, ctx("email"))).isError, true);
+  const midas = await s.source(ctx("sales"));
+  assert.ok((await run(midas.tools, ACTION_TOOL, { app: "hubspot", action: "HUBSPOT_UPDATE_DEAL", arguments: { id: "9" } }, ctx("sales"))).approval);
+  // Cyrus can't reach HubSpot even if he names it.
+  const cyrus = await s.source(ctx("email"));
+  assert.equal((await run(cyrus.tools, ACTION_TOOL, { app: "hubspot", action: "HUBSPOT_UPDATE_DEAL", arguments: { id: "9" } }, ctx("email"))).isError, true);
   assert.deepEqual(
     s.approvals.map((a) => [a.agent, a.product, a.tool]),
     [
@@ -395,7 +395,7 @@ test("app tools with the real map: a send by Iris, a CRM change by Hermes and a 
   );
   // Only the reads ran.
   assert.deepEqual(s.c.ran.map((x) => x.slug), ["GMAIL_FETCH_EMAILS", "GMAIL_FETCH_EMAILS", "GMAIL_FETCH_EMAILS", "GMAIL_FETCH_EMAILS"]);
-  // The approved send runs for Hermes; a HubSpot change saved by Iris (somehow) never would.
+  // The approved send runs for Midas; a HubSpot change saved by Cyrus (somehow) never would.
   assert.equal((await runApproval({ workspace_id: WS_ID, agent: "sales", product: "gmail", tool: "GMAIL_SEND_EMAIL", input: send }, s.deps)).ok, true);
   assert.deepEqual(await runApproval({ workspace_id: WS_ID, agent: "email", product: "hubspot", tool: "HUBSPOT_UPDATE_DEAL", input: { id: "9" } }, s.deps), { ok: false, text: "This teammate can't make this change any more." });
 });
@@ -461,7 +461,7 @@ test("runApproval checks again: a disconnected app, a lost sign-in, a teammate n
   const theirs = setup({ rows: [{ id: "r9", workspace_id: OTHER_ID, toolkit: "gmail", composio_account: "ca_9", status: "active", account_label: null }], access: { sales: { toolkits: ["gmail"], reads: false } } });
   assert.equal((await runApproval(approved(), theirs.deps)).ok, false);
   assert.deepEqual(await runApproval(approved({ agent: "chief" }), setup().deps), { ok: false, text: "This teammate can't make this change any more." });
-  assert.deepEqual(await runApproval(approved({ agent: "social" }), setup().deps), { ok: false, text: "This teammate can't make this change any more." }, "the real map gives Aphrodite no apps");
+  assert.deepEqual(await runApproval(approved({ agent: "social" }), setup().deps), { ok: false, text: "This teammate can't make this change any more." }, "the real map gives Leo no apps");
   await withSoon("sales", async () => assert.deepEqual(await runApproval(approved(), setup().deps), { ok: false, text: "This teammate can't make this change any more." }, "a coming soon teammate"));
   assert.deepEqual(await runApproval(approved(), { ...s.deps, on: false }), { ok: false, text: "Apps aren't set up on the server yet." });
   assert.deepEqual(await runApproval(approved({ tool: "GMAIL_DELETE_MESSAGE" }), s.deps), { ok: false, text: "This change isn't allowed." });
@@ -499,14 +499,14 @@ test("closeApps removes every account of the workspace at Composio and here, and
   assert.equal(await closeApps(db as never, WS_ID, { fetcher: c.fetch, env: ENV }), 0);
 });
 
-// ─────────────── the website builders (Hephaestus) ───────────────
+// ─────────────── the website builders (Archon) ───────────────
 
 type FixtureTool = { slug: string; name: string; tags: string[]; input_parameters: Record<string, unknown> };
 const BUILDERS = JSON.parse(readFileSync(new URL("./fixtures/composio-builders.json", import.meta.url), "utf8")) as Record<"framer" | "webflow" | "wordpress_com" | "shopify", FixtureTool[]>;
 const LISTS = { framer: FRAMER_ACTIONS, webflow: WEBFLOW_ACTIONS, wordpress_com: WORDPRESS_COM_ACTIONS, shopify: SHOPIFY_ACTIONS } as const;
 const sortReal = (toolkit: keyof typeof LISTS) => BUILDERS[toolkit].map((t) => [t.slug, kindOf(toolkit, { ...t, description: "" }).kind] as const);
 
-test("website builders: Hephaestus gets the listed actions only, each real on Composio; reads read, changes wait, nothing deletes", () => {
+test("website builders: Archon gets the listed actions only, each real on Composio; reads read, changes wait, nothing deletes", () => {
   for (const toolkit of ["framer", "webflow", "wordpress_com", "shopify"] as const) {
     const list = LISTS[toolkit];
     assert.equal(TOOLKITS[toolkit].actions, list);
@@ -587,7 +587,7 @@ function builderSetup(o: { rows?: string[]; direct?: string[] } = {}) {
   return { c, deps, approvals, activity, accounts, source: appToolSource(deps) };
 }
 
-test("Hephaestus: app tools for Framer, Webflow and WordPress.com; reads run at once, every change waits with a clear title", async () => {
+test("Archon: app tools for Framer, Webflow and WordPress.com; reads run at once, every change waits with a clear title", async () => {
   const s = builderSetup();
   const set = await s.source(ctx("web"));
   assert.deepEqual((tool(set.tools, ACTION_TOOL).definition.input_schema as { properties: { app: { enum: string[] } } }).properties.app.enum, ["framer", "webflow", "wordpress_com"]);
@@ -642,16 +642,16 @@ test("Hephaestus: app tools for Framer, Webflow and WordPress.com; reads run at 
   assert.equal(s.activity.at(-1)!.text, 'ran "Publish your Webflow site" on autopilot');
 });
 
-test("Hephaestus: told which site builder to connect when none is; others can't reach his builders; approved publishes are checked again", async () => {
+test("Archon: told which site builder to connect when none is; others can't reach his builders; approved publishes are checked again", async () => {
   const none = builderSetup({ rows: [] });
   assert.deepEqual(await none.source(ctx("web")), { tools: [], missing: ["Website (connect Framer, Webflow, WordPress.com, Shopify or WordPress in Settings, Apps)"] });
   // His own WordPress site counts as a site builder: nothing to connect.
   assert.deepEqual(await builderSetup({ rows: [], direct: ["wordpress"] }).source(ctx("web")), { tools: [], missing: [] });
   assert.deepEqual(await builderSetup().source({ ...ctx("social") }), { tools: [], missing: [] });
-  // Iris can't use Framer, even when it's connected.
+  // Cyrus can't use Framer, even when it's connected.
   const s = builderSetup();
   assert.deepEqual(await s.source(ctx("email")), { tools: [], missing: ["Email (connect Gmail or Outlook in Settings, Apps)"] });
-  // Athena only reads the builders.
+  // Alexander only reads the builders.
   const chief = await s.source(ctx("chief"));
   assert.equal((await run(chief.tools, ACTION_TOOL, { app: "framer", action: "FRAMER_DEPLOY", arguments: { deployment_id: "d1" } }, ctx("chief", 2))).content, "You can only read from this app.");
   // The approved publish runs on the workspace's own Framer account; a delete saved somehow never would.
@@ -662,7 +662,7 @@ test("Hephaestus: told which site builder to connect when none is; others can't 
   assert.deepEqual(await runApproval({ workspace_id: WS_ID, agent: "email", product: "framer", tool: "FRAMER_DEPLOY", input: {} }, s.deps), { ok: false, text: "This teammate can't make this change any more." });
 });
 
-test("Hephaestus: Framer's guide to its own commands comes back longer than other answers before it is cut", async () => {
+test("Archon: Framer's guide to its own commands comes back longer than other answers before it is cut", async () => {
   const s = builderSetup({ rows: ["framer"] });
   const set = await s.source(ctx("web"));
   const big = "x".repeat(20_000);
@@ -710,7 +710,7 @@ test("appArgs: a new Shopify page or post is always made unpublished; other acti
   assert.deepEqual(appArgs("gmail", "GMAIL_SEND_EMAIL", { body: "x" }), { body: "x" });
 });
 
-test("Hephaestus on Shopify: reads run at once; a new page waits and is saved unpublished; publishing waits under its own title and is checked again", async () => {
+test("Archon on Shopify: reads run at once; a new page waits and is saved unpublished; publishing waits under its own title and is checked again", async () => {
   const s = builderSetup({ rows: ["shopify"] });
   const set = await s.source(ctx("web"));
   const listed = JSON.parse((await run(set.tools, SEARCH_TOOL, { app: "Shopify" }, ctx("web"))).content);
@@ -738,11 +738,11 @@ test("Hephaestus on Shopify: reads run at once; a new page waits and is saved un
   for (const tool of ["SHOPIFY_DELETE_PAGE", "SHOPIFY_CREATE_PRODUCT", "SHOPIFY_CREATE_ORDER"]) {
     assert.equal((await runApproval({ workspace_id: WS_ID, agent: "web", product: "shopify", tool, input: {} }, s.deps)).ok, false, tool);
   }
-  // Only Hephaestus changes things on Shopify; Athena only reads.
+  // Only Archon changes things on Shopify; Alexander only reads.
   assert.deepEqual(await runApproval({ workspace_id: WS_ID, agent: "chief", product: "shopify", tool: "SHOPIFY_UPDATE_PAGE", input: { page_id: "42" } }, s.deps), { ok: false, text: "This teammate can't make this change any more." });
 });
 
-test("direct apps: WordPress is Morning Telos's own connection, in the Website group, for Hephaestus, never a Composio toolkit", () => {
+test("direct apps: WordPress is Morning Telos's own connection, in the Website group, for Archon, never a Composio toolkit", () => {
   assert.deepEqual(DIRECT_APPS.map((a) => [a.id, a.name, a.group, a.forAgents]), [["wordpress", "WordPress", "website", ["web"]]]);
   assert.doesNotMatch(DIRECT.wordpress.blurb, /[–—]/);
   assert.equal(isToolkit("wordpress"), false);
@@ -771,7 +771,7 @@ test("notConnected with a direct app: it counts for its group and connects witho
   assert.deepEqual(notConnected(["gmail"], [], false), ["Gmail (connecting apps isn't ready yet, so do the work here in chat)"]);
 });
 
-test("Hephaestus with Composio off but WordPress connected: no line telling him to connect a site builder", async () => {
+test("Archon with Composio off but WordPress connected: no line telling him to connect a site builder", async () => {
   const s = builderSetup({ rows: [], direct: ["wordpress"] });
   s.deps.on = false;
   assert.deepEqual(await appToolSource(s.deps)(ctx("web")), { tools: [], missing: [] });

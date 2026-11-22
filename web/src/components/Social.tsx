@@ -183,7 +183,7 @@ export function ConnectSocialCard({ sb, ws }: { sb: SupabaseClient; ws: Workspac
         <div className="row">
           <span className="main">
             <b>Reconnect your social accounts</b>
-            <small className="wrap">{lost === 1 ? "One account needs" : `${lost} accounts need`} you to sign in again so Aphrodite can keep posting.</small>
+            <small className="wrap">{lost === 1 ? "One account needs" : `${lost} accounts need`} you to sign in again so Leo can keep posting.</small>
           </span>
           <button type="button" className="btn sm" onClick={() => setOpen(true)}>
             Reconnect
@@ -199,7 +199,7 @@ const OPENED = "We opened the sign-in in a new tab. Your accounts show up here w
 
 /**
  * Settings: every connected account, with Reconnect on the ones that were lost, Disconnect for owners and admins, and
- * the networks to add. Aphrodite's own Settings tab shows the same list under "Accounts".
+ * the networks to add. Leo's own Settings tab shows the same list under "Accounts".
  */
 export function SocialSettings({ sb, ws, title = "Social accounts", inTeam = false }: { sb: SupabaseClient; ws: Workspace; title?: string; inTeam?: boolean }) {
   const admin = can(ws.role, "connectSocial");
@@ -216,7 +216,7 @@ export function SocialSettings({ sb, ws, title = "Social accounts", inTeam = fal
     try {
       await callApi(sb, "/api/social/disconnect", { workspaceId: ws.id, channelId: c.channel_id });
       setAsking("");
-      setGone(`${networkName(c.network)} is disconnected. Aphrodite won't post there.`);
+      setGone(`${networkName(c.network)} is disconnected. Leo won't post there.`);
       await load();
     } catch (e) {
       setDiscError(message(e));
@@ -227,7 +227,7 @@ export function SocialSettings({ sb, ws, title = "Social accounts", inTeam = fal
       <div className="sh">
         <h2>{title}</h2>
       </div>
-      <p className="hint-s mb-3">{admin ? "The accounts Aphrodite posts to. You sign in to each one on the network's own page." : "The accounts Aphrodite posts to. Admins and the owner can connect more."}</p>
+      <p className="hint-s mb-3">{admin ? "The accounts Leo posts to. You sign in to each one on the network's own page." : "The accounts Leo posts to. Admins and the owner can connect more."}</p>
       {error ? <ErrorText>{error}</ErrorText> : null}
       {loadError ? <ErrorText>{loadError}</ErrorText> : null}
       {opened || re.opened ? <Notice>{OPENED}</Notice> : null}
@@ -284,7 +284,7 @@ export function SocialSettings({ sb, ws, title = "Social accounts", inTeam = fal
       {rows?.length && !inTeam ? (
         <p className="hint-s mt-3">
           <button type="button" className="link-u" onClick={() => navigate("/team/social")}>
-            See what Aphrodite does
+            See what Leo does
           </button>
         </p>
       ) : null}

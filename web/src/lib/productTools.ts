@@ -3,7 +3,7 @@
 // customer, so a gateway (SCOPE) rewrote each call to the customer's brand. A brand key sees only its own brand (the
 // products check it before any tool runs), so the gateway is gone. What stays:
 //   - which agent may use which app (AGENTS[k].apps in team.ts: social on Capybaroar, seo and web on Arrowsterr,
-//     Athena on every app, reads only),
+//     Alexander on every app, reads only),
 //   - reads run, changes (isWrite in approvals.ts) are saved for approval unless the agent is on autopilot,
 //   - an approved change runs only after checking it is still allowed, and every change is logged in activity.
 //
@@ -216,7 +216,7 @@ export async function productRead(workspaceId: string, product: Product, tool: s
   }
 }
 
-/** The changes a person may make from a screen (Aphrodite's calendar, Artemis's Visibility tab), by product. Every other tool is refused. */
+/** The changes a person may make from a screen (Leo's calendar, Theseus's Visibility tab), by product. Every other tool is refused. */
 export const SCREEN_WRITES: Record<Product, ReadonlySet<string>> = {
   arrowsterr: new Set(["add_prompts", "add_to_content_plan", "update_content_plan", "remove_from_content_plan"]),
   capybaroar: new Set(["create_posts", "update_post", "delete_post"]),

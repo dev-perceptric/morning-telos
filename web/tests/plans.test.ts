@@ -80,6 +80,6 @@ test("the internal plan is always in force, never expires and is never sold", as
 });
 
 
-test("questionLimit: the AI questions Artemis may track on each plan", () => {
+test("questionLimit: the AI questions Theseus may track on each plan", () => {
   assert.deepEqual(["trial", "starter", "pro", "internal", "expired"].map((p) => questionLimit(p as Parameters<typeof questionLimit>[0])), [15, 15, 40, 500, 0]);
 });

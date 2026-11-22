@@ -31,7 +31,7 @@ export function agentStatus(k: AgentKey, s: { paused: boolean; services: Readonl
 
 /**
  * The business apps a teammate works in, for the logos on its card: its Composio apps, then the ones Morning Telos
- * connects itself (self-hosted WordPress). Athena reads all of them, so none are shown.
+ * connects itself (self-hosted WordPress). Alexander reads all of them, so none are shown.
  */
 export function agentToolkits(k: AgentKey): string[] {
   const a = AGENTS[k];

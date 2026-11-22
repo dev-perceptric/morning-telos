@@ -1,4 +1,4 @@
-// The database and product calls behind Artemis's Visibility tab (src/lib/seoWork.ts). Server only.
+// The database and product calls behind Theseus's Visibility tab (src/lib/seoWork.ts). Server only.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/nextjs";
 import { effectivePlan, questionLimit, type PlanFields } from "./plans.ts";

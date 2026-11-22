@@ -1,4 +1,4 @@
--- Settings a teammate keeps beyond on or off, trust and model. Today: Hora's booking rules ({"booking": {...}},
+-- Settings a teammate keeps beyond on or off, trust and model. Today: Cleo's booking rules ({"booking": {...}},
 -- src/lib/booking.ts), set on her Settings tab and given to her in her instructions. Admins and the owner change it
 -- through the existing agent_prefs policies (011_ai_team.sql); members read it.
 alter table public.agent_prefs add column if not exists settings jsonb not null default '{}'::jsonb;

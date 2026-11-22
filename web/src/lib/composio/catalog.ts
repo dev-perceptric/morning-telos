@@ -220,7 +220,7 @@ export const appLogo = (toolkit: string) => `https://logos.composio.dev/api/${en
 /**
  * Which connected apps each teammate may use, in one place. "*" is every app. `reads`: only actions that read.
  * A teammate that is coming soon gets nothing, whatever this says (appsFor).
- * Athena reads every app. Iris, Hora, Hermes and Hestia (plan phase 4, step 2) and Hephaestus read and change their
+ * Alexander reads every app. Cyrus, Cleo, Midas and Irene (plan phase 4, step 2) and Archon read and change their
  * own apps; every change waits for the owner's approval below autopilot (src/lib/composio/appAction.ts), and
  * runApproval checks again.
  */

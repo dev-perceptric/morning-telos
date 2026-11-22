@@ -77,7 +77,7 @@ test("tables: header, body rows and alignment from :---:, ---: and :---", () => 
   });
 });
 
-test("tables: the Artemis answer that showed raw pipes now parses, numbers right-aligned on their own", () => {
+test("tables: the Theseus answer that showed raw pipes now parses, numbers right-aligned on their own", () => {
   const blocks = parseMarkdown("Here is your traffic:\n| Month | Traffic |\n|---|---|\n| March | 1,240 |\n| April | -3% |\n| May | - |\nThat's all.");
   assert.deepEqual(blocks.map((b) => b.kind), ["p", "table", "p"]);
   const t = blocks[1] as Extract<Block, { kind: "table" }>;
@@ -208,7 +208,7 @@ code here
 \`\`\`
 
 1. Add a page
-2. Ask Artemis again
+2. Ask Theseus again
 
 ---
 End.`;

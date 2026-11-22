@@ -3,7 +3,7 @@ import { adminClient, roleGate } from "@/lib/serverAuth";
 import { socialAct, socialPosts } from "@/lib/socialWork";
 import { socialData } from "@/lib/socialWorkServer";
 
-// Aphrodite's Posts tab (src/components/Posts.tsx, src/lib/socialWork.ts).
+// Leo's Posts tab (src/components/Posts.tsx, src/lib/socialWork.ts).
 // GET ?workspaceId&from&to: the calendar (viewers and up). POST { workspaceId, action, ... }: create, save or delete a
 // post in Capybaroar (editors and up). Waiting posts are approved through /api/approvals/<id>.
 export const dynamic = "force-dynamic";

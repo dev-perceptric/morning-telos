@@ -41,7 +41,7 @@ export function trialPill(p: Pick<PlanState, "plan" | "daysLeft">): { warn: bool
 
 /** The ideas under the Home box. Ideas for SEO or social show only once that product is ready for the workspace. */
 export function homeIdeas(ideas: readonly string[], ready: { arrowsterr: boolean; capybaroar: boolean }, max = 4): string[] {
-  const needs = (t: string) => (/^@(Artemis|Hephaestus)\b/.test(t) ? ready.arrowsterr : /^@Aphrodite\b/.test(t) ? ready.capybaroar : true);
+  const needs = (t: string) => (/^@(Theseus|Archon)\b/.test(t) ? ready.arrowsterr : /^@Leo\b/.test(t) ? ready.capybaroar : true);
   return ideas.filter(needs).slice(0, max);
 }
 
@@ -117,13 +117,13 @@ export function finishSetup(s: SetupState): SetupRow[] {
   const ready = (apps: readonly string[]) => apps.filter((a) => s.connectable.includes(a));
   const out: SetupRow[] = [];
   if (!s.socialAccounts)
-    out.push({ key: "social", title: "Connect your social accounts", text: "Instagram, Facebook, LinkedIn and more, so Aphrodite can post for you.", logos: ["instagram", "facebook", "linkedin"], connect: { kind: "social" } });
+    out.push({ key: "social", title: "Connect your social accounts", text: "Instagram, Facebook, LinkedIn and more, so Leo can post for you.", logos: ["instagram", "facebook", "linkedin"], connect: { kind: "social" } });
   if (!has(MAIL_APPS) && ready(MAIL_APPS).length)
-    out.push({ key: "email", title: "Connect your email", text: "Gmail or Outlook, so Iris, Hermes and Hestia can work in your inbox.", logos: [...MAIL_APPS], connect: { kind: "apps", apps: ready(MAIL_APPS) } });
+    out.push({ key: "email", title: "Connect your email", text: "Gmail or Outlook, so Cyrus, Midas and Irene can work in your inbox.", logos: [...MAIL_APPS], connect: { kind: "apps", apps: ready(MAIL_APPS) } });
   if (!has(CALENDAR_APPS) && ready(CALENDAR_APPS).length)
-    out.push({ key: "calendar", title: "Connect your calendar", text: "Google Calendar or Calendly, so Hora can book meetings for you.", logos: [...CALENDAR_APPS], connect: { kind: "apps", apps: ready(CALENDAR_APPS) } });
+    out.push({ key: "calendar", title: "Connect your calendar", text: "Google Calendar or Calendly, so Cleo can book meetings for you.", logos: [...CALENDAR_APPS], connect: { kind: "apps", apps: ready(CALENDAR_APPS) } });
   if (!has(SITE_APPS))
-    out.push({ key: "website", title: "Connect your website builder", text: "WordPress, Shopify, Framer or Webflow, so Hephaestus can build pages for you.", logos: ["wordpress", "shopify", "framer", "webflow"], connect: { kind: "page", path: "/settings/apps" } });
+    out.push({ key: "website", title: "Connect your website builder", text: "WordPress, Shopify, Framer or Webflow, so Archon can build pages for you.", logos: ["wordpress", "shopify", "framer", "webflow"], connect: { kind: "page", path: "/settings/apps" } });
   return out;
 }
 

@@ -3,37 +3,41 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { MODEL_CHOICES, MODELS, modelFor } from "../src/lib/models.ts";
-import { agentByGod, agentFace, agentPicture, AGENTS, insertMention, LEAD, mentionMatches, mentionQuery, ORDER, parseMentions, workingAgents } from "../src/lib/team.ts";
+import { agentByGod, agentFace, agentPicture, AGENTS, insertMention, LEAD, mentionMatches, mentionQuery, OLD_NAMES, ORDER, parseMentions, workingAgents } from "../src/lib/team.ts";
 
-test("the same 8 agents, gods, job titles and order as the old app; every one works now", () => {
+test("the same 8 agents, job titles and order as the old app, with the new names; every one works now", () => {
   assert.deepEqual(ORDER, ["chief", "sales", "support", "forms", "email", "social", "seo", "web"]);
   assert.deepEqual(
     ORDER.map((k) => AGENTS[k].god),
-    ["Athena", "Hermes", "Hestia", "Hora", "Iris", "Aphrodite", "Artemis", "Hephaestus"],
+    ["Alexander", "Midas", "Irene", "Cleo", "Cyrus", "Leo", "Theseus", "Archon"],
   );
-  // Plan phase 4 gate: Iris, Hora, Hermes and Hestia left Coming soon.
+  // Plan phase 4 gate: Cyrus, Cleo, Midas and Irene left Coming soon.
   assert.deepEqual(workingAgents(), ORDER);
   for (const k of ORDER) assert.equal(AGENTS[k].soon, undefined, k);
   assert.equal(LEAD, "chief");
   assert.ok(AGENTS.chief.readOnly);
-  // The old app (app/lib/agents.js) still lists the same names and job titles. Its jobs match for the four teammates
-  // that worked there; Iris, Hora, Hermes and Hestia are still "coming soon" in the old app, and here they work
-  // through the customer's own apps, so their jobs say that instead (an intended difference until launch).
+  // The old app (app/lib/agents.js) still uses the Greek god names (OLD_NAMES here), with the same job titles. Its jobs
+  // match for the four teammates that worked there; Cyrus, Cleo, Midas and Irene are still "coming soon" in the old app,
+  // and here they work through the customer's own apps, so their jobs say that instead (an intended difference until launch).
   const old = readFileSync(new URL("../../app/lib/agents.js", import.meta.url), "utf8");
+  const oldName = (k: string) => {
+    const n = Object.keys(OLD_NAMES).find((x) => OLD_NAMES[x] === k)!;
+    return n[0].toUpperCase() + n.slice(1);
+  };
   for (const k of ORDER) {
     const a = AGENTS[k];
     assert.equal(a.key, k);
-    assert.ok(old.includes(`god: "${a.god}", name: "${a.name}"`), `${k} name`);
+    assert.ok(old.includes(`god: "${oldName(k)}", name: "${a.name}"`), `${k} name`);
     const appsTeammate = ["sales", "support", "forms", "email"].includes(k);
-    assert.equal(old.includes(`${k}: { god: "${a.god}", name: "${a.name}", apps: [], soon: true`), appsTeammate, `${k} is coming soon only in the old app`);
-    // Hephaestus's job starts with the old app's, then says he also builds on the owner's own site builder.
+    assert.equal(old.includes(`${k}: { god: "${oldName(k)}", name: "${a.name}", apps: [], soon: true`), appsTeammate, `${k} is coming soon only in the old app`);
+    // Archon's job starts with the old app's, then says he also builds on the owner's own site builder.
     if (k === "web") assert.ok(old.includes(`job: "${a.job.split(". ")[0]}."`), "web job");
     else if (!appsTeammate) assert.ok(old.includes(a.job), `${k} job`);
     assert.doesNotMatch(a.job + a.out.join(" ") + (a.rules ?? []).join(" "), /[—–]/);
   }
 });
 
-test("Iris, Hora, Hermes and Hestia: honest jobs that name their apps and the owner's OK", () => {
+test("Cyrus, Cleo, Midas and Irene: honest jobs that name their apps and the owner's OK", () => {
   assert.match(AGENTS.email.job, /Gmail or Outlook after you approve/);
   assert.match(AGENTS.forms.job, /Google Calendar or Calendly/);
   assert.match(AGENTS.sales.job, /Nothing goes out until you approve it/);
@@ -47,7 +51,7 @@ test("Iris, Hora, Hermes and Hestia: honest jobs that name their apps and the ow
   }
 });
 
-test("Hephaestus: an honest job that names Framer, Webflow, WordPress, WordPress.com and Shopify and the owner's OK, and keeps Arrowsterr", () => {
+test("Archon: an honest job that names Framer, Webflow, WordPress, WordPress.com and Shopify and the owner's OK, and keeps Arrowsterr", () => {
   const a = AGENTS.web;
   assert.deepEqual(a.apps, ["arrowsterr"]);
   assert.match(a.job, /Framer/);
@@ -101,10 +105,18 @@ test("agentByGod and parseMentions", () => {
   assert.equal(agentByGod("ATHENA"), "chief");
   assert.equal(agentByGod("Zeus"), null);
   assert.equal(agentByGod(undefined), null);
-  assert.deepEqual(parseMentions("@Artemis, @hephaestus! and @Artemis"), ["seo", "web"]);
-  assert.deepEqual(parseMentions("(@Iris) mail ana@iris.com"), ["email"]);
-  assert.deepEqual(parseMentions("@@Athena"), []);
+  assert.deepEqual(parseMentions("@Theseus, @archon! and @Theseus"), ["seo", "web"]);
+  assert.deepEqual(parseMentions("(@Cyrus) mail ana@cyrus.com"), ["email"]);
+  assert.deepEqual(parseMentions("@@Alexander"), []);
   assert.deepEqual(parseMentions(""), []);
+});
+
+test("old names from before the rename still reach the same teammate", () => {
+  assert.deepEqual(parseMentions("@Hermes and @athena, then @Midas"), ["sales", "chief"]);
+  assert.equal(agentByGod("Iris"), "email");
+  assert.equal(agentByGod("hephaestus"), "web");
+  // The @ menu offers only the new names.
+  assert.deepEqual(mentionMatches("her"), []);
 });
 
 test("the @ menu: what's being typed, who matches, and putting the name in", () => {
@@ -113,14 +125,14 @@ test("the @ menu: what's being typed, who matches, and putting the name in", () 
   assert.equal(mentionQuery("ana@art"), null);
   assert.equal(mentionQuery("ask @Art now"), null);
   assert.deepEqual(mentionMatches(""), ORDER);
-  assert.deepEqual(mentionMatches("a"), ["chief", "social", "seo"]);
+  assert.deepEqual(mentionMatches("a"), ["chief", "web"]);
   // A job title word matches too, after the names.
   assert.deepEqual(mentionMatches("so"), ["social"]);
   assert.deepEqual(mentionMatches("web"), ["web"]);
   assert.deepEqual(mentionMatches("sales"), ["sales"]);
   assert.deepEqual(mentionMatches("zzz"), []);
-  assert.deepEqual(insertMention("hi @art please", 7, "seo"), { text: "hi @Artemis  please", cursor: 12 });
-  assert.deepEqual(insertMention("@", 1, "chief"), { text: "@Athena ", cursor: 8 });
+  assert.deepEqual(insertMention("hi @the please", 7, "seo"), { text: "hi @Theseus  please", cursor: 12 });
+  assert.deepEqual(insertMention("@", 1, "chief"), { text: "@Alexander ", cursor: 11 });
 });
 
 test("modelFor: an explicit choice, then the agent's setting, then auto", () => {

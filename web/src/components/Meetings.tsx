@@ -1,6 +1,6 @@
 "use client";
 
-// Hora's Calendar tab: the business's meetings, busy time and Hora's waiting invites on one calendar, one drawer for
+// Cleo's Calendar tab: the business's meetings, busy time and Cleo's waiting invites on one calendar, one drawer for
 // any meeting, and her booking rules on the Settings tab. The data and the rules are in src/lib/formsWork.ts and
 // src/lib/booking.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -74,7 +74,7 @@ export function HoraMeetings({ sb, ws, editor, onAsk }: { sb: SupabaseClient; ws
     <>
       {(data?.lost ?? []).map((t) => (
         <div key={t} className="ag-alert">
-          <span>{appName(t)} stopped working. Hora can&apos;t see new meetings until you reconnect.</span>
+          <span>{appName(t)} stopped working. Cleo can&apos;t see new meetings until you reconnect.</span>
           <button type="button" className="btn sm" onClick={() => navigate("/settings/apps")}>
             Reconnect
           </button>
@@ -88,7 +88,7 @@ export function HoraMeetings({ sb, ws, editor, onAsk }: { sb: SupabaseClient; ws
       ) : null}
       {data && !data.source && !data.lost.length ? (
         <div className="ag-alert">
-          <span>Connect Google Calendar or Calendly so Hora can see your meetings.</span>
+          <span>Connect Google Calendar or Calendly so Cleo can see your meetings.</span>
           <button type="button" className="btn sm" onClick={() => navigate("/settings/apps")}>
             Connect a calendar
           </button>
@@ -279,7 +279,7 @@ function MeetingDrawer({
       {m.status === "wait" ? (
         <p className="po-take">
           <Face agent="forms" size={24} />
-          <span>Hora made this invite. Nothing goes to the guests until you approve it.</span>
+          <span>Cleo made this invite. Nothing goes to the guests until you approve it.</span>
         </p>
       ) : null}
       {canMove ? (
@@ -330,7 +330,7 @@ function MeetingDrawer({
         ) : null}
         <button type="button" className="btn" onClick={onAsk}>
           <Icon name="message" small />
-          Ask Hora
+          Ask Cleo
         </button>
         <span className="sp" />
         {canCancel ? (
@@ -354,7 +354,7 @@ function MeetingDrawer({
   );
 }
 
-/** Hora's booking rules on her Settings tab. Owners and admins change them; everyone else sees them. */
+/** Cleo's booking rules on her Settings tab. Owners and admins change them; everyone else sees them. */
 export function BookingRules({ sb, ws, admin }: { sb: SupabaseClient; ws: Workspace; admin: boolean }) {
   const [rules, setRules] = useState<Booking | null>(null);
   const [settings, setSettings] = useState<Record<string, unknown>>({});
@@ -370,7 +370,7 @@ export function BookingRules({ sb, ws, admin }: { sb: SupabaseClient; ws: Worksp
       .maybeSingle()
       .then(({ data, error: e }) => {
         if (!live) return;
-        if (e) return setError("We couldn't load Hora's booking rules. Try again.");
+        if (e) return setError("We couldn't load Cleo's booking rules. Try again.");
         const s = ((data as { settings?: Record<string, unknown> } | null)?.settings ?? {}) as Record<string, unknown>;
         setSettings(s);
         setRules(cleanBooking(s.booking));
@@ -395,7 +395,7 @@ export function BookingRules({ sb, ws, admin }: { sb: SupabaseClient; ws: Worksp
     setBusy(false);
     if (e) return setError("That didn't save. Try again.");
     setSettings(next);
-    setNote("Saved. Hora books inside these rules from now on.");
+    setNote("Saved. Cleo books inside these rules from now on.");
   }
 
   return (
@@ -406,7 +406,7 @@ export function BookingRules({ sb, ws, admin }: { sb: SupabaseClient; ws: Worksp
       <div className="card book-r">
         <div className="po-f">
           <label>Days</label>
-          <div className="pick" role="group" aria-label="Days Hora books meetings">
+          <div className="pick" role="group" aria-label="Days Cleo books meetings">
             {DAY_NAMES.map((n, i) => {
               const on = rules.days.includes(i + 1);
               return (

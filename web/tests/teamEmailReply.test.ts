@@ -6,8 +6,8 @@ import { markdownHtml, markdownText } from "../src/lib/emailMarkdown.ts";
 import { MAX_REFERENCES, replyFrom, replyFromName, replyHeaders, teamReplyEmail } from "../src/lib/teamEmailReply.ts";
 
 test("from: '<Teammate> at Morning Telos' at the workspace's own address", () => {
-  assert.equal(replyFromName("sales"), "Hermes at Morning Telos");
-  assert.equal(replyFrom("chief", "acme", "team.morningtelos.com"), "Athena at Morning Telos <acme@team.morningtelos.com>");
+  assert.equal(replyFromName("sales"), "Midas at Morning Telos");
+  assert.equal(replyFrom("chief", "acme", "team.morningtelos.com"), "Alexander at Morning Telos <acme@team.morningtelos.com>");
 });
 
 test("reply headers: In-Reply-To is the email answered, References the conversation ending with it", () => {
@@ -51,7 +51,7 @@ test("the answer email: subject Re:, the answer, each approval with Approve and 
     address: "acme@team.morningtelos.com",
   });
   assert.equal(m.subject, "Re: posts for next week");
-  assert.match(m.html, /Aphrodite answered/);
+  assert.match(m.html, /Leo answered/);
   assert.match(m.html, /<strong[^>]*>3 posts<\/strong>/);
   assert.match(m.html, /These 2 need your OK:/);
   assert.match(m.html, /Schedule 3 posts[\s\S]*href="https:\/\/chat.test\/api\/email\/approve\?a=7&amp;t=tok"[^>]*>Approve<\/a>[\s\S]*href="https:\/\/chat.test\/approvals\/7"[^>]*>Open<\/a>/);

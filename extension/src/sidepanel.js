@@ -129,7 +129,7 @@ function logo() {
 function richText(text) {
   const out = [];
   for (const part of inlineParts(String(text))) {
-    const pieces = part.text.split(/(@(?:Athena|Hermes|Hestia|Hora|Iris|Aphrodite|Artemis|Hephaestus)\b)/);
+    const pieces = part.text.split(/(@(?:Alexander|Midas|Irene|Cleo|Cyrus|Leo|Theseus|Archon)\b)/);
     const nodes = pieces.map((p, i) => (i % 2 ? h("span", { class: "mention", text: p }) : document.createTextNode(p)));
     out.push(part.bold ? h("b", {}, nodes) : nodes);
   }

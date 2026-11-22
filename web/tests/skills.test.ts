@@ -44,7 +44,7 @@ test("src/skills/index.ts is up to date with the SKILL.md files (run npm run ski
   assert.equal(readFileSync(new URL("../src/skills/index.ts", import.meta.url), "utf8"), renderIndex(files), "Run npm run skills after changing a SKILL.md");
 });
 
-test("every working teammate has 2 to 4 System skills (Hephaestus up to 8, with his design skills), and every skill file is in a working teammate's folder", () => {
+test("every working teammate has 2 to 4 System skills (Archon up to 8, with his design skills), and every skill file is in a working teammate's folder", () => {
   const files = readSkillFiles();
   for (const path of Object.keys(files)) assert.ok(workingAgents().includes(path.split("/")[0] as AgentKey), `${path} is not in a working teammate's folder`);
   for (const k of workingAgents()) {
@@ -68,7 +68,7 @@ test("every System skill parses cleanly: its folder is its name, a title, and a 
   assert.equal(new Set(SYSTEM_SKILLS.map((s) => s.key)).size, SYSTEM_SKILLS.length);
 });
 
-// Morning Telos's own tools that only one teammate gets: Hermes's leads list and Iris's campaigns.
+// Morning Telos's own tools that only one teammate gets: Midas's leads list and Cyrus's campaigns.
 const OWN: Partial<Record<AgentKey, string[]>> = { sales: ["save_lead", "find_leads"], email: ["save_campaign", "mailing_lists"] };
 
 test("System skills name only tools their teammate has: its products' tools from the fixture, the app tools if it may use apps, or Morning Telos's own", () => {
@@ -92,7 +92,7 @@ test("System skills name only tools their teammate has: its products' tools from
   }
 });
 
-test("Iris, Hora, Hermes and Hestia each have their three skills; app skills say where to connect and that changes wait", () => {
+test("Cyrus, Cleo, Midas and Irene each have their three skills; app skills say where to connect and that changes wait", () => {
   const names = (k: AgentKey) => SYSTEM_SKILLS.filter((s) => s.agent === k).map((s) => s.name);
   assert.deepEqual(names("email"), ["welcome-series", "win-back", "write-a-campaign"]);
   assert.deepEqual(names("forms"), ["book-a-meeting", "reminder-emails", "weekly-schedule"]);
@@ -105,7 +105,7 @@ test("Iris, Hora, Hermes and Hestia each have their three skills; app skills say
     assert.match(s.body, /approv|Read only\./, `${s.key} says what waits for the owner's OK, or that it only reads`);
     assert.ok(!/delete/i.test(s.body) || /Never delete|never.*delete/i.test(s.body) || /close, delete or merge/.test(s.body), `${s.key} never deletes`);
   }
-  // Hestia's skills that answer customers hand refunds, legal and medical questions and angry customers to the owner.
+  // Irene's skills that answer customers hand refunds, legal and medical questions and angry customers to the owner.
   for (const n of ["answer-an-email", "daily-inbox-triage"]) {
     const s = SYSTEM_SKILLS.find((x) => x.agent === "support" && x.name === n)!;
     assert.match(s.body, /refund/i, n);
@@ -115,7 +115,7 @@ test("Iris, Hora, Hermes and Hestia each have their three skills; app skills say
   }
 });
 
-test("Hephaestus: build-on-framer and the page skills put their work on a connected site builder, never publish on their own, and never delete", () => {
+test("Archon: build-on-framer and the page skills put their work on a connected site builder, never publish on their own, and never delete", () => {
   const web = SYSTEM_SKILLS.filter((s) => s.agent === "web");
   for (const n of ["build-on-framer", "design-a-page", "improve-a-page", "match-the-brand", "plan-the-site", "review-the-design", "write-a-page"]) assert.ok(web.some((s) => s.name === n), n);
   for (const n of ["build-on-framer", "design-a-page", "improve-a-page", "match-the-brand", "review-the-design", "write-a-page"]) {
@@ -125,7 +125,7 @@ test("Hephaestus: build-on-framer and the page skills put their work on a connec
     assert.match(s.body, /approv|agreed/, `${n} says changes wait for the owner's OK`);
     if (n !== "match-the-brand") assert.match(s.body, /Never publish/, n);
     assert.doesNotMatch(s.body, /\b(FRAMER|WEBFLOW|WORDPRESS_COM|SHOPIFY)_\w*(DELETE|REMOVE)|wordpress_\w*(delete|remove)/, `${n} never names a delete`);
-    // Every action a skill names is one Hephaestus may run.
+    // Every action a skill names is one Archon may run.
     for (const slug of s.body.match(/\b(?:FRAMER|WEBFLOW|WORDPRESS_COM|SHOPIFY)_[A-Z0-9_]+\b/g) ?? []) {
       const toolkit = slug.startsWith("WORDPRESS_COM_") ? "wordpress_com" : slug.split("_")[0].toLowerCase();
       assert.ok(appAction(toolkit, slug), `${n} names ${slug}, which isn't in the catalog`);
@@ -148,7 +148,7 @@ test("Hephaestus: build-on-framer and the page skills put their work on a connec
 const body = (n: string) => SYSTEM_SKILLS.find((s) => s.agent === "web" && s.name === n)!.body;
 const steps = (n: string) => body(n).split("## Steps")[1].split("\n## ")[0];
 
-test("Hephaestus runs review-the-design before asking to publish in build-on-framer, write-a-page, improve-a-page, design-a-page and publish-to-wordpress", () => {
+test("Archon runs review-the-design before asking to publish in build-on-framer, write-a-page, improve-a-page, design-a-page and publish-to-wordpress", () => {
   for (const n of ["build-on-framer", "write-a-page", "improve-a-page", "design-a-page", "publish-to-wordpress"]) {
     assert.match(steps(n), /^\d+\. Run review-the-design .*before you ask (the owner )?to publish/m, `${n} has a step that runs review-the-design before publishing`);
   }
@@ -165,7 +165,7 @@ test("Hephaestus runs review-the-design before asking to publish in build-on-fra
   assert.ok(framer.indexOf("review-the-design") < framer.indexOf("FRAMER_PUBLISH"), "review before FRAMER_PUBLISH");
 });
 
-test("Hephaestus's design skills: the brand comes from real sources and is saved to memory, the review lists at most 7 problems and works from the page's structure", () => {
+test("Archon's design skills: the brand comes from real sources and is saved to memory, the review lists at most 7 problems and works from the page's structure", () => {
   const brand = body("match-the-brand");
   for (const t of ["search_knowledge", "remember", "FRAMER_GET_AGENT_CONTEXT"]) assert.ok(brand.includes(t), `match-the-brand uses ${t}`);
   assert.match(brand, /Never invent a logo, colors or fonts/);
@@ -188,7 +188,7 @@ test("Hephaestus's design skills: the brand comes from real sources and is saved
 test("a teammate marked coming soon can't own a skill, and the / menu skips it", async () => {
   await withSoon("sales", () => {
     assert.deepEqual(cleanSkill({ agent: "sales", name: "a", description: "d", body: "b" }), { ok: false, error: "Pick who uses this skill." });
-    assert.equal(menuAgent("@Hermes and @Aphrodite /", "chief"), "social");
+    assert.equal(menuAgent("@Midas and @Leo /", "chief"), "social");
   });
 });
 
@@ -240,7 +240,7 @@ test("cleanSkill: a teammate who works or everyone, a name made into a slug, a d
     value: { agent: null, name: "welcome-new-customers", description: "Use it when a new customer joins.", body: "Step 1\nStep 2" },
   });
   assert.equal(cleanSkill({ agent: "social", name: "a", description: "d", body: "b" }).ok, true);
-  assert.equal(cleanSkill({ agent: "sales", name: "a", description: "d", body: "b" }).ok, true, "Hermes takes work now");
+  assert.equal(cleanSkill({ agent: "sales", name: "a", description: "d", body: "b" }).ok, true, "Midas takes work now");
   assert.deepEqual(cleanSkill({ agent: "zeus", name: "a", description: "d", body: "b" }), { ok: false, error: "Pick who uses this skill." });
   assert.deepEqual(cleanSkill({ name: "!!!", description: "d", body: "b" }), { ok: false, error: "Give the skill a name." });
   assert.deepEqual(cleanSkill({ name: "a", description: " ", body: "b" }), { ok: false, error: "Say when the team should use it." });
@@ -300,8 +300,8 @@ test("the / menu: the query after /, whose skills to show, matches best first, a
   assert.equal(slashQuery("https://x.com/"), null);
   assert.equal(slashQuery("/plan now"), null, "the cursor left the word");
   assert.equal(menuAgent("hi", "chief"), "chief");
-  assert.equal(menuAgent("@Hermes and @Aphrodite /", "chief"), "sales", "the first tagged teammate");
-  assert.equal(menuAgent("@Hestia /", "seo"), "support");
+  assert.equal(menuAgent("@Midas and @Leo /", "chief"), "sales", "the first tagged teammate");
+  assert.equal(menuAgent("@Irene /", "seo"), "support");
   const list = skillsFor("social", []);
   assert.deepEqual(
     matchSkills(list, "post").map((s) => s.name),
@@ -318,7 +318,7 @@ test("the / menu: the query after /, whose skills to show, matches best first, a
 
 test("pickedSkill: the first /name in the message that is one of this teammate's skills", () => {
   const list = skillsFor("social", []);
-  assert.equal(pickedSkill("@Aphrodite /write-a-post about our sale", list)?.name, "write-a-post");
+  assert.equal(pickedSkill("@Leo /write-a-post about our sale", list)?.name, "write-a-post");
   assert.equal(pickedSkill("Do /social-report.", list)?.name, "social-report");
   assert.equal(pickedSkill("/find-keywords then /write-a-post", list)?.name, "write-a-post", "skips skills of other teammates");
   assert.equal(pickedSkill("see https://x.com/write-a-post", list), null);

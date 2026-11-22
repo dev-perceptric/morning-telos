@@ -1,4 +1,4 @@
-// Aphrodite's Posts tab (src/lib/socialWork.ts): what goes on the calendar, the person's own changes, and
+// Leo's Posts tab (src/lib/socialWork.ts): what goes on the calendar, the person's own changes, and
 // disconnecting a social account. Every dependency is a fake: no Capybaroar, no database.
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -51,7 +51,7 @@ test("postItems: Capybaroar's statuses become calendar states, deleted posts and
   assert.deepEqual(postItems("not a list"), []);
 });
 
-test("approvalItems: each post Aphrodite is waiting on, from create_posts and update_post only", () => {
+test("approvalItems: each post Leo is waiting on, from create_posts and update_post only", () => {
   const items = approvalItems([
     { id: 7, tool: "create_posts", status: "pending", input: { posts: [{ text: "A", channel_ids: ["li"], publish_at: "2027-01-06T09:00:00Z" }, { text: "B", channel_ids: ["ig", 3] }, "bad"] } },
     { id: 8, tool: "update_post", status: "pending", input: { id: "p1", text: "New words" } },
@@ -122,7 +122,7 @@ function readDeps(o: { status?: string | null; read?: (tool: string, input: Reco
   };
 }
 
-test("socialPosts: Capybaroar's posts and the waiting ones together, with Aphrodite's line", async () => {
+test("socialPosts: Capybaroar's posts and the waiting ones together, with Leo's line", async () => {
   const { deps, reads } = readDeps();
   const out = await socialPosts(RANGE, deps);
   assert.equal(out.status, 200);

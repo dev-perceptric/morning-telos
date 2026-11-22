@@ -12,7 +12,7 @@ export type Plan = {
   name: string;
   price: number; // US dollars a month. 0 for the trial.
   aiAllowance: number; // US dollars of Claude a month, the most one workspace can spend on AI
-  // AI questions Artemis tracks in Arrowsterr. Each one is asked of every AI tool daily, about $0.27 a month (Arrowsterr's cost_ledger).
+  // AI questions Theseus tracks in Arrowsterr. Each one is asked of every AI tool daily, about $0.27 a month (Arrowsterr's cost_ledger).
   aiQuestions: number;
 };
 
@@ -83,5 +83,5 @@ export function effectivePlan(ws: PlanFields, now = Date.now()): PlanState {
   return { plan: "expired", trial: false, daysLeft: 0, paid: false, status, aiAllowance: 0 };
 }
 
-/** How many AI questions Artemis may track for a workspace on this plan. None once the plan has ended. */
+/** How many AI questions Theseus may track for a workspace on this plan. None once the plan has ended. */
 export const questionLimit = (plan: EffectivePlan) => (plan === "expired" ? 0 : PLANS[plan].aiQuestions);

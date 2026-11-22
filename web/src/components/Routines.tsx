@@ -107,7 +107,7 @@ export function RoutinesPage({ sb, ws, onRun }: { sb: SupabaseClient; ws: Worksp
             </div>
           ))
         ) : (
-          <Empty title="No routines yet">Example: every Monday at 8am, Aphrodite plans the week&apos;s posts.</Empty>
+          <Empty title="No routines yet">Example: every Monday at 8am, Leo plans the week&apos;s posts.</Empty>
         )}
       </div>
       {full ? <p className="hint-s">You have {MAX_ROUTINES} routines, the most you can have. Delete one to add another.</p> : null}

@@ -1070,7 +1070,7 @@ test("members and visitors can't call queue_daily_jobs or expired_workspaces", a
 async function chatIn(ws: string, by: User) {
   const t = (await db!.query("insert into threads (workspace_id, title, created_by) values ($1, 'Plan my week', $2) returning id", [ws, by.id])).rows[0].id as string;
   await db!.query(
-    "insert into messages (thread_id, workspace_id, role, agent, content, meta) values ($1, $2, 'user', null, 'Plan my week', '{}'), ($1, $2, 'agent', 'chief', 'Here it is.', '{}'), ($1, $2, 'note', 'chief', 'Athena handed this to Artemis: check', '{\"to\":\"seo\"}')",
+    "insert into messages (thread_id, workspace_id, role, agent, content, meta) values ($1, $2, 'user', null, 'Plan my week', '{}'), ($1, $2, 'agent', 'chief', 'Here it is.', '{}'), ($1, $2, 'note', 'chief', 'Alexander handed this to Theseus: check', '{\"to\":\"seo\"}')",
     [t, ws],
   );
   return t;
@@ -1192,7 +1192,7 @@ test("messages only take known roles, agents and shapes", async (t) => {
   await assert.rejects(db.query("insert into messages (thread_id, workspace_id, role, content) values ($1, $2, 'user', $3)", [id, ws, "x".repeat(40001)]), /violates check constraint/);
 });
 
-test("agent_prefs.settings: Hora's booking rules, set by admins and the owner, read by members, objects only", async (t) => {
+test("agent_prefs.settings: Cleo's booking rules, set by admins and the owner, read by members, objects only", async (t) => {
   if (!db) return t.skip("no test database");
   const { ws, admin, editor, viewer } = await team("booking");
   const rules = JSON.stringify({ booking: { days: [1, 2, 3], start: "09:00", end: "15:00", length: 30, gap: 10 } });

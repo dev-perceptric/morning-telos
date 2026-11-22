@@ -1,5 +1,5 @@
-// Hermes's lead tools (src/lib/leads.ts): save_lead adds or changes a lead on the business's own list, and find_leads
-// reads it. They only change the app's own data, never anything outside it, so they need no approval. Only Hermes
+// Midas's lead tools (src/lib/leads.ts): save_lead adds or changes a lead on the business's own list, and find_leads
+// reads it. They only change the app's own data, never anything outside it, so they need no approval. Only Midas
 // gets them. Pure: the database comes in as deps (src/lib/teamTools.ts wires the real one).
 import type { ToolDef } from "./agentLoop.ts";
 import { cleanLead, type Lead, type LeadFields } from "./leads.ts";
@@ -79,7 +79,7 @@ export function leadTools(deps: LeadToolDeps): ToolDef[] {
   return [save, find];
 }
 
-/** save_lead and find_leads for Hermes only. */
+/** save_lead and find_leads for Midas only. */
 export function leadToolSource(deps: LeadToolDeps): ToolSource {
   const tools = leadTools(deps);
   return async (ctx) => ({ tools: ctx.agent === "sales" ? tools : [], missing: [] });

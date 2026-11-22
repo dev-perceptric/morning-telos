@@ -1,6 +1,6 @@
-// Iris's email campaigns (029_campaigns.sql): the mailing list, the campaign's words, the footer every email gets, and
+// Cyrus's email campaigns (029_campaigns.sql): the mailing list, the campaign's words, the footer every email gets, and
 // how many may go out from an inbox in a day. Shared by the Campaigns tab (src/components/Campaigns.tsx), the sender
-// (src/lib/campaignSend.ts), Iris's tools (src/lib/campaignTools.ts) and the tests.
+// (src/lib/campaignSend.ts), Cyrus's tools (src/lib/campaignTools.ts) and the tests.
 
 export type CampaignStatus = "draft" | "scheduled" | "sending" | "sent" | "canceled";
 export type Campaign = {
@@ -13,6 +13,7 @@ export type Campaign = {
   from_app: "gmail" | "outlook" | null;
   sent_count: number;
   failed_count: number;
+  /** "iris" means Cyrus wrote it: the value is from before the team was renamed, and 029_campaigns.sql only allows it. */
   source: "person" | "iris";
   created_at: string;
   updated_at: string;
@@ -124,7 +125,7 @@ export function cleanAddress(v: unknown): string | null {
   return a.length >= 8 && /\d/.test(a) ? a : null;
 }
 
-/** Iris's line at the top of the tab. */
+/** Cyrus's line at the top of the tab. */
 export function campaignsSummary(campaigns: readonly Pick<Campaign, "status" | "sent_count">[], contacts: number): string | null {
   const last = campaigns.find((c) => c.status === "sent");
   const scheduled = campaigns.filter((c) => c.status === "scheduled" || c.status === "sending").length;

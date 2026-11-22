@@ -90,10 +90,10 @@ test("catalog: plain words, no dashes, no internal product names", () => {
 
 test("starterMessage: tags the teammate, then the use case and the ask", () => {
   const u = findUseCase("social-manager")!;
-  assert.equal(starterMessage(u), "@Aphrodite /plan-weekly-posts Start: Social media manager. Keep my channels full, on brand and on schedule.");
+  assert.equal(starterMessage(u), "@Leo /plan-weekly-posts Start: Social media manager. Keep my channels full, on brand and on schedule.");
   const plain = findUseCase("pitch-research")!;
   assert.equal(plain.skill, undefined);
-  assert.equal(starterMessage(plain), "@Athena Start: Pitch research. Look into a business I want to pitch and tell me how to open.");
+  assert.equal(starterMessage(plain), "@Alexander Start: Pitch research. Look into a business I want to pitch and tell me how to open.");
   for (const x of USE_CASES) {
     const m = starterMessage(x);
     // The chat sends it to the right teammate.

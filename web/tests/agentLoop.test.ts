@@ -49,7 +49,7 @@ const toolUse = (id: string, name: string, input: unknown): Block => ({ type: "t
 const say = (t: string): Reply => ({ content: [text(t)], stop_reason: "end_turn" });
 const USAGE = { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 3000, cache_creation_input_tokens: 500 };
 
-/** Who a request is for, from its system prompt ("You are Athena, ..."). */
+/** Who a request is for, from its system prompt ("You are Alexander, ..."). */
 const agentOf = (p: Params): AgentKey => {
   const sys = Array.isArray(p.system) ? p.system[0].text : String(p.system);
   const god = sys.match(/^You are (\w+),/)![1];
@@ -110,7 +110,7 @@ const lastUser = (p: Params) => p.messages[p.messages.length - 1];
 
 // ─────────────── one agent ───────────────
 
-test("no tag: Athena answers with a cached prompt, medium effort and the refusal fallback", async () => {
+test("no tag: Alexander answers with a cached prompt, medium effort and the refusal fallback", async () => {
   const { client, calls } = fakeClaude({ chief: [say("Here is your week.")] });
   const r = await turn("Plan my week", { client });
   assert.equal(calls.length, 1);
@@ -123,11 +123,11 @@ test("no tag: Athena answers with a cached prompt, medium effort and the refusal
   assert.deepEqual(p.betas, ["server-side-fallback-2026-07-01"]);
   assert.ok(Array.isArray(p.system));
   assert.deepEqual(p.system[0].cache_control, { type: "ephemeral" });
-  assert.match(p.system[0].text, /^You are Athena, the Chief of Staff on the AI team of Ana's Bakery \(anasbakery\.com\)/);
+  assert.match(p.system[0].text, /^You are Alexander, the Chief of Staff on the AI team of Ana's Bakery \(anasbakery\.com\)/);
   assert.equal(lastUser(p).role, "user");
   assert.equal(lastUser(p).content, "Plan my week");
   assert.deepEqual(r.said.map((m) => [m.role, m.agent, m.content]), [["agent", "chief", "Here is your week."]]);
-  // Without a router, an untagged message goes to Athena, and the screen hears so before she starts.
+  // Without a router, an untagged message goes to Alexander, and the screen hears so before he starts.
   assert.deepEqual(
     r.events.map((e) => e.type),
     ["route", "status", "message"],
@@ -138,11 +138,11 @@ test("no tag: Athena answers with a cached prompt, medium effort and the refusal
 
 test("the system prompt keeps the old app's rules: plain English, 9th grade, no em dashes, teammates listed", () => {
   const s = systemPrompt({ name: "Ana's Bakery", website: null }, "seo", { tools: false, missing: [], teammates: ["chief", "sales", "social", "web"] });
-  assert.match(s, /^You are Artemis, the SEO Specialist on the AI team of Ana's Bakery\. Gets you found/);
+  assert.match(s, /^You are Theseus, the SEO Specialist on the AI team of Ana's Bakery\. Gets you found/);
   assert.match(s, /plain English at a 9th grade level\. Short sentences\. No em dashes\./);
-  assert.match(s, /- Athena: Chief of Staff\. Runs the owner's day/);
-  assert.match(s, /- Hermes: Sales Rep\. Replies to new leads/);
-  assert.match(s, /- Hestia: Customer Support\. \(Paused right now\.\)/);
+  assert.match(s, /- Alexander: Chief of Staff\. Runs the owner's day/);
+  assert.match(s, /- Midas: Sales Rep\. Replies to new leads/);
+  assert.match(s, /- Irene: Customer Support\. \(Paused right now\.\)/);
   assert.match(s, /no tools connected yet/);
   assert.match(s, /call handoff/);
   assert.doesNotMatch(s, /[—–]/);
@@ -179,11 +179,11 @@ test("the brand's tone is in the prompt only when the workspace has one", () => 
 test("a coming soon teammate is listed as one in the prompt", async () => {
   await withSoon("sales", () => {
     const s = systemPrompt({ name: "B", website: null }, "seo", { tools: false, missing: [], teammates: ["chief"] });
-    assert.match(s, /- Hermes: Sales Rep\. \(Coming soon, can't take work yet\.\)/);
+    assert.match(s, /- Midas: Sales Rep\. \(Coming soon, can't take work yet\.\)/);
   });
 });
 
-test("Iris, Hora, Hermes and Hestia: their prompts name their apps, where to connect them, approvals and no invented facts", () => {
+test("Cyrus, Cleo, Midas and Irene: their prompts name their apps, where to connect them, approvals and no invented facts", () => {
   for (const k of ["email", "forms", "sales", "support"] as AgentKey[]) {
     const s = systemPrompt({ name: "Ana's Bakery", website: null }, k, { tools: true, writes: "ask", missing: [], teammates: workingAgents().filter((x) => x !== k) });
     const access = APP_ACCESS[k]!;
@@ -197,27 +197,27 @@ test("Iris, Hora, Hermes and Hestia: their prompts name their apps, where to con
     // The rest of the team is listed as working, so a handoff makes sense.
     for (const o of ORDER.filter((x) => x !== k)) assert.match(s, new RegExp(`- ${AGENTS[o].god}: ${AGENTS[o].name.replace("+", "\\+")}\\. ${AGENTS[o].job.slice(0, 20)}`), `${k} lists ${o}`);
   }
-  // Hestia hands refunds, legal, medical and angry customers to the owner. The others don't carry that line.
-  const hestia = systemPrompt({ name: "B", website: null }, "support", { tools: true, missing: [], teammates: [] });
-  assert.ok(hestia.includes(ESCALATE));
+  // Irene hands refunds, legal, medical and angry customers to the owner. The others don't carry that line.
+  const irene = systemPrompt({ name: "B", website: null }, "support", { tools: true, missing: [], teammates: [] });
+  assert.ok(irene.includes(ESCALATE));
   assert.match(ESCALATE, /refunds, legal questions, medical questions or angry customers/);
   assert.match(ESCALATE, /send nothing to the customer/);
   for (const k of ["email", "forms", "sales", "chief", "social"] as AgentKey[]) assert.ok(!systemPrompt({ name: "B", website: null }, k, { tools: true, missing: [], teammates: [] }).includes(ESCALATE), k);
-  // Hephaestus's prompt names his site builders, where to connect them, and that nothing goes live without the OK.
+  // Archon's prompt names his site builders, where to connect them, and that nothing goes live without the OK.
   const heph = systemPrompt({ name: "B", website: null }, "web", { tools: true, writes: "ask", missing: [], teammates: [] });
-  for (const t of APP_ACCESS.web!.toolkits as string[]) assert.ok(heph.includes(appName(t)), `Hephaestus's prompt names ${appName(t)}`);
+  for (const t of APP_ACCESS.web!.toolkits as string[]) assert.ok(heph.includes(appName(t)), `Archon's prompt names ${appName(t)}`);
   assert.match(heph, /If the app you need isn't connected, say which one to connect in Settings, Apps\. Then still do the useful part here in chat: write the page/);
   assert.match(heph, /Never publish, add or change anything on the website without the owner's OK, unless the owner put you on autopilot\./);
   assert.doesNotMatch(heph, /[—–]/);
   assert.ok(!heph.includes(ESCALATE));
-  // Athena and the product teammates have no app lines.
+  // Alexander and the product teammates have no app lines.
   for (const k of ["chief", "social", "seo"] as AgentKey[]) assert.doesNotMatch(systemPrompt({ name: "B", website: null }, k, { tools: true, missing: [], teammates: [] }), /Settings, Apps/, k);
 });
 
 test("the handoff tool lists only the teammates given", () => {
   const t = handoffTool(["seo", "social"]);
   assert.equal(t.name, "handoff");
-  assert.deepEqual((t.input_schema.properties as { teammate: { enum: string[] } }).teammate.enum, ["Artemis", "Aphrodite"]);
+  assert.deepEqual((t.input_schema.properties as { teammate: { enum: string[] } }).teammate.enum, ["Theseus", "Leo"]);
   assert.deepEqual(t.input_schema.required, ["teammate", "note"]);
 });
 
@@ -237,9 +237,9 @@ test("an agent's model setting is used when the message doesn't pick one", async
 
 // ─────────────── handoffs and tags ───────────────
 
-test("tool_use handoff: Athena hands to Artemis, who runs next and sees the note", async () => {
+test("tool_use handoff: Alexander hands to Theseus, who runs next and sees the note", async () => {
   const { client, calls } = fakeClaude({
-    chief: [{ content: [text("Artemis can check that."), toolUse("tu_1", "handoff", { teammate: "Artemis", note: "Check our AI visibility this week." })], stop_reason: "tool_use" }, say("I asked Artemis to check.")],
+    chief: [{ content: [text("Theseus can check that."), toolUse("tu_1", "handoff", { teammate: "Theseus", note: "Check our AI visibility this week." })], stop_reason: "tool_use" }, say("I asked Theseus to check.")],
     seo: [say("Your visibility is steady.")],
   });
   const r = await turn("How are we doing online?", { client });
@@ -247,22 +247,22 @@ test("tool_use handoff: Athena hands to Artemis, who runs next and sees the note
     calls.map((c) => c.agent),
     ["chief", "chief", "seo"],
   );
-  // Athena's second call: her reply, then the tool result in one user message with the same id.
+  // Alexander's second call: his reply, then the tool result in one user message with the same id.
   const back = calls[1].params.messages;
   assert.equal(back[back.length - 2].role, "assistant");
   const results = back[back.length - 1].content as Anthropic.Beta.BetaToolResultBlockParam[];
   assert.equal(results.length, 1);
   assert.equal(results[0].tool_use_id, "tu_1");
-  assert.match(String(results[0].content), /Artemis will take it from here/);
+  assert.match(String(results[0].content), /Theseus will take it from here/);
   assert.equal(results[0].is_error, undefined);
-  // Artemis sees the person, Athena's reply and the handoff note as user text, and Athena isn't her own turn.
+  // Theseus sees the person, Alexander's reply and the handoff note as user text, and Alexander isn't his own turn.
   const seen = calls[2].params.messages;
   assert.equal(seen.length, 1);
   assert.equal(seen[0].role, "user");
-  assert.match(String(seen[0].content), /How are we doing online\?\n\nAthena: I asked Artemis to check\.\n\nAthena handed this to Artemis: Check our AI visibility this week\./);
-  // Artemis can hand back to Athena but not to herself.
+  assert.match(String(seen[0].content), /How are we doing online\?\n\nAlexander: I asked Theseus to check\.\n\nAlexander handed this to Theseus: Check our AI visibility this week\./);
+  // Theseus can hand back to Alexander but not to himself.
   const handoff = calls[2].params.tools!.find((t) => (t as { name: string }).name === "handoff") as Anthropic.Beta.BetaTool;
-  assert.deepEqual((handoff.input_schema.properties as { teammate: { enum: string[] } }).teammate.enum, ["Athena", "Hermes", "Hestia", "Hora", "Iris", "Aphrodite", "Hephaestus"]);
+  assert.deepEqual((handoff.input_schema.properties as { teammate: { enum: string[] } }).teammate.enum, ["Alexander", "Midas", "Irene", "Cleo", "Cyrus", "Leo", "Archon"]);
   assert.deepEqual(
     r.said.map((m) => [m.role, m.agent]),
     [
@@ -276,7 +276,7 @@ test("tool_use handoff: Athena hands to Artemis, who runs next and sees the note
     r.events.filter((e) => e.type !== "status"),
     [
       { type: "route", agent: "chief", how: "lead", reason: "Answers general questions" },
-      { type: "message", agent: "chief", text: "I asked Artemis to check." },
+      { type: "message", agent: "chief", text: "I asked Theseus to check." },
       { type: "handoff", from: "chief", to: "seo", note: "Check our AI visibility this week." },
       { type: "message", agent: "seo", text: "Your visibility is steady." },
     ],
@@ -288,7 +288,7 @@ test("a handoff to itself, a coming soon teammate or a paused one is refused, an
     const { client, calls } = fakeClaude({
       chief: [
         {
-          content: [toolUse("a", "handoff", { teammate: "Athena", note: "x" }), toolUse("b", "handoff", { teammate: "Hermes", note: "x" }), toolUse("c", "handoff", { teammate: "Aphrodite", note: "x" }), toolUse("d", "handoff", { teammate: "Artemis", note: " " })],
+          content: [toolUse("a", "handoff", { teammate: "Alexander", note: "x" }), toolUse("b", "handoff", { teammate: "Midas", note: "x" }), toolUse("c", "handoff", { teammate: "Leo", note: "x" }), toolUse("d", "handoff", { teammate: "Theseus", note: " " })],
           stop_reason: "tool_use",
         },
         say("OK."),
@@ -313,11 +313,11 @@ test("a handoff to itself, a coming soon teammate or a paused one is refused, an
   });
 });
 
-test("Athena hands work to Iris, Hora, Hermes and Hestia, who run next with the note", async () => {
+test("Alexander hands work to Cyrus, Cleo, Midas and Irene, who run next with the note", async () => {
   const { client, calls } = fakeClaude({
     chief: [
       {
-        content: [toolUse("a", "handoff", { teammate: "Hermes", note: "Follow up on the quote to Bob." }), toolUse("b", "handoff", { teammate: "Hestia", note: "Answer Ana's question." }), toolUse("c", "handoff", { teammate: "Iris", note: "Write the welcome email." })],
+        content: [toolUse("a", "handoff", { teammate: "Midas", note: "Follow up on the quote to Bob." }), toolUse("b", "handoff", { teammate: "Irene", note: "Answer Ana's question." }), toolUse("c", "handoff", { teammate: "Cyrus", note: "Write the welcome email." })],
         stop_reason: "tool_use",
       },
       say("Handed off."),
@@ -328,41 +328,41 @@ test("Athena hands work to Iris, Hora, Hermes and Hestia, who run next with the 
   });
   const r = await turn("Do the follow-ups", { client });
   const handoff = calls[0].params.tools!.find((t) => (t as { name: string }).name === "handoff") as Anthropic.Beta.BetaTool;
-  assert.deepEqual((handoff.input_schema.properties as { teammate: { enum: string[] } }).teammate.enum, ["Hermes", "Hestia", "Hora", "Iris", "Aphrodite", "Artemis", "Hephaestus"]);
+  assert.deepEqual((handoff.input_schema.properties as { teammate: { enum: string[] } }).teammate.enum, ["Midas", "Irene", "Cleo", "Cyrus", "Leo", "Theseus", "Archon"]);
   const results = calls[1].params.messages.at(-1)!.content as Anthropic.Beta.BetaToolResultBlockParam[];
   assert.deepEqual(results.map((x) => x.is_error), [undefined, undefined, undefined]);
   assert.deepEqual(
     calls.map((c) => c.agent),
     ["chief", "chief", "sales", "support", "email"],
   );
-  assert.match(String(lastUser(calls[2].params).content), /Athena handed this to Hermes: Follow up on the quote to Bob\./);
-  assert.match(String(calls[2].params.system && (calls[2].params.system as { text: string }[])[0].text), /^You are Hermes, the Sales Rep/);
+  assert.match(String(lastUser(calls[2].params).content), /Alexander handed this to Midas: Follow up on the quote to Bob\./);
+  assert.match(String(calls[2].params.system && (calls[2].params.system as { text: string }[])[0].text), /^You are Midas, the Sales Rep/);
   assert.deepEqual(
     r.events.filter((e) => e.type === "handoff").map((e) => (e as { to: AgentKey }).to),
     ["sales", "support", "email"],
   );
-  // Hora can take one too.
-  const h = fakeClaude({ chief: [{ content: [toolUse("d", "handoff", { teammate: "Hora", note: "Find times." })], stop_reason: "tool_use" }, say("OK.")], forms: [say("Three times found.")] });
+  // Cleo can take one too.
+  const h = fakeClaude({ chief: [{ content: [toolUse("d", "handoff", { teammate: "Cleo", note: "Find times." })], stop_reason: "tool_use" }, say("OK.")], forms: [say("Three times found.")] });
   const r2 = await turn("Sort this out for me", { client: h.client });
   assert.deepEqual(r2.said.filter((m) => m.role === "agent").map((m) => m.agent), ["chief", "forms"]);
 });
 
 test("@mentions: tagged teammates answer in the order they were tagged, once each; unknown names are ignored", async () => {
-  assert.deepEqual(whoAnswers("@Aphrodite and @artemis, then @Aphrodite again. cc @Zeus"), ["social", "seo"]);
+  assert.deepEqual(whoAnswers("@Leo and @theseus, then @Leo again. cc @Zeus"), ["social", "seo"]);
   assert.deepEqual(whoAnswers("nobody tagged"), ["chief"]);
-  assert.deepEqual(whoAnswers("ask @Artemis", "web"), ["web", "seo"]);
-  assert.deepEqual(whoAnswers("ask @Hephaestus", "web"), ["web"]);
-  assert.deepEqual(whoAnswers("email me at ana@artemis.com"), ["chief"]);
+  assert.deepEqual(whoAnswers("ask @Theseus", "web"), ["web", "seo"]);
+  assert.deepEqual(whoAnswers("ask @Archon", "web"), ["web"]);
+  assert.deepEqual(whoAnswers("email me at ana@theseus.com"), ["chief"]);
 
   const { client, calls } = fakeClaude({ social: [say("Posts planned.")], seo: [say("Keywords found.")] });
-  const r = await turn("@Aphrodite plan posts and @Artemis find keywords", { client });
+  const r = await turn("@Leo plan posts and @Theseus find keywords", { client });
   assert.deepEqual(
     calls.map((c) => c.agent),
     ["social", "seo"],
   );
-  // Artemis runs after Aphrodite: Aphrodite's reply comes to her as user text, so her request never ends on an assistant turn.
+  // Theseus runs after Leo: Leo's reply comes to him as user text, so his request never ends on an assistant turn.
   assert.equal(lastUser(calls[1].params).role, "user");
-  assert.match(String(lastUser(calls[1].params).content), /Aphrodite: Posts planned\./);
+  assert.match(String(lastUser(calls[1].params).content), /Leo: Posts planned\./);
   assert.deepEqual(
     r.said.map((m) => m.agent),
     ["social", "seo"],
@@ -370,12 +370,12 @@ test("@mentions: tagged teammates answer in the order they were tagged, once eac
 });
 
 test(`at most ${MAX_RUNS} replies a turn, then a note that the team stopped`, async () => {
-  const { client, calls } = fakeClaude({ sales: [say("Hi from Hermes.")], support: [say("Hi from Hestia.")], forms: [say("Hi from Hora.")], email: [say("Hi from Iris.")] });
-  const r = await turn("@Hermes @Hestia @Hora @Iris @Athena hello", { client });
+  const { client, calls } = fakeClaude({ sales: [say("Hi from Midas.")], support: [say("Hi from Irene.")], forms: [say("Hi from Cleo.")], email: [say("Hi from Cyrus.")] });
+  const r = await turn("@Midas @Irene @Cleo @Cyrus @Alexander hello", { client });
   assert.deepEqual(
     calls.map((c) => c.agent),
     ["sales", "support", "forms", "email"],
-    "Athena is fifth, so she never runs",
+    "Alexander is fifth, so he never runs",
   );
   assert.deepEqual(
     r.said.map((m) => m.agent),
@@ -388,10 +388,10 @@ test(`at most ${MAX_RUNS} replies a turn, then a note that the team stopped`, as
 test("a coming soon teammate says so without calling Claude, naming who can help", async () => {
   await withSoon("sales", async () => {
     const { client, calls } = fakeClaude({});
-    const r = await turn("@Hermes hello", { client });
+    const r = await turn("@Midas hello", { client });
     assert.equal(calls.length, 0);
     assert.equal(r.said[0].content, TEAM_MESSAGES.soon("sales"));
-    assert.match(r.said[0].content, /^Hermes is coming soon\. For now, ask Athena, Hestia, Hora, Iris, Aphrodite, Artemis or Hephaestus\.$/);
+    assert.match(r.said[0].content, /^Midas is coming soon\. For now, ask Alexander, Irene, Cleo, Cyrus, Leo, Theseus or Archon\.$/);
     assert.deepEqual(r.said[0].meta, { soon: true });
   });
 });
@@ -399,23 +399,23 @@ test("a coming soon teammate says so without calling Claude, naming who can help
 test("a chain of handoffs stops at 4 replies", async () => {
   const hand = (to: string): Reply => ({ content: [toolUse(`h-${to}`, "handoff", { teammate: to, note: "your turn" })], stop_reason: "tool_use" });
   const { client, calls } = fakeClaude({
-    chief: [hand("Artemis"), say("Passed on.")],
-    seo: [hand("Aphrodite"), say("Passed on.")],
-    social: [hand("Hephaestus"), say("Passed on.")],
-    web: [hand("Athena"), say("Done here.")],
+    chief: [hand("Theseus"), say("Passed on.")],
+    seo: [hand("Leo"), say("Passed on.")],
+    social: [hand("Archon"), say("Passed on.")],
+    web: [hand("Alexander"), say("Done here.")],
   });
   const r = await turn("Go", { client });
   assert.deepEqual([...new Set(calls.map((c) => c.agent))], ["chief", "seo", "social", "web"]);
-  // Hephaestus handing back to Athena doesn't run her again: she already answered this turn.
+  // Archon handing back to Alexander doesn't run him again: he already answered this turn.
   assert.equal(r.events.filter((e) => e.type === "handoff").length, 3);
   assert.equal(r.said.filter((m) => m.role === "agent").length, 4);
 });
 
 test("a paused teammate says so and doesn't call Claude", async () => {
   const { client, calls } = fakeClaude({});
-  const r = await turn("@Artemis hi", { client, store: memoryStore({ prefs: { seo: { enabled: false } } }) });
+  const r = await turn("@Theseus hi", { client, store: memoryStore({ prefs: { seo: { enabled: false } } }) });
   assert.equal(calls.length, 0);
-  assert.equal(r.said[0].content, "Artemis is paused. An admin can turn them back on in Team.");
+  assert.equal(r.said[0].content, "Theseus is paused. An admin can turn them back on in Team.");
 });
 
 // ─────────────── how replies end ───────────────
@@ -506,7 +506,7 @@ test("tools from the registry: run in parallel, labels shown, all results in one
   );
   assert.deepEqual(
     r.events.filter((e) => e.type === "tool").map((e) => (e as { line?: string }).line),
-    ["Athena is working on Label zeta_read", "Athena is working on Label alpha_read", "Athena is working on Label broken"],
+    ["Alexander is working on Label zeta_read", "Alexander is working on Label alpha_read", "Alexander is working on Label broken"],
   );
   assert.deepEqual(
     r.events.filter((e) => e.type === "tool").map((e) => (e as { used?: string }).used),
@@ -537,7 +537,7 @@ test("a call saved for approval: the chat gets an approval event, and the reply 
     },
   ];
   const { client, calls } = fakeClaude({ social: [{ content: [toolUse("1", "capybaroar__create_posts", { posts: [] })], stop_reason: "tool_use" }, say("I drafted 3 posts for you to approve.")] });
-  const r = await turn("@Aphrodite draft 3 posts", { client, tools });
+  const r = await turn("@Leo draft 3 posts", { client, tools });
   assert.match(calls[0].params.system![0].text as string, /saved for the owner's approval instead of running/);
   const ev = r.events.filter((e) => e.type === "approval" || e.type === "message");
   assert.deepEqual(ev, [
@@ -566,7 +566,7 @@ test("prompt context (knowledge, skills, memory) goes in a second cached system 
 test("every call writes a usage row with its cost, priced by the model that served it", async () => {
   const { client } = fakeClaude({
     chief: [
-      { content: [toolUse("1", "handoff", { teammate: "Artemis", note: "check" })], stop_reason: "tool_use", usage: { input_tokens: 2000, output_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 4000 } },
+      { content: [toolUse("1", "handoff", { teammate: "Theseus", note: "check" })], stop_reason: "tool_use", usage: { input_tokens: 2000, output_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 4000 } },
       // A declined request that the server ran again on a fallback model.
       { content: [text("Done.")], stop_reason: "end_turn", model: "claude-opus-4-8", usage: { input_tokens: 10, output_tokens: 10, cache_read_input_tokens: 6000, cache_creation_input_tokens: 0 } },
     ],
@@ -612,7 +612,7 @@ test("allowance: a trial that spent its $5 is stopped before Claude is called; u
 
 test("allowance: a handoff doesn't run once the turn has used up what was left", async () => {
   const { client, calls } = fakeClaude({
-    chief: [{ content: [toolUse("1", "handoff", { teammate: "Artemis", note: "go" })], stop_reason: "tool_use", usage: { input_tokens: 1_000_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } }, say("Passed on.")],
+    chief: [{ content: [toolUse("1", "handoff", { teammate: "Theseus", note: "go" })], stop_reason: "tool_use", usage: { input_tokens: 1_000_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } }, say("Passed on.")],
   });
   const r = await turn("Go", { client, store: memoryStore({ spent: 1 }) });
   assert.deepEqual(
@@ -648,7 +648,7 @@ test("API errors become one short line: a bad key reads as starting up, busy as 
   assert.equal(bad.said[0].content, CAP_MESSAGES.startingUp);
   assert.equal(bad.logs.length, 1);
 
-  const busy = await turn("@Athena @Artemis hi", { client: fakeClaude({ chief: [err(429)], seo: [say("Here.")] }).client });
+  const busy = await turn("@Alexander @Theseus hi", { client: fakeClaude({ chief: [err(429)], seo: [say("Here.")] }).client });
   assert.equal(busy.said[0].content, TEAM_MESSAGES.busy);
   assert.equal(busy.said[1].content, "Here.", "the next teammate still runs");
   assert.ok(busy.events.some((e) => e.type === "message" && e.error));
@@ -666,19 +666,19 @@ test("history: own replies are the assistant, teammates and notes are user text,
     { role: "agent", agent: "chief", content: "Hello!" },
     { role: "agent", agent: "chief", content: "Your trial ended.", meta: { blocked: "expired" } },
     { role: "agent", agent: "seo", content: "Something went wrong.", meta: { error: true } },
-    { role: "note", agent: "chief", content: "Athena handed this to Artemis: check" },
+    { role: "note", agent: "chief", content: "Alexander handed this to Theseus: check" },
     { role: "user", agent: null, content: "  " },
   ];
   assert.deepEqual(historyFor(rows, "chief"), [
     { role: "user", content: "Hi team" },
     { role: "assistant", content: "Hello!" },
-    { role: "user", content: "Athena handed this to Artemis: check" },
+    { role: "user", content: "Alexander handed this to Theseus: check" },
   ]);
-  assert.deepEqual(historyFor(rows, "seo"), [{ role: "user", content: "Athena: Orphan reply\n\nHi team\n\nAthena: Hello!\n\nAthena handed this to Artemis: check" }]);
+  assert.deepEqual(historyFor(rows, "seo"), [{ role: "user", content: "Alexander: Orphan reply\n\nHi team\n\nAlexander: Hello!\n\nAlexander handed this to Theseus: check" }]);
   // Never ends on the agent's own turn (no prefill on current models).
   const own = historyFor([{ role: "user", agent: null, content: "Hi" }, { role: "agent", agent: "web", content: "Hey" }], "web");
   assert.equal(own.at(-1)!.role, "user");
-  assert.deepEqual(historyFor([], "web"), [{ role: "user", content: "Hephaestus, it's your turn. Answer the last message." }]);
+  assert.deepEqual(historyFor([], "web"), [{ role: "user", content: "Archon, it's your turn. Answer the last message." }]);
 });
 
 // ─────────────── streaming ───────────────
@@ -776,11 +776,11 @@ test("streaming with tools: the progress line, then the next step's text starts 
   const { client } = streamingClaude({
     seo: [{ content: [text("Let me look."), toolUse("1", "arrowsterr__domain_overview", { domain: "katalon.com" })], stop_reason: "tool_use" }, say("katalon.com gets **1,240** visits.")],
   });
-  const r = await streamTurn("@Artemis check traffic of katalon.com", client, { tools: [tool] });
+  const r = await streamTurn("@Theseus check traffic of katalon.com", client, { tools: [tool] });
   const seq = r.events.map((e) => (e.type === "delta" ? `delta${e.start ? "*" : ""}` : e.type === "tool" ? `tool:${e.line}` : e.type));
-  assert.deepEqual(seq, ["route", "status", "delta*", "delta", "delta", "tool:Artemis is checking katalon.com", "status", "delta*", "delta", "delta", "delta", "message"]);
+  assert.deepEqual(seq, ["route", "status", "delta*", "delta", "delta", "tool:Theseus is checking katalon.com", "status", "delta*", "delta", "delta", "delta", "message"]);
   const tl = r.events.find((e) => e.type === "tool")!;
-  assert.deepEqual(tl, { type: "tool", agent: "seo", text: "SEO and AI visibility: domain overview", line: "Artemis is checking katalon.com", used: "domain overview" });
+  assert.deepEqual(tl, { type: "tool", agent: "seo", text: "SEO and AI visibility: domain overview", line: "Theseus is checking katalon.com", used: "domain overview" });
   assert.deepEqual(r.events.at(-1), { type: "message", agent: "seo", text: "katalon.com gets **1,240** visits.", used: ["domain overview"] });
   assert.deepEqual(r.messages.at(-1)!.meta.used, ["domain overview"]);
 });
@@ -789,7 +789,7 @@ test("Stop: the Claude call is aborted, what was written is saved with the Stopp
   const ctrl = new AbortController();
   const { client, calls } = streamingClaude(
     {
-      chief: [{ content: [text("Here is the first part of a long plan that keeps going."), toolUse("h", "handoff", { teammate: "Artemis", note: "x" })], stop_reason: "tool_use" }],
+      chief: [{ content: [text("Here is the first part of a long plan that keeps going."), toolUse("h", "handoff", { teammate: "Theseus", note: "x" })], stop_reason: "tool_use" }],
       seo: [say("never")],
     },
     { onPiece: (n) => n === 4 && ctrl.abort() },
@@ -881,11 +881,11 @@ test("stoppedTokens: never less than the API said, and counts the words written"
 // ─────────────── routing in a turn ───────────────
 
 test("an untagged message goes to the teammate the router picks, and the router's tokens are metered", async () => {
-  const { client, calls } = streamingClaude({ social: [say("Aphrodite handles social media.")] });
+  const { client, calls } = streamingClaude({ social: [say("Leo handles social media.")] });
   const asked: unknown[] = [];
   const router = async (p: unknown) => {
     asked.push(p);
-    return { id: "r", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [{ type: "text", text: '{"agent":"Aphrodite","reason":"Social media"}' }], stop_reason: "end_turn", usage: { input_tokens: 150, output_tokens: 20, cache_read_input_tokens: 700, cache_creation_input_tokens: 0 } } as unknown as Anthropic.Beta.BetaMessage;
+    return { id: "r", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [{ type: "text", text: '{"agent":"Leo","reason":"Social media"}' }], stop_reason: "end_turn", usage: { input_tokens: 150, output_tokens: 20, cache_read_input_tokens: 700, cache_creation_input_tokens: 0 } } as unknown as Anthropic.Beta.BetaMessage;
   };
   const r = await streamTurn("Who's responsible for the social media here", client, { router });
   assert.equal(asked.length, 1);
@@ -896,7 +896,7 @@ test("an untagged message goes to the teammate the router picks, and the router'
   assert.equal(r.usage[1].agent, "social");
 });
 
-test("a router error means Athena answers, and the turn goes on", async () => {
+test("a router error means Alexander answers, and the turn goes on", async () => {
   const { client } = streamingClaude({ chief: [say("Hi.")] });
   const r = await streamTurn("Hello", client, { router: async () => Promise.reject(new Error("down")) });
   assert.deepEqual(r.events[0], { type: "route", agent: "chief", how: "fallback", reason: "Answers general questions" });
@@ -918,10 +918,10 @@ test("a paused teammate is never picked by the router", async () => {
   const seen: string[] = [];
   const router = async (p: { messages: { content: unknown }[] }) => {
     seen.push(String(p.messages[0].content));
-    return { id: "r", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [{ type: "text", text: '{"agent":"Aphrodite","reason":"x"}' }], stop_reason: "end_turn", usage: USAGE } as unknown as Anthropic.Beta.BetaMessage;
+    return { id: "r", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [{ type: "text", text: '{"agent":"Leo","reason":"x"}' }], stop_reason: "end_turn", usage: USAGE } as unknown as Anthropic.Beta.BetaMessage;
   };
   const r = await streamTurn("Post this", client, { router: router as never, store: memoryStore({ prefs: { social: { enabled: false } } }) });
-  assert.doesNotMatch(seen[0].split("\n")[0], /Aphrodite/);
+  assert.doesNotMatch(seen[0].split("\n")[0], /Leo/);
   assert.deepEqual(r.events[0], { type: "route", agent: "chief", how: "fallback", reason: "Answers general questions" });
 });
 
@@ -943,7 +943,7 @@ test("cards: a card is sent on the stream as it is made, kept with the reply, an
   const { client } = streamingClaude({
     social: [{ content: [text("Three quick taps and I'll build the plan."), toolUse("c1", "show_card", CHOICES_IN)], stop_reason: "tool_use" }, say("Pick and tap the button.")],
   });
-  const r = await streamTurn("@Aphrodite grow my LinkedIn", client, { tools: [cardTool()] });
+  const r = await streamTurn("@Leo grow my LinkedIn", client, { tools: [cardTool()] });
   const seq = r.events.map((e) => (e.type === "delta" ? `delta${e.start ? "*" : ""}` : e.type));
   assert.ok(!seq.includes("tool"), "a card tool shows no progress line");
   const card = r.events.find((e): e is Extract<ChatEvent, { type: "card" }> => e.type === "card")!;
@@ -962,7 +962,7 @@ test("cards: a card is sent on the stream as it is made, kept with the reply, an
 
 test("cards: a reply that is only a card saves no Done text, and the next turn reads the card in words", async () => {
   const { client } = fakeClaude({ social: [{ content: [toolUse("c1", "show_card", CHOICES_IN)], stop_reason: "tool_use" }, { content: [], stop_reason: "end_turn" }] });
-  const r = await turn("@Aphrodite grow my LinkedIn", { client, tools: [cardTool()] });
+  const r = await turn("@Leo grow my LinkedIn", { client, tools: [cardTool()] });
   const saved = r.said.at(-1)!;
   assert.equal(saved.content, "");
   assert.equal((saved.meta.cards as unknown[]).length, 1);
@@ -974,7 +974,7 @@ test("cards: a reply that is only a card saves no Done text, and the next turn r
 test("cards: a bad card goes back to the teammate as an error, and too many cards in one reply are refused", async () => {
   const many = Array.from({ length: 7 }, (_, i) => toolUse(`c${i}`, "show_card", { kind: "quick_replies", replies: [`a${i}`, `b${i}`] }));
   const { client, calls } = fakeClaude({ social: [{ content: [toolUse("x", "show_card", { kind: "quick_replies", replies: ["one"] }), ...many], stop_reason: "tool_use" }, say("Done.")] });
-  const r = await turn("@Aphrodite hi", { client, tools: [cardTool()] });
+  const r = await turn("@Leo hi", { client, tools: [cardTool()] });
   const results = calls[1].params.messages.at(-1)!.content as Anthropic.Beta.BetaToolResultBlockParam[];
   assert.equal(results[0].is_error, true);
   assert.match(String(results[0].content), /needs at least 2/);
@@ -988,7 +988,7 @@ const QUICK_IN = { kind: "quick_replies", replies: ["Show more", "Check my site"
 test("cards: words written again after a quick replies card are saved once", async () => {
   const answer = "The special is a maple pecan croissant for $4.75.";
   const { client } = fakeClaude({ chief: [{ content: [text(answer), toolUse("q1", "show_card", QUICK_IN)], stop_reason: "tool_use" }, say(answer)] });
-  const r = await turn("@Athena what's the special?", { client, tools: [cardTool()] });
+  const r = await turn("@Alexander what's the special?", { client, tools: [cardTool()] });
   assert.equal(r.said.at(-1)!.content, answer);
 });
 
@@ -1006,7 +1006,7 @@ test("cards: a reply that is only quick replies or a table is asked once for its
   const { client, calls } = fakeClaude({
     chief: [{ content: [toolUse("t1", "show_card", table), toolUse("q1", "show_card", QUICK_IN)], stop_reason: "tool_use" }, { content: [], stop_reason: "end_turn" }, say("Here are your prices from Knowledge.")],
   });
-  const r = await turn("@Athena show our prices as a table", { client, tools: [cardTool()] });
+  const r = await turn("@Alexander show our prices as a table", { client, tools: [cardTool()] });
   assert.equal(calls.length, 3, "one more call for the words");
   const asked = calls[2].params.messages.at(-1)!;
   assert.equal(asked.role, "user");
@@ -1034,15 +1034,15 @@ test("card prompts point at cards below the words, and ask for words with every 
 
 test("replies never name the services behind the team", async () => {
   const { client } = fakeClaude({ seo: [say("Arrowsterr shows you in 23% of answers, and Capybaroar has 3 drafts.")] });
-  const r = await turn("@Artemis how are we doing", { client });
+  const r = await turn("@Theseus how are we doing", { client });
   assert.equal(r.said.at(-1)!.content, "your SEO tools shows you in 23% of answers, and your social tools has 3 drafts.");
   for (const n of INTERNAL_NAMES) assert.ok(!JSON.stringify(r.events).includes(n), n);
 });
 
-test("systemPrompt gives Hora the owner's booking rules, and nobody else", () => {
+test("systemPrompt gives Cleo the owner's booking rules, and nobody else", () => {
   const booking = { days: [1, 2, 3, 4, 5], start: "09:00", end: "17:00", length: 30, gap: 15 };
-  const hora = systemPrompt({ name: "B", website: null, timezone: "America/Chicago" }, "forms", { tools: true, missing: [], teammates: [], booking });
-  assert.match(hora, /Booking rules from the owner: book meetings Monday to Friday, 9:00 AM to 5:00 PM \(America\/Chicago time\)\. Meetings are 30 minutes, with 15 minutes between them\./);
+  const cleo = systemPrompt({ name: "B", website: null, timezone: "America/Chicago" }, "forms", { tools: true, missing: [], teammates: [], booking });
+  assert.match(cleo, /Booking rules from the owner: book meetings Monday to Friday, 9:00 AM to 5:00 PM \(America\/Chicago time\)\. Meetings are 30 minutes, with 15 minutes between them\./);
   assert.doesNotMatch(systemPrompt({ name: "B", website: null }, "sales", { tools: true, missing: [], teammates: [], booking }), /Booking rules/);
   assert.doesNotMatch(systemPrompt({ name: "B", website: null }, "forms", { tools: true, missing: [], teammates: [] }), /Booking rules/);
 });

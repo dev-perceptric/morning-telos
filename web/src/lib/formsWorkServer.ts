@@ -1,4 +1,4 @@
-// The connections and Composio calls behind Hora's Calendar tab (src/lib/formsWork.ts). Server only.
+// The connections and Composio calls behind Cleo's Calendar tab (src/lib/formsWork.ts). Server only.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/nextjs";
 import { AppSetupError, needsReconnect, runTool } from "./composio/actions.ts";

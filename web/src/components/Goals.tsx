@@ -1,6 +1,6 @@
 "use client";
 
-// Athena's Goals tab: every goal the team is working on, with its steps and who owns each, and one drawer to change,
+// Alexander's Goals tab: every goal the team is working on, with its steps and who owns each, and one drawer to change,
 // finish, stop or delete one. Goals are made in chat (set_goal, src/lib/cardTools.ts); editors change them here
 // straight in the database, under the goals policies (024_goals.sql).
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -128,7 +128,7 @@ export function AthenaGoals({ sb, ws, editor, onAsk }: { sb: SupabaseClient; ws:
         })}
         {items && !list.length ? (
           view === "active" ? (
-            <Empty title="No goals yet">Tell Athena what you want to reach, like 20 new leads by the end of the month. She splits it into steps for the team.</Empty>
+            <Empty title="No goals yet">Tell Alexander what you want to reach, like 20 new leads by the end of the month. He splits it into steps for the team.</Empty>
           ) : (
             <Empty title="Nothing done yet">Finished and stopped goals show up here.</Empty>
           )
@@ -231,7 +231,7 @@ function GoalDrawer({
             ))}
           </div>
         ) : (
-          <p className="hint-s">No steps yet. Ask Athena to plan them in the goal&apos;s chat.</p>
+          <p className="hint-s">No steps yet. Ask Alexander to plan them in the goal&apos;s chat.</p>
         )}
       </div>
       <div className="po-foot">

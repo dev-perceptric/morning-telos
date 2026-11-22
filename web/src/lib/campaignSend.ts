@@ -1,4 +1,4 @@
-// Sends Iris's scheduled campaigns from the business's own Gmail or Outlook, a few at a time. The worker calls
+// Sends Cyrus's scheduled campaigns from the business's own Gmail or Outlook, a few at a time. The worker calls
 // sendDue every minute (src/app/api/worker/route.ts). Each run sends at most PER_RUN emails per campaign and keeps
 // each inbox under its daily limit (campaigns.ts DAILY_LIMIT), so a big list goes out over a day or more. Every email
 // ends with the footer (mailing address and unsubscribe link). campaign_sends keeps who got it, so no one gets it

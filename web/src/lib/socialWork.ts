@@ -1,5 +1,5 @@
-// Aphrodite's Posts tab (src/components/Posts.tsx): what goes on the calendar and what a person can do to it.
-// Posts come from Capybaroar with the workspace's brand key. Posts Aphrodite wrote while on "Ask me first" are not in
+// Leo's Posts tab (src/components/Posts.tsx): what goes on the calendar and what a person can do to it.
+// Posts come from Capybaroar with the workspace's brand key. Posts Leo wrote while on "Ask me first" are not in
 // Capybaroar yet: they are pending approvals of create_posts or update_post (src/lib/approvals.ts), shown on the
 // calendar as "waiting". Approving one goes through /api/approvals/<id>, the same as the Approvals page.
 // Pure: the routes in src/app/api/work/social and src/app/api/social/disconnect pass the database, the product calls
@@ -85,7 +85,7 @@ export function postItems(posts: unknown, engagements: ReadonlyMap<string, numbe
 }
 
 /**
- * Aphrodite's pending approvals as waiting calendar items: each post in a create_posts call, and the new version of
+ * Leo's pending approvals as waiting calendar items: each post in a create_posts call, and the new version of
  * a post in an update_post call. Anything else (a delete, a different tool) stays on the Approvals page only.
  */
 export function approvalItems(rows: readonly ApprovalRow[]): PostItem[] {
@@ -126,7 +126,7 @@ export function editedApproval(tool: string, input: Record<string, unknown>, ind
 
 type Analytics = { current?: { posts?: number; reach?: number }; previous?: { reach?: number } };
 
-/** Aphrodite's one line at the top of the tab, from the last 30 days. Null when there's nothing to say yet. */
+/** Leo's one line at the top of the tab, from the last 30 days. Null when there's nothing to say yet. */
 export function summaryLine(a: Analytics | null): string | null {
   const posts = a?.current?.posts ?? 0;
   const reach = a?.current?.reach ?? 0;
@@ -161,7 +161,7 @@ export function cleanRange(from: unknown, to: unknown): { ok: true; from: string
 }
 
 export const SOCIAL_MESSAGES = {
-  setup: "Aphrodite's social media is still setting up. Check back in a few minutes.",
+  setup: "Leo's social media is still setting up. Check back in a few minutes.",
   load: "We couldn't load your posts. Try again.",
   range: "Pick a range of up to 92 days.",
   text: "Write the post first.",
@@ -182,7 +182,7 @@ export type WorkDeps = {
   serviceStatus: () => Promise<string | null>;
   /** A read with the brand key (productRead): the tool's JSON text, or null when it fails. */
   read: (tool: string, input: Record<string, unknown>) => Promise<string | null>;
-  /** Aphrodite's pending approvals for Capybaroar. */
+  /** Leo's pending approvals for Capybaroar. */
   approvals: () => Promise<ApprovalRow[]>;
   /** The workspace's social channels (social_channels). */
   channels: () => Promise<Channel[]>;
@@ -310,7 +310,7 @@ export async function disconnectSocial(b: Record<string, unknown>, d: Disconnect
   return { status: 200, body: { ok: true } };
 }
 
-/** One post inside an approval of Aphrodite's, as the approval card shows it. */
+/** One post inside an approval of Leo's, as the approval card shows it. */
 export type ReviewPost = { index: number | null; text: string; at: string | null; best: boolean; channelIds: string[]; mode: "draft" | "schedule" | "now" | "queue"; media: number };
 
 const MODES = new Set(["draft", "schedule", "now", "queue"]);

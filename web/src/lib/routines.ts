@@ -1,4 +1,4 @@
-// Routines: a teammate does the same job on a schedule, like "every Monday at 8am, Aphrodite plans the week's posts".
+// Routines: a teammate does the same job on a schedule, like "every Monday at 8am, Leo plans the week's posts".
 // Pure, so the Routines page, the server and the tests share one set of rules. Ported from the old app's routines
 // routes and scheduler (app/server.js runRoutine and tick()), with the table in supabase/014_routines_skills_memory.sql.
 // Which minute is due is decided in SQL (due_routines), in each workspace's own time zone.

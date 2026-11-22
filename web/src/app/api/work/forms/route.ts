@@ -3,8 +3,8 @@ import { formsData } from "@/lib/formsWorkServer";
 import { routeError } from "@/lib/routeError";
 import { adminClient, roleGate } from "@/lib/serverAuth";
 
-// Hora's Calendar tab (src/components/Meetings.tsx, src/lib/formsWork.ts).
-// GET ?workspaceId&from&to: meetings from Google Calendar or Calendly, and Hora's waiting invites (viewers and up).
+// Cleo's Calendar tab (src/components/Meetings.tsx, src/lib/formsWork.ts).
+// GET ?workspaceId&from&to: meetings from Google Calendar or Calendly, and Cleo's waiting invites (viewers and up).
 // POST { workspaceId, action: "cancel" | "move", source, id, start?, end? }: the person's own change (editors and up).
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;

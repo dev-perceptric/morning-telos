@@ -35,10 +35,10 @@ test("trialPill: trial days, ended trial, nothing on paid or internal plans", ()
 });
 
 test("homeIdeas: SEO and social ideas wait for their product", () => {
-  const ideas = ["@Artemis how is our AI visibility?", "@Aphrodite plan posts", "@Hephaestus outline a page", "@Iris write an email", "What can my team do?"];
-  assert.deepEqual(homeIdeas(ideas, { arrowsterr: false, capybaroar: false }), ["@Iris write an email", "What can my team do?"]);
+  const ideas = ["@Theseus how is our AI visibility?", "@Leo plan posts", "@Archon outline a page", "@Cyrus write an email", "What can my team do?"];
+  assert.deepEqual(homeIdeas(ideas, { arrowsterr: false, capybaroar: false }), ["@Cyrus write an email", "What can my team do?"]);
   assert.deepEqual(homeIdeas(ideas, { arrowsterr: true, capybaroar: true }, 3), ideas.slice(0, 3));
-  assert.deepEqual(homeIdeas(ideas, { arrowsterr: false, capybaroar: true }), ["@Aphrodite plan posts", "@Iris write an email", "What can my team do?"]);
+  assert.deepEqual(homeIdeas(ideas, { arrowsterr: false, capybaroar: true }), ["@Leo plan posts", "@Cyrus write an email", "What can my team do?"]);
 });
 
 const ALL_APPS = ["gmail", "outlook", "googlecalendar", "calendly", "slack", "shopify", "framer", "webflow", "wordpress_com"];
@@ -105,11 +105,11 @@ test("showSlackBanner: owners and admins, Slack ready here, not connected, not d
 test("paletteMatch: every typed word must match", () => {
   const items: PaletteItem[] = [
     { label: "Home", group: "Pages", path: "/" },
-    { label: "Artemis, SEO Specialist", group: "Teammates", path: "/team/seo" },
+    { label: "Theseus, SEO Specialist", group: "Teammates", path: "/team/seo" },
     { label: "How visible are we", group: "Chats", path: "/chat/1", keywords: "seo" },
   ];
   assert.equal(paletteMatch(items, "").length, 3);
   assert.deepEqual(paletteMatch(items, "seo").map((i) => i.path), ["/team/seo", "/chat/1"]);
-  assert.deepEqual(paletteMatch(items, "artemis  seo").map((i) => i.path), ["/team/seo"]);
+  assert.deepEqual(paletteMatch(items, "theseus  seo").map((i) => i.path), ["/team/seo"]);
   assert.deepEqual(paletteMatch(items, "zzz"), []);
 });

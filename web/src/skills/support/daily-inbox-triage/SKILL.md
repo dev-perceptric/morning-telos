@@ -18,7 +18,7 @@ Every new customer message is sorted, the easy ones are answered, and nothing ur
 - app_search_actions: shows the connected email, help desk and chat apps and their actions.
 - app_action: reads new messages and tickets, and sends replies or a Slack note after the owner approves.
 - search_knowledge: the answers and the tone.
-- handoff: gives sales leads to Hermes and booking requests to Hora.
+- handoff: gives sales leads to Midas and booking requests to Cleo.
 
 ## Steps
 1. Check the apps with app_search_actions. If none is connected, say to connect Gmail, Outlook, Zendesk or Help Scout in Settings, Apps, and stop.
@@ -26,7 +26,7 @@ Every new customer message is sorted, the easy ones are answered, and nothing ur
 3. Sort each one: answer now, needs the owner, sales lead, booking, or nothing to do.
 4. Needs the owner: refunds, legal or medical questions, and angry customers. List them first, with who, what and why. Send nothing to them.
 5. Answer now: write each reply from search_knowledge and send it with app_action. They wait for the owner's approval.
-6. Hand sales leads to Hermes and booking requests to Hora with handoff.
+6. Hand sales leads to Midas and booking requests to Cleo with handoff.
 
 ## Output
 - One line with the counts per group.
